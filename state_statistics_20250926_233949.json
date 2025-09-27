@@ -1,0 +1,679 @@
+{
+  "AL": {
+    "state_code": "AL",
+    "state_name": "Alabama",
+    "total_properties": 7,
+    "avg_price": 215714,
+    "min_price": 60000,
+    "max_price": 470000,
+    "cities": [
+      "Montgomery",
+      "Mobile",
+      "Birmingham"
+    ],
+    "city_count": 3
+  },
+  "AK": {
+    "state_code": "AK",
+    "state_name": "Alaska",
+    "total_properties": 2,
+    "avg_price": 222500,
+    "min_price": 195000,
+    "max_price": 250000,
+    "cities": [
+      "Anchorage"
+    ],
+    "city_count": 1
+  },
+  "AZ": {
+    "state_code": "AZ",
+    "state_name": "Arizona",
+    "total_properties": 4,
+    "avg_price": 201250,
+    "min_price": 150000,
+    "max_price": 285000,
+    "cities": [
+      "Phoenix",
+      "Tucson",
+      "Mesa"
+    ],
+    "city_count": 3
+  },
+  "AR": {
+    "state_code": "AR",
+    "state_name": "Arkansas",
+    "total_properties": 3,
+    "avg_price": 280000,
+    "min_price": 220000,
+    "max_price": 360000,
+    "cities": [
+      "Little Rock"
+    ],
+    "city_count": 1
+  },
+  "CA": {
+    "state_code": "CA",
+    "state_name": "California",
+    "total_properties": 2,
+    "avg_price": 330000,
+    "min_price": 205000,
+    "max_price": 455000,
+    "cities": [
+      "Sacramento",
+      "Los Angeles"
+    ],
+    "city_count": 2
+  },
+  "CO": {
+    "state_code": "CO",
+    "state_name": "Colorado",
+    "total_properties": 2,
+    "avg_price": 170000,
+    "min_price": 135000,
+    "max_price": 205000,
+    "cities": [
+      "Colorado Springs"
+    ],
+    "city_count": 1
+  },
+  "CT": {
+    "state_code": "CT",
+    "state_name": "Connecticut",
+    "total_properties": 4,
+    "avg_price": 248750,
+    "min_price": 140000,
+    "max_price": 500000,
+    "cities": [
+      "Bridgeport",
+      "New Haven",
+      "Hartford"
+    ],
+    "city_count": 3
+  },
+  "DE": {
+    "state_code": "DE",
+    "state_name": "Delaware",
+    "total_properties": 5,
+    "avg_price": 186000,
+    "min_price": 80000,
+    "max_price": 340000,
+    "cities": [
+      "Dover"
+    ],
+    "city_count": 1
+  },
+  "DC": {
+    "state_code": "DC",
+    "state_name": "District of Columbia",
+    "total_properties": 6,
+    "avg_price": 166666,
+    "min_price": 140000,
+    "max_price": 240000,
+    "cities": [
+      "Washington"
+    ],
+    "city_count": 1
+  },
+  "FL": {
+    "state_code": "FL",
+    "state_name": "Florida",
+    "total_properties": 7,
+    "avg_price": 313571,
+    "min_price": 185000,
+    "max_price": 490000,
+    "cities": [
+      "Orlando",
+      "Jacksonville",
+      "Tampa"
+    ],
+    "city_count": 3
+  },
+  "GA": {
+    "state_code": "GA",
+    "state_name": "Georgia",
+    "total_properties": 2,
+    "avg_price": 242500,
+    "min_price": 140000,
+    "max_price": 345000,
+    "cities": [
+      "Augusta",
+      "Columbus"
+    ],
+    "city_count": 2
+  },
+  "HI": {
+    "state_code": "HI",
+    "state_name": "Hawaii",
+    "total_properties": 6,
+    "avg_price": 283333,
+    "min_price": 150000,
+    "max_price": 585000,
+    "cities": [
+      "Hilo",
+      "Honolulu"
+    ],
+    "city_count": 2
+  },
+  "ID": {
+    "state_code": "ID",
+    "state_name": "Idaho",
+    "total_properties": 3,
+    "avg_price": 198333,
+    "min_price": 145000,
+    "max_price": 300000,
+    "cities": [
+      "Nampa"
+    ],
+    "city_count": 1
+  },
+  "IL": {
+    "state_code": "IL",
+    "state_name": "Illinois",
+    "total_properties": 2,
+    "avg_price": 265000,
+    "min_price": 115000,
+    "max_price": 415000,
+    "cities": [
+      "Springfield",
+      "Chicago"
+    ],
+    "city_count": 2
+  },
+  "IN": {
+    "state_code": "IN",
+    "state_name": "Indiana",
+    "total_properties": 4,
+    "avg_price": 383750,
+    "min_price": 245000,
+    "max_price": 660000,
+    "cities": [
+      "Fort Wayne",
+      "Evansville"
+    ],
+    "city_count": 2
+  },
+  "IA": {
+    "state_code": "IA",
+    "state_name": "Iowa",
+    "total_properties": 3,
+    "avg_price": 263333,
+    "min_price": 85000,
+    "max_price": 400000,
+    "cities": [
+      "Cedar Rapids",
+      "Des Moines"
+    ],
+    "city_count": 2
+  },
+  "KS": {
+    "state_code": "KS",
+    "state_name": "Kansas",
+    "total_properties": 2,
+    "avg_price": 180000,
+    "min_price": 140000,
+    "max_price": 220000,
+    "cities": [
+      "Overland Park"
+    ],
+    "city_count": 1
+  },
+  "KY": {
+    "state_code": "KY",
+    "state_name": "Kentucky",
+    "total_properties": 4,
+    "avg_price": 137500,
+    "min_price": 110000,
+    "max_price": 190000,
+    "cities": [
+      "Lexington",
+      "Louisville"
+    ],
+    "city_count": 2
+  },
+  "LA": {
+    "state_code": "LA",
+    "state_name": "Louisiana",
+    "total_properties": 2,
+    "avg_price": 162500,
+    "min_price": 145000,
+    "max_price": 180000,
+    "cities": [
+      "Baton Rouge",
+      "New Orleans"
+    ],
+    "city_count": 2
+  },
+  "ME": {
+    "state_code": "ME",
+    "state_name": "Maine",
+    "total_properties": 4,
+    "avg_price": 200000,
+    "min_price": 125000,
+    "max_price": 310000,
+    "cities": [
+      "Lewiston",
+      "Portland"
+    ],
+    "city_count": 2
+  },
+  "MD": {
+    "state_code": "MD",
+    "state_name": "Maryland",
+    "total_properties": 6,
+    "avg_price": 318333,
+    "min_price": 120000,
+    "max_price": 605000,
+    "cities": [
+      "Baltimore",
+      "Annapolis"
+    ],
+    "city_count": 2
+  },
+  "MA": {
+    "state_code": "MA",
+    "state_name": "Massachusetts",
+    "total_properties": 6,
+    "avg_price": 320000,
+    "min_price": 125000,
+    "max_price": 465000,
+    "cities": [
+      "Springfield",
+      "Worcester"
+    ],
+    "city_count": 2
+  },
+  "MI": {
+    "state_code": "MI",
+    "state_name": "Michigan",
+    "total_properties": 3,
+    "avg_price": 385000,
+    "min_price": 180000,
+    "max_price": 660000,
+    "cities": [
+      "Warren",
+      "Detroit",
+      "Grand Rapids"
+    ],
+    "city_count": 3
+  },
+  "MN": {
+    "state_code": "MN",
+    "state_name": "Minnesota",
+    "total_properties": 4,
+    "avg_price": 140000,
+    "min_price": 90000,
+    "max_price": 225000,
+    "cities": [
+      "Minneapolis",
+      "Saint Paul"
+    ],
+    "city_count": 2
+  },
+  "MS": {
+    "state_code": "MS",
+    "state_name": "Mississippi",
+    "total_properties": 4,
+    "avg_price": 202500,
+    "min_price": 115000,
+    "max_price": 250000,
+    "cities": [
+      "Gulfport",
+      "Jackson"
+    ],
+    "city_count": 2
+  },
+  "MO": {
+    "state_code": "MO",
+    "state_name": "Missouri",
+    "total_properties": 3,
+    "avg_price": 181666,
+    "min_price": 140000,
+    "max_price": 260000,
+    "cities": [
+      "Springfield",
+      "St. Louis",
+      "Kansas City"
+    ],
+    "city_count": 3
+  },
+  "MT": {
+    "state_code": "MT",
+    "state_name": "Montana",
+    "total_properties": 4,
+    "avg_price": 273750,
+    "min_price": 150000,
+    "max_price": 405000,
+    "cities": [
+      "Missoula",
+      "Billings"
+    ],
+    "city_count": 2
+  },
+  "NE": {
+    "state_code": "NE",
+    "state_name": "Nebraska",
+    "total_properties": 4,
+    "avg_price": 196250,
+    "min_price": 160000,
+    "max_price": 280000,
+    "cities": [
+      "Omaha",
+      "Lincoln"
+    ],
+    "city_count": 2
+  },
+  "NV": {
+    "state_code": "NV",
+    "state_name": "Nevada",
+    "total_properties": 5,
+    "avg_price": 187000,
+    "min_price": 130000,
+    "max_price": 255000,
+    "cities": [
+      "Las Vegas",
+      "Reno"
+    ],
+    "city_count": 2
+  },
+  "NH": {
+    "state_code": "NH",
+    "state_name": "New Hampshire",
+    "total_properties": 4,
+    "avg_price": 162500,
+    "min_price": 80000,
+    "max_price": 295000,
+    "cities": [
+      "Nashua",
+      "Manchester"
+    ],
+    "city_count": 2
+  },
+  "NJ": {
+    "state_code": "NJ",
+    "state_name": "New Jersey",
+    "total_properties": 8,
+    "avg_price": 350000,
+    "min_price": 125000,
+    "max_price": 545000,
+    "cities": [
+      "Paterson",
+      "Newark"
+    ],
+    "city_count": 2
+  },
+  "NM": {
+    "state_code": "NM",
+    "state_name": "New Mexico",
+    "total_properties": 2,
+    "avg_price": 280000,
+    "min_price": 175000,
+    "max_price": 385000,
+    "cities": [
+      "Las Cruces",
+      "Albuquerque"
+    ],
+    "city_count": 2
+  },
+  "NY": {
+    "state_code": "NY",
+    "state_name": "New York",
+    "total_properties": 2,
+    "avg_price": 167500,
+    "min_price": 125000,
+    "max_price": 210000,
+    "cities": [
+      "Syracuse",
+      "Buffalo"
+    ],
+    "city_count": 2
+  },
+  "NC": {
+    "state_code": "NC",
+    "state_name": "North Carolina",
+    "total_properties": 3,
+    "avg_price": 183333,
+    "min_price": 175000,
+    "max_price": 190000,
+    "cities": [
+      "Raleigh",
+      "Greensboro"
+    ],
+    "city_count": 2
+  },
+  "ND": {
+    "state_code": "ND",
+    "state_name": "North Dakota",
+    "total_properties": 4,
+    "avg_price": 235000,
+    "min_price": 175000,
+    "max_price": 325000,
+    "cities": [
+      "Bismarck",
+      "Fargo"
+    ],
+    "city_count": 2
+  },
+  "OH": {
+    "state_code": "OH",
+    "state_name": "Ohio",
+    "total_properties": 5,
+    "avg_price": 231000,
+    "min_price": 120000,
+    "max_price": 510000,
+    "cities": [
+      "Columbus",
+      "Cincinnati",
+      "Cleveland"
+    ],
+    "city_count": 3
+  },
+  "OK": {
+    "state_code": "OK",
+    "state_name": "Oklahoma",
+    "total_properties": 4,
+    "avg_price": 202500,
+    "min_price": 160000,
+    "max_price": 265000,
+    "cities": [
+      "Oklahoma City"
+    ],
+    "city_count": 1
+  },
+  "OR": {
+    "state_code": "OR",
+    "state_name": "Oregon",
+    "total_properties": 4,
+    "avg_price": 243750,
+    "min_price": 85000,
+    "max_price": 460000,
+    "cities": [
+      "Salem",
+      "Eugene",
+      "Portland"
+    ],
+    "city_count": 3
+  },
+  "PA": {
+    "state_code": "PA",
+    "state_name": "Pennsylvania",
+    "total_properties": 3,
+    "avg_price": 205000,
+    "min_price": 140000,
+    "max_price": 270000,
+    "cities": [
+      "Philadelphia",
+      "Allentown"
+    ],
+    "city_count": 2
+  },
+  "PR": {
+    "state_code": "PR",
+    "state_name": "Puerto Rico",
+    "total_properties": 2,
+    "avg_price": 272500,
+    "min_price": 200000,
+    "max_price": 345000,
+    "cities": [
+      "Bayam\u00f3n",
+      "San Juan"
+    ],
+    "city_count": 2
+  },
+  "RI": {
+    "state_code": "RI",
+    "state_name": "Rhode Island",
+    "total_properties": 5,
+    "avg_price": 199000,
+    "min_price": 85000,
+    "max_price": 350000,
+    "cities": [
+      "Providence",
+      "Warwick"
+    ],
+    "city_count": 2
+  },
+  "SC": {
+    "state_code": "SC",
+    "state_name": "South Carolina",
+    "total_properties": 5,
+    "avg_price": 206000,
+    "min_price": 175000,
+    "max_price": 245000,
+    "cities": [
+      "Charleston",
+      "Columbia"
+    ],
+    "city_count": 2
+  },
+  "SD": {
+    "state_code": "SD",
+    "state_name": "South Dakota",
+    "total_properties": 2,
+    "avg_price": 190000,
+    "min_price": 185000,
+    "max_price": 195000,
+    "cities": [
+      "Sioux Falls",
+      "Rapid City"
+    ],
+    "city_count": 2
+  },
+  "TN": {
+    "state_code": "TN",
+    "state_name": "Tennessee",
+    "total_properties": 2,
+    "avg_price": 207500,
+    "min_price": 165000,
+    "max_price": 250000,
+    "cities": [
+      "Knoxville",
+      "Memphis"
+    ],
+    "city_count": 2
+  },
+  "TX": {
+    "state_code": "TX",
+    "state_name": "Texas",
+    "total_properties": 5,
+    "avg_price": 186000,
+    "min_price": 90000,
+    "max_price": 320000,
+    "cities": [
+      "Austin",
+      "San Antonio",
+      "Dallas",
+      "Houston"
+    ],
+    "city_count": 4
+  },
+  "UT": {
+    "state_code": "UT",
+    "state_name": "Utah",
+    "total_properties": 3,
+    "avg_price": 185000,
+    "min_price": 170000,
+    "max_price": 210000,
+    "cities": [
+      "West Valley City",
+      "Salt Lake City"
+    ],
+    "city_count": 2
+  },
+  "VT": {
+    "state_code": "VT",
+    "state_name": "Vermont",
+    "total_properties": 3,
+    "avg_price": 211666,
+    "min_price": 135000,
+    "max_price": 255000,
+    "cities": [
+      "Burlington"
+    ],
+    "city_count": 1
+  },
+  "VA": {
+    "state_code": "VA",
+    "state_name": "Virginia",
+    "total_properties": 3,
+    "avg_price": 186666,
+    "min_price": 120000,
+    "max_price": 255000,
+    "cities": [
+      "Norfolk",
+      "Virginia Beach",
+      "Richmond"
+    ],
+    "city_count": 3
+  },
+  "WA": {
+    "state_code": "WA",
+    "state_name": "Washington",
+    "total_properties": 5,
+    "avg_price": 258000,
+    "min_price": 195000,
+    "max_price": 280000,
+    "cities": [
+      "Spokane",
+      "Tacoma"
+    ],
+    "city_count": 2
+  },
+  "WV": {
+    "state_code": "WV",
+    "state_name": "West Virginia",
+    "total_properties": 5,
+    "avg_price": 168000,
+    "min_price": 135000,
+    "max_price": 205000,
+    "cities": [
+      "Huntington",
+      "Charleston"
+    ],
+    "city_count": 2
+  },
+  "WI": {
+    "state_code": "WI",
+    "state_name": "Wisconsin",
+    "total_properties": 5,
+    "avg_price": 273000,
+    "min_price": 135000,
+    "max_price": 410000,
+    "cities": [
+      "Milwaukee",
+      "Madison"
+    ],
+    "city_count": 2
+  },
+  "WY": {
+    "state_code": "WY",
+    "state_name": "Wyoming",
+    "total_properties": 3,
+    "avg_price": 211666,
+    "min_price": 140000,
+    "max_price": 335000,
+    "cities": [
+      "Casper"
+    ],
+    "city_count": 1
+  }
+}

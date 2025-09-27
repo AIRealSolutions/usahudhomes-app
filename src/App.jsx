@@ -1,21 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { Badge } from '@/components/ui/badge.jsx'
-import { Search, Home, MapPin, DollarSign, Users, BookOpen, Menu, X, Phone } from 'lucide-react'
+import { Search, Home, MapPin, DollarSign, Users, BookOpen, Menu, X, Phone, LogOut } from 'lucide-react'
 import PropertySearch from './components/PropertySearch.jsx'
 import BrokerDashboard from './components/BrokerDashboard.jsx'
+import Login from './components/Login.jsx'
+import USMap from './components/USMap.jsx'
 import './App.css'
 
 // Header Component
-function Header() {
+function Header({ isAuthenticated, onLogout }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const location = useLocation()
 
   const isActive = (path) => {
     return location.pathname === path
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('isAuthenticated')
+    localStorage.removeItem('userRole')
+    localStorage.removeItem('userEmail')
+    onLogout()
   }
 
   return (
