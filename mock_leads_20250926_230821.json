@@ -1,0 +1,252 @@
+[
+  {
+    "lead_id": "lead-001",
+    "name": "David Miller",
+    "email": "david.miller@email.com",
+    "phone": "(314) 468-8572",
+    "state_of_interest": "NC",
+    "status": "Contacted",
+    "created_at": "2025-09-09T23:08:21.753609",
+    "notes": "Looking in Charlotte metro area"
+  },
+  {
+    "lead_id": "lead-002",
+    "name": "Jennifer Rodriguez",
+    "email": "jennifer.rodriguez@email.com",
+    "phone": "(876) 755-1589",
+    "state_of_interest": "NC",
+    "status": "Active",
+    "created_at": "2025-09-20T23:08:21.753618",
+    "notes": "Interested in properties with large yards"
+  },
+  {
+    "lead_id": "lead-003",
+    "name": "Sarah Thomas",
+    "email": "sarah.thomas@email.com",
+    "phone": "(470) 366-8974",
+    "state_of_interest": "NC",
+    "status": "New",
+    "created_at": "2025-09-14T23:08:21.753626",
+    "notes": "Interested in fixer-upper properties"
+  },
+  {
+    "lead_id": "lead-004",
+    "name": "Robert Jones",
+    "email": "robert.jones@email.com",
+    "phone": "(690) 486-2679",
+    "state_of_interest": "NC",
+    "status": "Contacted",
+    "created_at": "2025-09-02T23:08:21.753632",
+    "notes": "First-time homebuyer, needs guidance"
+  },
+  {
+    "lead_id": "lead-005",
+    "name": "Ashley Taylor",
+    "email": "ashley.taylor@email.com",
+    "phone": "(330) 739-8287",
+    "state_of_interest": "NC",
+    "status": "Contacted",
+    "created_at": "2025-09-17T23:08:21.753639",
+    "notes": "Looking for 3+ bedroom properties"
+  },
+  {
+    "lead_id": "lead-006",
+    "name": "David Williams",
+    "email": "david.williams@email.com",
+    "phone": "(844) 763-5442",
+    "state_of_interest": "NC",
+    "status": "Closed",
+    "created_at": "2025-09-05T23:08:21.753645",
+    "notes": "Interested in properties with large yards"
+  },
+  {
+    "lead_id": "lead-007",
+    "name": "Christopher Miller",
+    "email": "christopher.miller@email.com",
+    "phone": "(668) 661-5276",
+    "state_of_interest": "NC",
+    "status": "Contacted",
+    "created_at": "2025-09-06T23:08:21.753652",
+    "notes": "Looking for 3+ bedroom properties"
+  },
+  {
+    "lead_id": "lead-008",
+    "name": "John Taylor",
+    "email": "john.taylor@email.com",
+    "phone": "(861) 802-1227",
+    "state_of_interest": "NC",
+    "status": "Active",
+    "created_at": "2025-09-21T23:08:21.753661",
+    "notes": "Looking for 3+ bedroom properties"
+  },
+  {
+    "lead_id": "lead-009",
+    "name": "William Gonzalez",
+    "email": "william.gonzalez@email.com",
+    "phone": "(231) 686-8521",
+    "state_of_interest": "NC",
+    "status": "Contacted",
+    "created_at": "2025-09-23T23:08:21.753671",
+    "notes": "Interested in HUD homes under $300k"
+  },
+  {
+    "lead_id": "lead-010",
+    "name": "William Williams",
+    "email": "william.williams@email.com",
+    "phone": "(490) 923-6476",
+    "state_of_interest": "NC",
+    "status": "New",
+    "created_at": "2025-09-24T23:08:21.753677",
+    "notes": "Looking for 3+ bedroom properties"
+  },
+  {
+    "lead_id": "lead-011",
+    "name": "Michael Lopez",
+    "email": "michael.lopez@email.com",
+    "phone": "(401) 853-6196",
+    "state_of_interest": "NC",
+    "status": "Closed",
+    "created_at": "2025-09-05T23:08:21.753684",
+    "notes": "Needs to close within 60 days"
+  },
+  {
+    "lead_id": "lead-012",
+    "name": "Jane Gonzalez",
+    "email": "jane.gonzalez@email.com",
+    "phone": "(688) 997-2630",
+    "state_of_interest": "NC",
+    "status": "Closed",
+    "created_at": "2025-09-20T23:08:21.753690",
+    "notes": "Looking for 3+ bedroom properties"
+  },
+  {
+    "lead_id": "lead-013",
+    "name": "Sarah Johnson",
+    "email": "sarah.johnson@email.com",
+    "phone": "(829) 517-8152",
+    "state_of_interest": "NC",
+    "status": "Active",
+    "created_at": "2025-09-07T23:08:21.753696",
+    "notes": "Interested in HUD homes under $300k"
+  },
+  {
+    "lead_id": "lead-014",
+    "name": "Michelle Brown",
+    "email": "michelle.brown@email.com",
+    "phone": "(224) 360-6854",
+    "state_of_interest": "NC",
+    "status": "New",
+    "created_at": "2025-09-15T23:08:21.753702",
+    "notes": "Looking for 3+ bedroom properties"
+  },
+  {
+    "lead_id": "lead-015",
+    "name": "Stephanie Miller",
+    "email": "stephanie.miller@email.com",
+    "phone": "(945) 634-6695",
+    "state_of_interest": "NC",
+    "status": "New",
+    "created_at": "2025-08-31T23:08:21.753708",
+    "notes": "Needs to close within 60 days"
+  },
+  {
+    "lead_id": "lead-016",
+    "name": "Michael Martin",
+    "email": "michael.martin@email.com",
+    "phone": "(776) 702-4813",
+    "state_of_interest": "NC",
+    "status": "New",
+    "created_at": "2025-09-04T23:08:21.753725",
+    "notes": "Looking for 3+ bedroom properties"
+  },
+  {
+    "lead_id": "lead-017",
+    "name": "Jessica Rodriguez",
+    "email": "jessica.rodriguez@email.com",
+    "phone": "(919) 484-1716",
+    "state_of_interest": "NC",
+    "status": "Active",
+    "created_at": "2025-09-14T23:08:21.753733",
+    "notes": "Looking in Charlotte metro area"
+  },
+  {
+    "lead_id": "lead-018",
+    "name": "Michael Taylor",
+    "email": "michael.taylor@email.com",
+    "phone": "(429) 624-1677",
+    "state_of_interest": "NC",
+    "status": "New",
+    "created_at": "2025-09-04T23:08:21.753739",
+    "notes": "First-time homebuyer, needs guidance"
+  },
+  {
+    "lead_id": "lead-019",
+    "name": "Christopher Hernandez",
+    "email": "christopher.hernandez@email.com",
+    "phone": "(856) 354-9867",
+    "state_of_interest": "NC",
+    "status": "Closed",
+    "created_at": "2025-08-28T23:08:21.753814",
+    "notes": "Looking for 3+ bedroom properties"
+  },
+  {
+    "lead_id": "lead-020",
+    "name": "Thomas Brown",
+    "email": "thomas.brown@email.com",
+    "phone": "(531) 213-1748",
+    "state_of_interest": "NC",
+    "status": "Closed",
+    "created_at": "2025-08-28T23:08:21.753820",
+    "notes": "First-time homebuyer, needs guidance"
+  },
+  {
+    "lead_id": "lead-021",
+    "name": "Lisa Gonzalez",
+    "email": "lisa.gonzalez@email.com",
+    "phone": "(510) 899-6197",
+    "state_of_interest": "NC",
+    "status": "Contacted",
+    "created_at": "2025-08-29T23:08:21.753826",
+    "notes": "First-time homebuyer, needs guidance"
+  },
+  {
+    "lead_id": "lead-022",
+    "name": "John Thomas",
+    "email": "john.thomas@email.com",
+    "phone": "(205) 669-2298",
+    "state_of_interest": "NC",
+    "status": "Active",
+    "created_at": "2025-09-12T23:08:21.753832",
+    "notes": "First-time homebuyer, needs guidance"
+  },
+  {
+    "lead_id": "lead-023",
+    "name": "James Taylor",
+    "email": "james.taylor@email.com",
+    "phone": "(694) 364-1124",
+    "state_of_interest": "NC",
+    "status": "Active",
+    "created_at": "2025-09-09T23:08:21.753855",
+    "notes": "Interested in fixer-upper properties"
+  },
+  {
+    "lead_id": "lead-024",
+    "name": "Jessica Rodriguez",
+    "email": "jessica.rodriguez@email.com",
+    "phone": "(701) 931-9498",
+    "state_of_interest": "NC",
+    "status": "Closed",
+    "created_at": "2025-09-02T23:08:21.753862",
+    "notes": "Looking for 3+ bedroom properties"
+  },
+  {
+    "lead_id": "lead-025",
+    "name": "Stephanie Jackson",
+    "email": "stephanie.jackson@email.com",
+    "phone": "(869) 250-1225",
+    "state_of_interest": "NC",
+    "status": "New",
+    "created_at": "2025-08-28T23:08:21.753868",
+    "notes": "First-time homebuyer, needs guidance"
+  }
+]

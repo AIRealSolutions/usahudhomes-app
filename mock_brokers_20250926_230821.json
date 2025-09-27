@@ -1,0 +1,120 @@
+[
+  {
+    "broker_id": "broker-001",
+    "name": "Jennifer Martinez",
+    "email": "jennifer.martinez@carolinahomegroup.com",
+    "phone": "(954) 742-4320",
+    "company": "Triangle Realty",
+    "license_state": "NC",
+    "coverage_states": [
+      "NC"
+    ],
+    "referral_fee_pct": 25,
+    "hud_registered": true,
+    "created_at": "2025-01-20T23:08:21.753900"
+  },
+  {
+    "broker_id": "broker-002",
+    "name": "Robert Thompson",
+    "email": "robert.thompson@coastalrealestate.com",
+    "phone": "(438) 946-4221",
+    "company": "Mountain View Realty",
+    "license_state": "NC",
+    "coverage_states": [
+      "NC"
+    ],
+    "referral_fee_pct": 30,
+    "hud_registered": true,
+    "created_at": "2025-08-24T23:08:21.753913"
+  },
+  {
+    "broker_id": "broker-003",
+    "name": "Lisa Anderson",
+    "email": "lisa.anderson@heritagerealestate.com",
+    "phone": "(993) 762-4392",
+    "company": "Carolina Home Group",
+    "license_state": "NC",
+    "coverage_states": [
+      "NC"
+    ],
+    "referral_fee_pct": 20,
+    "hud_registered": true,
+    "created_at": "2024-10-13T23:08:21.753923"
+  },
+  {
+    "broker_id": "broker-004",
+    "name": "Michael Johnson",
+    "email": "michael.johnson@carolinahomegroup.com",
+    "phone": "(487) 800-4098",
+    "company": "Lightkeeper Realty",
+    "license_state": "NC",
+    "coverage_states": [
+      "NC",
+      "VA",
+      "TN"
+    ],
+    "referral_fee_pct": 30,
+    "hud_registered": true,
+    "created_at": "2025-02-08T23:08:21.753934"
+  },
+  {
+    "broker_id": "broker-005",
+    "name": "Sarah Williams",
+    "email": "sarah.williams@firstchoicerealty.com",
+    "phone": "(979) 754-8422",
+    "company": "Piedmont Properties",
+    "license_state": "NC",
+    "coverage_states": [
+      "NC",
+      "SC"
+    ],
+    "referral_fee_pct": 30,
+    "hud_registered": true,
+    "created_at": "2024-11-09T23:08:21.753947"
+  },
+  {
+    "broker_id": "broker-006",
+    "name": "David Brown",
+    "email": "david.brown@trianglerealty.com",
+    "phone": "(532) 830-6768",
+    "company": "Heritage Real Estate",
+    "license_state": "NC",
+    "coverage_states": [
+      "NC",
+      "GA"
+    ],
+    "referral_fee_pct": 30,
+    "hud_registered": true,
+    "created_at": "2025-05-25T23:08:21.753958"
+  },
+  {
+    "broker_id": "broker-007",
+    "name": "Amanda Davis",
+    "email": "amanda.davis@lightkeeperrealty.com",
+    "phone": "(238) 285-5586",
+    "company": "Mountain View Realty",
+    "license_state": "NC",
+    "coverage_states": [
+      "NC",
+      "TN"
+    ],
+    "referral_fee_pct": 30,
+    "hud_registered": true,
+    "created_at": "2024-09-30T23:08:21.753968"
+  },
+  {
+    "broker_id": "broker-008",
+    "name": "Christopher Wilson",
+    "email": "christopher.wilson@lightkeeperrealty.com",
+    "phone": "(351) 528-8050",
+    "company": "Triangle Realty",
+    "license_state": "NC",
+    "coverage_states": [
+      "NC",
+      "SC"
+    ],
+    "referral_fee_pct": 20,
+    "hud_registered": true,
+    "created_at": "2024-11-05T23:08:21.753982"
+  }
+]
