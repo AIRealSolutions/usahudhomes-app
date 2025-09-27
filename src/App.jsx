@@ -155,8 +155,45 @@ function Header({ isAuthenticated, onLogout }) {
 }
 
 // Home Page Component
-function HomePage() {
+function HomePage({ stateStats, onStateSelect }) {
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Sample nationwide properties for featured section
+  const featuredProperties = [
+    {
+      id: '387-123456',
+      address: '1234 Sunset Blvd',
+      city: 'Los Angeles',
+      state: 'CA',
+      price: 485000,
+      beds: 3,
+      baths: 2,
+      status: 'New Listing',
+      county: 'Los Angeles County'
+    },
+    {
+      id: '387-789012',
+      address: '567 Broadway',
+      city: 'New York City',
+      state: 'NY',
+      price: 625000,
+      beds: 2,
+      baths: 1,
+      status: 'Price Reduced',
+      county: 'New York County'
+    },
+    {
+      id: '387-345678',
+      address: '890 Ocean Drive',
+      city: 'Miami',
+      state: 'FL',
+      price: 395000,
+      beds: 4,
+      baths: 3,
+      status: 'Available',
+      county: 'Miami-Dade County'
+    }
+  ]
 
   return (
     <div className="min-h-screen bg-white">
@@ -164,10 +201,10 @@ function HomePage() {
       <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            Find Your Dream HUD Home
+            Find HUD Homes Nationwide
           </h1>
           <p className="text-xl md:text-2xl mb-8 text-blue-100">
-            Discover government foreclosure properties at below-market prices nationwide
+            Discover government foreclosure properties at below-market prices across all 50 states, DC, and Puerto Rico
           </p>
           
           <div className="max-w-2xl mx-auto">
@@ -193,7 +230,7 @@ function HomePage() {
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
               <MapPin className="h-4 w-4 mr-1" />
-              North Carolina Focus
+              All 50 States + DC + PR
             </Badge>
             <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
               <DollarSign className="h-4 w-4 mr-1" />
@@ -207,8 +244,20 @@ function HomePage() {
         </div>
       </section>
 
+      {/* Interactive US Map */}
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Explore Properties by State</h2>
+            <p className="text-lg text-gray-600">Click on any state to view available HUD properties in that area</p>
+          </div>
+          
+          <USMap stateStats={stateStats} onStateSelect={onStateSelect} />
+        </div>
+      </section>
+
       {/* Featured Properties */}
-      <FeaturedProperties />
+      <FeaturedProperties properties={featuredProperties} />
 
       {/* Lead Capture Form */}
       <LeadCaptureForm />
@@ -220,7 +269,63 @@ function HomePage() {
 }
 
 // Featured Properties Component
-function FeaturedProperties() {
+function FeaturedProperties({ properties }) {
+  return (
+    <section className="py-16 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured HUD Properties</h2>
+          <p className="text-lg text-gray-600">Discover available HUD homes across the United States</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {properties.map((property) => (
+            <Card key={property.id} className="hover:shadow-lg transition-shadow">
+              <div className="h-48 bg-gradient-to-br from-gray-200 to-gray-300 rounded-t-lg flex items-center justify-center">
+                <Home className="h-16 w-16 text-gray-400" />
+              </div>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <CardTitle className="text-lg">{property.address}</CardTitle>
+                  <Badge variant={property.status === 'New Listing' ? 'default' : 'secondary'}>
+                    {property.status}
+                  </Badge>
+                </div>
+                <CardDescription>
+                  {property.city}, {property.state} • {property.county}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-2xl font-bold text-green-600">
+                    ${property.price.toLocaleString()}
+                  </span>
+                  <span className="text-sm text-gray-500">Case #{property.id}</span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-600 mb-4">
+                  <span>{property.beds} beds</span>
+                  <span>{property.baths} baths</span>
+                </div>
+                <Button className="w-full">View Details & Submit Interest</Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="text-center mt-12">
+          <Link to="/search">
+            <Button variant="outline" size="lg">
+              View All Properties
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// Legacy Featured Properties Component (keeping for compatibility)
+function LegacyFeaturedProperties() {
   const sampleProperties = [
     {
       id: '387-069497',
