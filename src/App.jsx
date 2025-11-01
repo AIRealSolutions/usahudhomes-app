@@ -9,6 +9,8 @@ import PropertySearch from './components/PropertySearch.jsx'
 import BrokerDashboard from './components/BrokerDashboard.jsx'
 import Login from './components/Login.jsx'
 import USMap from './components/USMap.jsx'
+import PropertyDetail from './components/PropertyDetail.jsx'
+import PropertyConsultation from './components/PropertyConsultation.jsx'
 import './App.css'
 
 // Header Component
@@ -64,25 +66,43 @@ function Header({ isAuthenticated, onLogout }) {
             >
               Learn About HUD
             </Link>
-            <Link 
-              to="/broker-dashboard" 
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                isActive('/broker-dashboard') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
-              }`}
-            >
-              Broker Dashboard
-            </Link>
+            {isAuthenticated ? (
+              <Link 
+                to="/broker-dashboard" 
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive('/broker-dashboard') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
+                }`}
+              >
+                Broker Dashboard
+              </Link>
+            ) : (
+              <Link 
+                to="/login" 
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive('/login') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
+                }`}
+              >
+                Login
+              </Link>
+            )}
           </nav>
 
           {/* Contact Info */}
-          <div className="hidden lg:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-4">
             <div className="flex items-center text-sm text-gray-600">
               <Phone className="h-4 w-4 mr-1" />
               (910) 363-6147
             </div>
-            <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
-              Get Connected
-            </Button>
+            {isAuthenticated ? (
+              <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
+                <LogOut className="h-4 w-4" />
+                Logout
+              </Button>
+            ) : (
+              <Button className="bg-orange-500 hover:bg-orange-600">
+                Get Connected
+              </Button>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -306,7 +326,9 @@ function FeaturedProperties({ properties }) {
                   <span>{property.beds} beds</span>
                   <span>{property.baths} baths</span>
                 </div>
-                <Button className="w-full">View Details & Submit Interest</Button>
+                <Link to={`/property/${property.id}`}>
+                  <Button className="w-full">View Details & Submit Interest</Button>
+                </Link>
               </CardContent>
             </Card>
           ))}
@@ -398,7 +420,9 @@ function LegacyFeaturedProperties() {
                   <span>{property.beds} beds</span>
                   <span>{property.baths} baths</span>
                 </div>
-                <Button className="w-full">View Details & Submit Interest</Button>
+                <Link to={`/property/${property.id}`}>
+                  <Button className="w-full">View Details & Submit Interest</Button>
+                </Link>
               </CardContent>
             </Card>
           ))}
@@ -696,16 +720,81 @@ function Footer() {
 
 // Main App Component
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [userRole, setUserRole] = useState(null)
+  const [stateStats, setStateStats] = useState({})
+
+  useEffect(() => {
+    // Check for existing authentication
+    const authStatus = localStorage.getItem('isAuthenticated')
+    const role = localStorage.getItem('userRole')
+    
+    if (authStatus === 'true') {
+      setIsAuthenticated(true)
+      setUserRole(role)
+    }
+
+    // Load mock state statistics
+    loadStateStats()
+  }, [])
+
+  const loadStateStats = async () => {
+    // Mock state statistics - in real app, this would come from API
+    const mockStats = {
+      'CA': { total_properties: 8, avg_price: 485000, min_price: 350000, max_price: 750000, cities: ['Los Angeles', 'San Francisco', 'San Diego'] },
+      'NY': { total_properties: 6, avg_price: 625000, min_price: 450000, max_price: 900000, cities: ['New York City', 'Buffalo', 'Albany'] },
+      'FL': { total_properties: 7, avg_price: 395000, min_price: 280000, max_price: 650000, cities: ['Miami', 'Orlando', 'Tampa'] },
+      'TX': { total_properties: 9, avg_price: 320000, min_price: 180000, max_price: 550000, cities: ['Houston', 'Dallas', 'Austin'] },
+      'NC': { total_properties: 5, avg_price: 285000, min_price: 165000, max_price: 450000, cities: ['Charlotte', 'Raleigh', 'Asheville'] },
+      'GA': { total_properties: 4, avg_price: 245000, min_price: 145000, max_price: 380000, cities: ['Atlanta', 'Savannah', 'Augusta'] },
+      'AZ': { total_properties: 3, avg_price: 365000, min_price: 220000, max_price: 520000, cities: ['Phoenix', 'Tucson', 'Scottsdale'] },
+      'NV': { total_properties: 2, avg_price: 425000, min_price: 285000, max_price: 565000, cities: ['Las Vegas', 'Reno'] },
+      'CO': { total_properties: 3, avg_price: 445000, min_price: 320000, max_price: 620000, cities: ['Denver', 'Boulder', 'Colorado Springs'] },
+      'WA': { total_properties: 4, avg_price: 565000, min_price: 385000, max_price: 785000, cities: ['Seattle', 'Spokane', 'Tacoma'] }
+    }
+    setStateStats(mockStats)
+  }
+
+  const handleLogin = (email, role) => {
+    setIsAuthenticated(true)
+    setUserRole(role)
+    localStorage.setItem('isAuthenticated', 'true')
+    localStorage.setItem('userRole', role)
+    localStorage.setItem('userEmail', email)
+  }
+
+  const handleLogout = () => {
+    setIsAuthenticated(false)
+    setUserRole(null)
+    localStorage.removeItem('isAuthenticated')
+    localStorage.removeItem('userRole')
+    localStorage.removeItem('userEmail')
+  }
+
+  const handleStateSelect = (state) => {
+    // Navigate to search page with state filter
+    window.location.href = `/search?state=${state.code}`
+  }
+
   return (
     <Router>
       <div className="min-h-screen bg-white">
-        <Header />
+        <Header isAuthenticated={isAuthenticated} onLogout={handleLogout} />
         <main>
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<HomePage stateStats={stateStats} onStateSelect={handleStateSelect} />} />
             <Route path="/search" element={<PropertySearch />} />
+            <Route path="/property/:propertyId" element={<PropertyDetail />} />
+            <Route path="/consult/:caseNumber" element={<PropertyConsultation />} />
             <Route path="/learn" element={<LearnPage />} />
-            <Route path="/broker-dashboard" element={<BrokerDashboard />} />
+            <Route path="/login" element={<Login onLogin={handleLogin} />} />
+            <Route path="/broker-dashboard" element={
+              isAuthenticated ? (
+                <BrokerDashboard userRole={userRole} />
+              ) : (
+                <Login onLogin={handleLogin} redirectTo="/broker-dashboard" />
+              )
+            } />
           </Routes>
         </main>
         <Footer />
