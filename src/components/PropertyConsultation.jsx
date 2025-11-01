@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import propertyDatabase from '../services/propertyDatabase.js'
+import { EnhancedPropertyDatabase } from '../services/enhancedPropertyDatabase.js'
 import chatbotService from '../services/chatbotService.js'
 import consultationService from '../services/consultationService.js'
 import { useParams, Link } from 'react-router-dom'
@@ -52,7 +52,7 @@ function PropertyConsultation() {
 
   // Load property from database service
   const loadProperty = () => {
-    const foundProperty = propertyDatabase.getProperty(caseNumber)
+    const foundProperty = EnhancedPropertyDatabase.getPropertyByCase(caseNumber) || fallbackPropertyDatabase[caseNumber]
     setProperty(foundProperty)
     setLoading(false)
   }
@@ -319,7 +319,7 @@ function PropertyConsultation() {
                 {property.status}
               </Badge>
               <div className="text-sm text-gray-600">
-                Case #{property.id}
+                Case #{property.caseNumber}
               </div>
             </div>
           </div>
@@ -371,11 +371,24 @@ function PropertyConsultation() {
             <Card>
               <CardContent className="p-0">
                 <div className="relative">
-                  <div className="aspect-video bg-gradient-to-br from-gray-200 to-gray-300 rounded-t-lg flex items-center justify-center">
-                    <div className="text-center">
-                      <Camera className="h-16 w-16 text-gray-400 mx-auto mb-2" />
-                      <p className="text-gray-500 font-semibold">Professional Property Photos</p>
-                      <p className="text-sm text-gray-400">Multiple interior and exterior views available</p>
+                  <div className="aspect-video bg-gradient-to-br from-gray-200 to-gray-300 rounded-t-lg overflow-hidden">
+                    {property.images && property.images[0] ? (
+                      <img 
+                        src={property.images[0]} 
+                        alt={`${property.address} - Main View`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <div className="w-full h-full flex items-center justify-center" style={{display: property.images && property.images[0] ? 'none' : 'flex'}}>
+                      <div className="text-center">
+                        <Camera className="h-16 w-16 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-500 font-semibold">Professional Property Photos</p>
+                        <p className="text-sm text-gray-400">Multiple interior and exterior views available</p>
+                      </div>
                     </div>
                   </div>
                 </div>
