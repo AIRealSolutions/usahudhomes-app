@@ -854,6 +854,7 @@ function App() {
             <Route path="/" element={<HomePage stateStats={stateStats} onStateSelect={handleStateSelect} />} />
             <Route path="/search" element={<PropertySearch />} />
             <Route path="/property/:propertyId" element={<PropertyDetail />} />
+            <Route path="/consult/:caseNumber" element={<PropertyConsultation />} />
             <Route path="/customer/:customerId" element={<CustomerDetail />} />
             <Route path="/leads" element={<LeadsManagement />} />
             <Route path="/lead/:leadId" element={<LeadDetail />} />            <Route path="/login" element={<Login onLogin={handleLogin} />} />
