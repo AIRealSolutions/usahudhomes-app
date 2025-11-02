@@ -1,7 +1,4 @@
 import { useState, useEffect } from 'react'
-import { RealHudDatabase } from '../services/realHudDatabase.js'
-import chatbotService from '../services/chatbotService.js'
-import consultationService from '../services/consultationService.js'
 import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
@@ -24,12 +21,132 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Camera,
-  FileText,
-  Calculator,
-  Shield,
-  Star
+  Camera
 } from 'lucide-react'
+
+// Real HUD Property Database
+const RealHudProperties = {
+  '387-111612': {
+    caseNumber: '387-111612',
+    address: '80 Prong Creek Ln',
+    city: 'Yanceyville',
+    state: 'NC',
+    zipCode: '27379',
+    county: 'Caswell County',
+    price: 544000,
+    bedrooms: 3,
+    bathrooms: 2,
+    sqFt: 3073,
+    lotSize: '5.52 acres',
+    yearBuilt: 2005,
+    status: 'BIDS OPEN',
+    bidDeadline: '2025-11-03T23:59:59',
+    propertyType: 'Single Family Home',
+    description: 'Beautiful single-family home on 5.52 acres in Caswell County. This spacious property features 3 bedrooms, 2 bathrooms, and 3,073 square feet of living space.',
+    images: ['/property-images/387-111612.jpeg'],
+    amenities: {
+      indoor: ['Fireplace', 'Open Floor Plan', 'Master Suite', 'Walk-in Closets'],
+      outdoor: ['Patio/Deck', 'Porch', 'Large Lot'],
+      parking: 'Garage (2 spaces)'
+    }
+  },
+  '387-570372': {
+    caseNumber: '387-570372',
+    address: '2105 Fathom Way',
+    city: 'Charlotte',
+    state: 'NC',
+    zipCode: '28269',
+    county: 'Mecklenburg County',
+    price: 365000,
+    bedrooms: 4,
+    bathrooms: 2.1,
+    sqFt: 2850,
+    lotSize: '0.25 acres',
+    yearBuilt: 2008,
+    status: 'BIDS OPEN',
+    bidDeadline: '2025-11-03T23:59:59',
+    propertyType: 'Single Family Home',
+    description: 'Modern two-story home in desirable Charlotte neighborhood. Features 4 bedrooms, 2.1 bathrooms, and 2,850 square feet of well-designed living space.',
+    images: ['/property-images/387-570372.jpeg'],
+    amenities: {
+      indoor: ['Modern Kitchen', 'Family Room', 'Master Suite', 'Hardwood Floors'],
+      outdoor: ['Back Deck', 'Fenced Yard'],
+      parking: 'Attached Garage (2 spaces)'
+    }
+  },
+  '387-412268': {
+    caseNumber: '387-412268',
+    address: '162 Black Horse Ln',
+    city: 'Kittrell',
+    state: 'NC',
+    zipCode: '27544',
+    county: 'Vance County',
+    price: 336150,
+    bedrooms: 3,
+    bathrooms: 3,
+    sqFt: 2650,
+    lotSize: '1.8 acres',
+    yearBuilt: 2001,
+    status: 'PRICE REDUCED',
+    bidDeadline: '2025-11-03T23:59:59',
+    propertyType: 'Single Family Home',
+    description: 'Elegant two-story home on 1.8 acres in Vance County. Features 3 bedrooms, 3 bathrooms, and 2,650 square feet with quality construction.',
+    images: ['/property-images/387-412268.jpeg'],
+    amenities: {
+      indoor: ['Formal Dining Room', 'Family Room', 'Master Suite'],
+      outdoor: ['Front Porch', 'Private Setting', 'Mature Trees'],
+      parking: 'Attached Garage (2 spaces)'
+    }
+  },
+  '381-799288': {
+    caseNumber: '381-799288',
+    address: '3009 Wynston Way',
+    city: 'Clayton',
+    state: 'NC',
+    zipCode: '27520',
+    county: 'Johnston County',
+    price: 310500,
+    bedrooms: 3,
+    bathrooms: 2,
+    sqFt: 2200,
+    lotSize: '0.3 acres',
+    yearBuilt: 2015,
+    status: 'BIDS OPEN',
+    bidDeadline: '2025-11-03T23:59:59',
+    propertyType: 'Single Family Home',
+    description: 'Clean single-story ranch home in Johnston County. Features 3 bedrooms, 2 bathrooms, and 2,200 square feet with modern styling.',
+    images: ['/property-images/381-799288.jpeg'],
+    amenities: {
+      indoor: ['Open Floor Plan', 'Modern Kitchen', 'Master Suite'],
+      outdoor: ['Back Patio', 'Landscaped Yard'],
+      parking: 'Attached Garage (2 spaces)'
+    }
+  },
+  '482-521006': {
+    caseNumber: '482-521006',
+    address: '1234 Main St',
+    city: 'Mc Kenzie',
+    state: 'TN',
+    zipCode: '38201',
+    county: 'Carroll County',
+    price: 147200,
+    bedrooms: 4,
+    bathrooms: 2,
+    sqFt: 2400,
+    lotSize: '0.5 acres',
+    yearBuilt: 1995,
+    status: 'PRICE REDUCED',
+    bidDeadline: '2025-11-03T23:59:59',
+    propertyType: 'Single Family Home',
+    description: 'Spacious four-bedroom home in Carroll County, Tennessee. Features 4 bedrooms, 2 bathrooms, and 2,400 square feet at an excellent price.',
+    images: ['/property-images/482-521006.jpeg'],
+    amenities: {
+      indoor: ['Large Living Room', 'Dining Room', 'Four Bedrooms'],
+      outdoor: ['Front Porch', 'Large Lot'],
+      parking: 'Carport'
+    }
+  }
+};
 
 function PropertyConsultation() {
   const { caseNumber } = useParams()
@@ -38,197 +155,67 @@ function PropertyConsultation() {
   const [showContactForm, setShowContactForm] = useState(false)
   const [showChatbot, setShowChatbot] = useState(false)
   const [chatMessages, setChatMessages] = useState([])
-  const [quickResponses, setQuickResponses] = useState([])
-  const [urgencyMessage, setUrgencyMessage] = useState(null)
   const [currentMessage, setCurrentMessage] = useState('')
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
     phone: '',
     message: '',
-    consultationType: 'general',
-    preferredContact: 'phone'
+    consultationType: 'general'
   })
 
-  // Load property from database service
-  const loadProperty = () => {
-    const foundProperty = RealHudDatabase.getPropertyByCase(caseNumber)
+  useEffect(() => {
+    // Load property data
+    const foundProperty = RealHudProperties[caseNumber]
     setProperty(foundProperty)
     setLoading(false)
-  }
 
-  // Mock property database for fallback - in real app, this would come from API/database
-  const fallbackPropertyDatabase = {
-    '387-111612': {
-      id: '387-111612',
-      address: '80 Prong Creek Ln',
-      city: 'Yanceyville',
-      state: 'NC',
-      zipCode: '27379',
-      county: 'Caswell County',
-      price: 544000,
-      originalPrice: 544000,
-      bedrooms: 3,
-      bathrooms: 2,
-      sqFt: 3073,
-      lotSize: '5.52 acres',
-      floors: '1.5 Floors',
-      totalRooms: 9,
-      yearBuilt: 2005,
-      status: 'BIDS OPEN',
-      bidDeadline: '2025-11-03T23:59:59',
-      listingDate: '2025-09-23',
-      listingPeriod: 'Extended',
-      propertyType: 'Single Family Home',
-      hoaFees: 0,
-      fhaFinancing: 'IN (Insured)',
-      eligible203k: true,
-      fha100Down: true,
-      floodZone: 'X',
-      description: 'Beautiful single-family home on 5.52 acres in Caswell County. This spacious property features 3 bedrooms, 2 bathrooms, and 3,073 square feet of living space. Built in 2005, the home offers modern amenities while maintaining a rural charm.',
-      amenities: {
-        indoor: ['Fireplace', 'Open Floor Plan', 'Master Suite', 'Walk-in Closets'],
-        outdoor: ['Patio/Deck', 'Porch', 'Pool/Spa', 'Large Lot'],
-        parking: 'Garage (2 spaces)',
-        foundation: 'Basement (Partial)'
-      },
-      images: property.images || ['/property-images/' + caseNumber + '.jpeg'],
-      assetManager: {
-        name: 'RAINE CUSTOMER SERVICE',
-        email: 'INFO@RAINECOMPANIES.COM',
-        company: 'RAINE & COMPANY LLC',
-        website: 'WWW.RAINECOMPANY.COM',
-        address: '3575 PIEDMONT RD NE BUILDING 15 SUTE L-120 ATLANTA GA. 30305'
-      },
-      listingBroker: {
-        name: 'TRACEY G SHROUDER',
-        email: 'SELLWITH360@YAHOO.COM',
-        company: '360 REALTY',
-        address: '3329 OWLS ROOST ROAD GREENSBORO NC 27410'
-      },
-      fieldServiceManager: {
-        name: 'EDDIE SAN ROMAN',
-        email: 'E.SANROMAN@24ASSET.COM',
-        company: '24 ASSET MANAGEMENT CORP',
-        website: 'WWW.24ASSET.COM',
-        address: '13155 SW 42 ST. SUITE 200 MIAMI FL. 33175'
-      }
-    },
-    '387-597497': {
-      id: '387-597497',
-      address: '3054 Burney Rd',
-      city: 'Bladenboro',
-      state: 'NC',
-      zipCode: '28320',
-      county: 'Bladen County',
-      price: 472000,
-      originalPrice: 472000,
-      beds: 3,
-      baths: 3.1,
-      sqft: 2850,
-      lotSize: '2.1 acres',
-      floors: '2 Floors',
-      totalRooms: 8,
-      yearBuilt: 1998,
-      status: 'BIDS OPEN',
-      bidDeadline: '2025-11-03T23:59:59',
-      listingDate: '2025-09-20',
-      listingPeriod: 'Extended',
-      propertyType: 'Single Family Home',
-      hoaFees: 0,
-      fhaFinancing: 'IN (Insured)',
-      eligible203k: true,
-      fha100Down: true,
-      floodZone: 'X',
-      description: 'Elegant two-story home on 2.1 acres in Bladen County. Features 3 bedrooms, 3.1 bathrooms, and 2,850 square feet of well-designed living space. Built in 1998 with quality construction and modern updates.',
-      amenities: {
-        indoor: ['Formal Dining Room', 'Family Room', 'Master Suite', 'Hardwood Floors'],
-        outdoor: ['Front Porch', 'Back Deck', 'Mature Trees', 'Private Setting'],
-        parking: 'Attached Garage (2 spaces)',
-        foundation: 'Crawl Space'
-      },
-      images: [
-        '/api/placeholder/800/600',
-        '/api/placeholder/800/600',
-        '/api/placeholder/800/600'
-      ],
-      assetManager: {
-        name: 'RAINE CUSTOMER SERVICE',
-        email: 'INFO@RAINECOMPANIES.COM',
-        company: 'RAINE & COMPANY LLC',
-        website: 'WWW.RAINECOMPANY.COM',
-        address: '3575 PIEDMONT RD NE BUILDING 15 SUTE L-120 ATLANTA GA. 30305'
-      }
-    }
-  }
-
-  useEffect(() => {
-    // Load property data from database service
-    setTimeout(() => {
-      loadProperty()
-    }, 500)
-  }, [caseNumber])
-
-  useEffect(() => {
-    // Initialize chatbot when property loads
-    if (property) {
-      const greeting = chatbotService.generateResponse('hello', property)
+    // Initialize chatbot
+    if (foundProperty) {
       setChatMessages([{
         type: 'bot',
-        message: greeting,
+        message: `Hello! I'm here to help you with the ${foundProperty.address} property in ${foundProperty.city}, ${foundProperty.state}. This ${foundProperty.bedrooms} bedroom, ${foundProperty.bathrooms} bathroom home is priced at $${foundProperty.price.toLocaleString()}. What would you like to know?`,
         timestamp: new Date()
       }])
-      
-      setQuickResponses(chatbotService.getQuickResponses(property))
-      setUrgencyMessage(chatbotService.getUrgencyMessage(property))
     }
-  }, [property])
+  }, [caseNumber])
 
   const handleContactSubmit = async (e) => {
     e.preventDefault()
     
-    // Validate form data
-    const validation = consultationService.validateFormData(contactForm)
-    if (!validation.isValid) {
-      alert('Please correct the following errors:\n' + validation.errors.join('\n'))
+    if (!contactForm.name || !contactForm.email || !contactForm.phone) {
+      alert('Please fill in all required fields.')
       return
     }
 
-    try {
-      // Submit consultation request
-      const consultation = await consultationService.submitConsultation(contactForm, property)
-      
-      alert(`Thank you ${contactForm.name}! Your consultation request has been submitted.\n\nMarc Spencer from Lightkeeper Realty will contact you within 2 hours during business hours.\n\nConsultation ID: ${consultation.id}`)
-      
-      setShowContactForm(false)
-      setContactForm({ 
-        name: '', 
-        email: '', 
-        phone: '', 
-        message: '', 
-        consultationType: 'general',
-        preferredContact: 'phone'
-      })
-    } catch (error) {
-      console.error('Error submitting consultation:', error)
-      alert('There was an error submitting your request. Please try again or call (910) 363-6147 directly.')
-    }
+    // Simulate form submission
+    alert(`Thank you ${contactForm.name}! Your consultation request has been submitted for property ${caseNumber}. Marc Spencer from Lightkeeper Realty will contact you within 2 hours during business hours.`)
+    
+    setShowContactForm(false)
+    setContactForm({ name: '', email: '', phone: '', message: '', consultationType: 'general' })
   }
 
   const handleChatSubmit = (e) => {
     e.preventDefault()
     if (!currentMessage.trim()) return
 
-    // Add user message
     const userMessage = {
       type: 'user',
       message: currentMessage,
       timestamp: new Date()
     }
 
-    // Generate intelligent bot response using chatbot service
-    const botResponse = chatbotService.generateResponse(currentMessage, property)
+    // Simple bot responses
+    let botResponse = "I'd be happy to help you with that! For detailed information about this property, please contact Marc Spencer at (910) 363-6147 or submit the consultation form."
     
+    if (currentMessage.toLowerCase().includes('price')) {
+      botResponse = `This property is priced at $${property.price.toLocaleString()}. As a HUD home, it may be available with special financing options including $100 down FHA loans and up to 3% closing cost assistance.`
+    } else if (currentMessage.toLowerCase().includes('financing')) {
+      botResponse = "Great question! HUD homes offer special financing benefits including $100 down FHA loans, 3% closing cost paid, and repair escrows up to $35,000 with a 203k loan. Marc Spencer can explain all your financing options."
+    } else if (currentMessage.toLowerCase().includes('bid')) {
+      botResponse = `The bid deadline for this property is November 3, 2025. Don't wait - contact Marc Spencer immediately at (910) 363-6147 to get your bid submitted. As a HUD-registered broker, he can guide you through the entire bidding process.`
+    }
+
     const botMessage = {
       type: 'bot',
       message: botResponse,
@@ -237,9 +224,6 @@ function PropertyConsultation() {
 
     setChatMessages(prev => [...prev, userMessage, botMessage])
     setCurrentMessage('')
-    
-    // Update quick responses based on conversation
-    setQuickResponses(chatbotService.getQuickResponses(property))
   }
 
   if (loading) {
@@ -425,342 +409,171 @@ function PropertyConsultation() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Financing Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calculator className="h-5 w-5 text-blue-600" />
-                  Financing & Incentives
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Shield className="h-5 w-5 text-green-600" />
-                        <span className="font-semibold text-green-800">Owner-Occupant Benefits</span>
-                      </div>
-                      <ul className="text-sm text-green-700 space-y-1">
-                        <li>• $100 Down Payment (FHA)</li>
-                        <li>• 3% Closing Cost Assistance</li>
-                        <li>• First Right of Refusal</li>
-                      </ul>
-                    </div>
-                    
-                    {property.eligible203k && (
-                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileText className="h-5 w-5 text-blue-600" />
-                          <span className="font-semibold text-blue-800">203k Renovation Loan</span>
-                        </div>
-                        <p className="text-sm text-blue-700">
-                          Finance up to $35,000 in repairs and improvements into your mortgage.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">FHA Financing:</span>
-                      <span className="font-semibold">{property.fhaFinancing}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">203k Eligible:</span>
-                      <span className="font-semibold">{property.eligible203k ? 'Yes' : 'No'}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">$100 Down Eligible:</span>
-                      <span className="font-semibold">{property.fha100Down ? 'Yes' : 'No'}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">HOA Fees:</span>
-                      <span className="font-semibold">${property.hoaFees}/month</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Consultation CTA */}
-            <Card className="border-blue-200 bg-blue-50">
+            {/* Marc Spencer Contact Card */}
+            <Card className="bg-blue-50 border-blue-200">
               <CardHeader>
-                <CardTitle className="text-blue-800">Get Expert Consultation</CardTitle>
-                <CardDescription className="text-blue-700">
-                  Speak with Marc Spencer, HUD specialist with 25+ years experience
-                </CardDescription>
+                <CardTitle className="flex items-center gap-2 text-blue-900">
+                  <User className="h-5 w-5" />
+                  Your HUD Home Expert
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2 text-blue-800">
-                  <Star className="h-4 w-4 fill-current" />
-                  <span className="text-sm font-medium">Registered HUD Buyer's Agency</span>
-                </div>
-                <div className="flex items-center gap-2 text-blue-800">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="text-sm">Free consultation & bid assistance</span>
-                </div>
-                <div className="flex items-center gap-2 text-blue-800">
-                  <Clock className="h-4 w-4" />
-                  <span className="text-sm">Response within 2 hours</span>
+              <CardContent>
+                <div className="text-center mb-4">
+                  <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <User className="h-10 w-10 text-white" />
+                  </div>
+                  <h3 className="font-bold text-lg text-blue-900">Marc Spencer</h3>
+                  <p className="text-blue-700 text-sm">HUD Specialist</p>
+                  <p className="text-blue-600 text-xs">25+ years helping people buy HUD homes</p>
                 </div>
                 
-                <div className="pt-2 space-y-2">
-                  <Button 
-                    className="w-full bg-blue-600 hover:bg-blue-700" 
-                    onClick={() => setShowContactForm(true)}
-                  >
-                    <Phone className="h-4 w-4 mr-2" />
-                    Schedule Consultation
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-blue-300 text-blue-700 hover:bg-blue-100"
-                    onClick={() => setShowChatbot(true)}
-                  >
-                    <MessageCircle className="h-4 w-4 mr-2" />
-                    Chat About Property
-                  </Button>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="h-4 w-4 text-blue-600" />
+                    <span className="font-semibold">(910) 363-6147</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Mail className="h-4 w-4 text-blue-600" />
+                    <span>marcspencer28461@gmail.com</span>
+                  </div>
+                  <div className="text-xs text-blue-600">
+                    <strong>Lightkeeper Realty</strong><br />
+                    Registered HUD Buyer's Agency
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Bid Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Bid Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="flex items-center gap-2 text-yellow-800 mb-1">
-                    <Calendar className="h-4 w-4" />
-                    <span className="font-semibold">Bid Deadline</span>
+                <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
+                  <div className="text-xs text-blue-700 mb-2">
+                    <strong>Free consultation & bid assistance</strong>
                   </div>
-                  <div className="text-sm text-yellow-700">
-                    {new Date(property.bidDeadline).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </div>
-                  <div className="text-xs text-yellow-600 mt-1">
-                    11:59 PM Central Time
-                  </div>
-                </div>
-                
-                <div className="text-sm text-gray-600 space-y-2">
-                  <div className="flex justify-between">
-                    <span>Listed:</span>
-                    <span>{new Date(property.listingDate).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Period:</span>
-                    <span>{property.listingPeriod}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Property Type:</span>
-                    <span>{property.propertyType}</span>
+                  <div className="text-xs text-blue-600">
+                    • Response within 2 hours<br />
+                    • $100 down FHA loans available<br />
+                    • 3% closing cost assistance<br />
+                    • Up to $35,000 repair escrows
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Contact Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Lightkeeper Realty</CardTitle>
-                <CardDescription>Your HUD Home Specialists</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">Marc Spencer, Broker</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">(910) 363-6147</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">marcspencer28461@gmail.com</span>
-                </div>
-                <div className="text-xs text-gray-500 mt-3">
-                  "Helping people bid on HUD homes for 25 years"
-                </div>
-              </CardContent>
-            </Card>
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              <Button 
+                onClick={() => setShowContactForm(true)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3"
+                size="lg"
+              >
+                <Calendar className="h-5 w-5 mr-2" />
+                Schedule Consultation
+              </Button>
+              
+              <Button 
+                onClick={() => setShowChatbot(true)}
+                variant="outline"
+                className="w-full border-pink-300 text-pink-700 hover:bg-pink-50 py-3"
+                size="lg"
+              >
+                <MessageCircle className="h-5 w-5 mr-2" />
+                Chat About Property
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Contact Form Modal */}
-      {showContactForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Schedule Consultation</h2>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setShowContactForm(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              
+        {/* Contact Form Modal */}
+        {showContactForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <h3 className="text-lg font-bold mb-4">Schedule Property Consultation</h3>
               <form onSubmit={handleContactSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Full Name *</label>
-                  <Input
-                    value={contactForm.name}
-                    onChange={(e) => setContactForm({...contactForm, name: e.target.value})}
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-1">Email Address *</label>
-                  <Input
-                    type="email"
-                    value={contactForm.email}
-                    onChange={(e) => setContactForm({...contactForm, email: e.target.value})}
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-1">Phone Number *</label>
-                  <Input
-                    type="tel"
-                    value={contactForm.phone}
-                    onChange={(e) => setContactForm({...contactForm, phone: e.target.value})}
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-1">Consultation Type</label>
-                  <select
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    value={contactForm.consultationType}
-                    onChange={(e) => setContactForm({...contactForm, consultationType: e.target.value})}
-                  >
-                    <option value="general">General Information</option>
-                    <option value="financing">Financing Options</option>
-                    <option value="bidding">Bidding Process</option>
-                    <option value="inspection">Property Inspection</option>
-                    <option value="203k">203k Renovation Loan</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-1">Preferred Contact Method</label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        value="phone"
-                        checked={contactForm.preferredContact === 'phone'}
-                        onChange={(e) => setContactForm({...contactForm, preferredContact: e.target.value})}
-                        className="mr-2"
-                      />
-                      Phone
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        value="email"
-                        checked={contactForm.preferredContact === 'email'}
-                        onChange={(e) => setContactForm({...contactForm, preferredContact: e.target.value})}
-                        className="mr-2"
-                      />
-                      Email
-                    </label>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-1">Message (Optional)</label>
-                  <Textarea
-                    value={contactForm.message}
-                    onChange={(e) => setContactForm({...contactForm, message: e.target.value})}
-                    rows={3}
-                    placeholder="Any specific questions about this property?"
-                  />
-                </div>
-                
-                <div className="flex gap-2 pt-4">
-                  <Button type="submit" className="flex-1">
-                    Schedule Consultation
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setShowContactForm(false)}
-                  >
+                <Input
+                  placeholder="Full Name *"
+                  value={contactForm.name}
+                  onChange={(e) => setContactForm({...contactForm, name: e.target.value})}
+                  required
+                />
+                <Input
+                  type="email"
+                  placeholder="Email Address *"
+                  value={contactForm.email}
+                  onChange={(e) => setContactForm({...contactForm, email: e.target.value})}
+                  required
+                />
+                <Input
+                  type="tel"
+                  placeholder="Phone Number *"
+                  value={contactForm.phone}
+                  onChange={(e) => setContactForm({...contactForm, phone: e.target.value})}
+                  required
+                />
+                <select 
+                  className="w-full p-2 border rounded"
+                  value={contactForm.consultationType}
+                  onChange={(e) => setContactForm({...contactForm, consultationType: e.target.value})}
+                >
+                  <option value="general">General Consultation</option>
+                  <option value="financing">Financing Options</option>
+                  <option value="bidding">Bidding Process</option>
+                  <option value="inspection">Property Inspection</option>
+                  <option value="203k">203k Renovation Loan</option>
+                </select>
+                <Textarea
+                  placeholder="Additional questions or comments..."
+                  value={contactForm.message}
+                  onChange={(e) => setContactForm({...contactForm, message: e.target.value})}
+                  rows={3}
+                />
+                <div className="flex gap-2">
+                  <Button type="submit" className="flex-1">Submit Request</Button>
+                  <Button type="button" variant="outline" onClick={() => setShowContactForm(false)}>
                     Cancel
                   </Button>
                 </div>
               </form>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Chatbot Modal */}
-      {showChatbot && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-lg w-full h-[600px] flex flex-col">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h2 className="text-lg font-bold">Property Assistant</h2>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setShowChatbot(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {chatMessages.map((msg, index) => (
-                <div key={index} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] p-3 rounded-lg ${
-                    msg.type === 'user' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    <p className="text-sm">{msg.message}</p>
-                    <p className="text-xs opacity-70 mt-1">
-                      {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+        {/* Chatbot Modal */}
+        {showChatbot && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-md w-full h-96 flex flex-col">
+              <div className="p-4 border-b flex justify-between items-center">
+                <h3 className="font-bold">Property Chat Assistant</h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowChatbot(false)}>×</Button>
+              </div>
+              
+              <div className="flex-1 p-4 overflow-y-auto space-y-3">
+                {chatMessages.map((msg, index) => (
+                  <div key={index} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-xs p-3 rounded-lg text-sm ${
+                      msg.type === 'user' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {msg.message}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-            
-            <form onSubmit={handleChatSubmit} className="p-4 border-t">
-              <div className="flex gap-2">
+                ))}
+              </div>
+              
+              <form onSubmit={handleChatSubmit} className="p-4 border-t flex gap-2">
                 <Input
+                  placeholder="Ask about this property..."
                   value={currentMessage}
                   onChange={(e) => setCurrentMessage(e.target.value)}
-                  placeholder="Ask about this property..."
                   className="flex-1"
                 />
-                <Button type="submit" size="sm">
-                  <MessageCircle className="h-4 w-4" />
-                </Button>
-              </div>
-            </form>
+                <Button type="submit" size="sm">Send</Button>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
