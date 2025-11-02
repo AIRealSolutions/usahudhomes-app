@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { EnhancedPropertyDatabase } from '../services/enhancedPropertyDatabase.js'
+import RealHudDatabase from '../services/realHudDatabase.js'
 import chatbotService from '../services/chatbotService.js'
 import consultationService from '../services/consultationService.js'
 import { useParams, Link } from 'react-router-dom'
@@ -52,7 +52,7 @@ function PropertyConsultation() {
 
   // Load property from database service
   const loadProperty = () => {
-    const foundProperty = EnhancedPropertyDatabase.getPropertyByCase(caseNumber) || fallbackPropertyDatabase[caseNumber]
+    const foundProperty = RealHudDatabase.getPropertyByCase(caseNumber)
     setProperty(foundProperty)
     setLoading(false)
   }
@@ -68,9 +68,9 @@ function PropertyConsultation() {
       county: 'Caswell County',
       price: 544000,
       originalPrice: 544000,
-      beds: 3,
-      baths: 2,
-      sqft: 3073,
+      bedrooms: 3,
+      bathrooms: 2,
+      sqFt: 3073,
       lotSize: '5.52 acres',
       floors: '1.5 Floors',
       totalRooms: 9,
@@ -92,12 +92,7 @@ function PropertyConsultation() {
         parking: 'Garage (2 spaces)',
         foundation: 'Basement (Partial)'
       },
-      images: [
-        '/api/placeholder/800/600',
-        '/api/placeholder/800/600',
-        '/api/placeholder/800/600',
-        '/api/placeholder/800/600'
-      ],
+      images: property.images || ['/property-images/' + caseNumber + '.jpeg'],
       assetManager: {
         name: 'RAINE CUSTOMER SERVICE',
         email: 'INFO@RAINECOMPANIES.COM',
@@ -343,17 +338,17 @@ function PropertyConsultation() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <Bed className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-              <div className="font-semibold">{property.beds}</div>
+              <div className="font-semibold">{property.bedrooms}</div>
               <div className="text-sm text-gray-600">Bedrooms</div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <Bath className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-              <div className="font-semibold">{property.baths}</div>
+              <div className="font-semibold">{property.bathrooms}</div>
               <div className="text-sm text-gray-600">Bathrooms</div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <Square className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-              <div className="font-semibold">{property.sqft.toLocaleString()}</div>
+              <div className="font-semibold">{property.sqFt.toLocaleString()}</div>
               <div className="text-sm text-gray-600">Sq Ft</div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
