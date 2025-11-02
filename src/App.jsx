@@ -14,6 +14,7 @@ import PropertyConsultation from './components/PropertyConsultation.jsx'
 import CustomerDetail from './components/CustomerDetail.jsx'
 import LeadsManagement from './components/LeadsManagement.jsx'
 import LeadDetail from './components/LeadDetail.jsx'
+import propertyManagement from './services/propertyManagement.js'
 import './App.css'
 
 // Header Component
@@ -180,9 +181,16 @@ function Header({ isAuthenticated, onLogout }) {
 // Home Page Component
 function HomePage({ stateStats, onStateSelect }) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [featuredProperties, setFeaturedProperties] = useState([])
 
-  // Real HUD properties from NC and TN database
-  const featuredProperties = [
+  useEffect(() => {
+    // Load properties from propertyManagement service
+    const properties = propertyManagement.getAllProperties()
+    setFeaturedProperties(properties.slice(0, 6)) // Show first 6 properties
+  }, [])
+
+  // Backup static properties (will be replaced by dynamic data)
+  const staticProperties = [
     {
       id: '387-111612',
       caseNumber: '387-111612',

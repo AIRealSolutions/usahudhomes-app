@@ -18,8 +18,12 @@ import {
   AlertCircle,
   Home,
   Filter,
-  Download
+  Download,
+  Settings
 } from 'lucide-react'
+import PropertyAdmin from './admin/PropertyAdmin.jsx'
+import CustomerAdmin from './admin/CustomerAdmin.jsx'
+import AgentAdmin from './admin/AgentAdmin.jsx'
 
 const BrokerDashboard = () => {
   const [leads, setLeads] = useState([])
@@ -265,9 +269,13 @@ const BrokerDashboard = () => {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="leads" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="leads">Lead Management</TabsTrigger>
           <TabsTrigger value="referrals">Referral Tracking</TabsTrigger>
+          <TabsTrigger value="admin">
+            <Settings className="h-4 w-4 mr-2" />
+            Admin Panel
+          </TabsTrigger>
         </TabsList>
 
         {/* Leads Tab */}
@@ -459,6 +467,29 @@ const BrokerDashboard = () => {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Admin Panel Tab */}
+        <TabsContent value="admin" className="space-y-6">
+          <Tabs defaultValue="properties" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="properties">Properties</TabsTrigger>
+              <TabsTrigger value="customers">Customers</TabsTrigger>
+              <TabsTrigger value="agents">Agents</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="properties">
+              <PropertyAdmin />
+            </TabsContent>
+
+            <TabsContent value="customers">
+              <CustomerAdmin />
+            </TabsContent>
+
+            <TabsContent value="agents">
+              <AgentAdmin />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>

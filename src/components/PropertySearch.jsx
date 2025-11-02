@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react'
+import propertyManagement from '../services/propertyManagement.js'
 
 const PropertySearch = () => {
   const [searchQuery, setSearchQuery] = useState('')
@@ -118,14 +119,18 @@ const PropertySearch = () => {
   ]
 
   useEffect(() => {
-    setProperties(sampleProperties)
+    // Load properties from propertyManagement service
+    const allProperties = propertyManagement.getAllProperties()
+    setProperties(allProperties)
   }, [])
 
   const handleSearch = () => {
     setLoading(true)
-    // Simulate API call
+    // Get all properties from service
+    const allProperties = propertyManagement.getAllProperties()
+    
     setTimeout(() => {
-      let filtered = sampleProperties.filter(property => {
+      let filtered = allProperties.filter(property => {
         const matchesQuery = !searchQuery || 
           property.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
           property.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
