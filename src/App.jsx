@@ -178,40 +178,87 @@ function Header({ isAuthenticated, onLogout }) {
 function HomePage({ stateStats, onStateSelect }) {
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Sample nationwide properties for featured section
+  // Real HUD properties from NC and TN database
   const featuredProperties = [
     {
-      id: '387-123456',
-      address: '1234 Sunset Blvd',
-      city: 'Los Angeles',
-      state: 'CA',
-      price: 485000,
+      id: '387-111612',
+      caseNumber: '387-111612',
+      address: '80 Prong Creek Ln',
+      city: 'Yanceyville',
+      state: 'NC',
+      price: 544000,
       beds: 3,
       baths: 2,
-      status: 'New Listing',
-      county: 'Los Angeles County'
+      status: 'BIDS OPEN',
+      county: 'Caswell County',
+      sqFt: 3073,
+      lotSize: '5.52 acres',
+      yearBuilt: 2005,
+      image: '/property-images/387-111612.jpeg'
     },
     {
-      id: '387-789012',
-      address: '567 Broadway',
-      city: 'New York City',
-      state: 'NY',
-      price: 625000,
-      beds: 2,
-      baths: 1,
-      status: 'Price Reduced',
-      county: 'New York County'
-    },
-    {
-      id: '387-345678',
-      address: '890 Ocean Drive',
-      city: 'Miami',
-      state: 'FL',
-      price: 395000,
+      id: '387-570372',
+      caseNumber: '387-570372',
+      address: '2105 Fathom Way',
+      city: 'Charlotte',
+      state: 'NC',
+      price: 365000,
       beds: 4,
+      baths: 2.1,
+      status: 'BIDS OPEN',
+      county: 'Mecklenburg County',
+      sqFt: 2850,
+      lotSize: '0.25 acres',
+      yearBuilt: 2008,
+      image: '/property-images/387-570372.jpeg'
+    },
+    {
+      id: '387-412268',
+      caseNumber: '387-412268',
+      address: '162 Black Horse Ln',
+      city: 'Kittrell',
+      state: 'NC',
+      price: 336150,
+      beds: 3,
       baths: 3,
-      status: 'Available',
-      county: 'Miami-Dade County'
+      status: 'PRICE REDUCED',
+      county: 'Vance County',
+      sqFt: 2650,
+      lotSize: '1.8 acres',
+      yearBuilt: 2001,
+      image: '/property-images/387-412268.jpeg'
+    },
+    {
+      id: '381-799288',
+      caseNumber: '381-799288',
+      address: '3009 Wynston Way',
+      city: 'Clayton',
+      state: 'NC',
+      price: 310500,
+      beds: 3,
+      baths: 2,
+      status: 'BIDS OPEN',
+      county: 'Johnston County',
+      sqFt: 2200,
+      lotSize: '0.3 acres',
+      yearBuilt: 2015,
+      image: '/property-images/381-799288.jpeg'
+    },
+    {
+      id: '482-521006',
+      caseNumber: '482-521006',
+      address: '1234 Main St',
+      city: 'Mc Kenzie',
+      state: 'TN',
+      price: 147200,
+      beds: 4,
+      baths: 2,
+      status: 'PRICE REDUCED',
+      county: 'Carroll County',
+      sqFt: 2400,
+      lotSize: '0.5 acres',
+      yearBuilt: 1995,
+      image: '/property-images/482-521006.jpeg'
     }
   ]
 
@@ -295,19 +342,32 @@ function FeaturedProperties({ properties }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured HUD Properties</h2>
-          <p className="text-lg text-gray-600">Discover available HUD homes across the United States</p>
+          <p className="text-lg text-gray-600">Real HUD properties available now in North Carolina and Tennessee</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {properties.map((property) => (
             <Card key={property.id} className="hover:shadow-lg transition-shadow">
-              <div className="h-48 bg-gradient-to-br from-gray-200 to-gray-300 rounded-t-lg flex items-center justify-center">
-                <Home className="h-16 w-16 text-gray-400" />
+              <div className="h-48 bg-gradient-to-br from-gray-200 to-gray-300 rounded-t-lg overflow-hidden">
+                {property.image ? (
+                  <img 
+                    src={property.image} 
+                    alt={`${property.address} - ${property.city}, ${property.state}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div className="w-full h-full flex items-center justify-center" style={{display: property.image ? 'none' : 'flex'}}>
+                  <Home className="h-16 w-16 text-gray-400" />
+                </div>
               </div>
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-lg">{property.address}</CardTitle>
-                  <Badge variant={property.status === 'New Listing' ? 'default' : 'secondary'}>
+                  <Badge variant={property.status === 'PRICE REDUCED' ? 'destructive' : property.status === 'BIDS OPEN' ? 'default' : 'secondary'}>
                     {property.status}
                   </Badge>
                 </div>
@@ -320,14 +380,20 @@ function FeaturedProperties({ properties }) {
                   <span className="text-2xl font-bold text-green-600">
                     ${property.price.toLocaleString()}
                   </span>
-                  <span className="text-sm text-gray-500">Case #{property.id}</span>
+                  <span className="text-sm text-gray-500">Case #{property.caseNumber}</span>
                 </div>
-                <div className="flex justify-between text-sm text-gray-600 mb-4">
+                <div className="grid grid-cols-3 gap-2 text-sm text-gray-600 mb-4">
                   <span>{property.beds} beds</span>
                   <span>{property.baths} baths</span>
+                  <span>{property.sqFt?.toLocaleString()} sq ft</span>
                 </div>
-                <Link to={`/property/${property.id}`}>
-                  <Button className="w-full">View Details & Submit Interest</Button>
+                <div className="text-xs text-gray-500 mb-4">
+                  Built {property.yearBuilt} • {property.lotSize}
+                </div>
+                <Link to={`/consult/${property.caseNumber}`}>
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                    View Details & Schedule Consultation
+                  </Button>
                 </Link>
               </CardContent>
             </Card>
