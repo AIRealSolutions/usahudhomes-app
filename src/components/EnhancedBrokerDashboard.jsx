@@ -1,638 +1,532 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Badge } from '@/components/ui/badge.jsx'
 import { Input } from '@/components/ui/input.jsx'
-import { Textarea } from '@/components/ui/textarea.jsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx'
 import { 
-  Users, 
-  DollarSign, 
-  TrendingUp, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Calendar,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  Home,
-  Filter,
-  Download,
-  Search,
-  Plus,
-  Eye,
-  MessageSquare,
-  Send,
-  RefreshCw
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, PieChart, Pie, Cell, Area, AreaChart
+} from 'recharts'
+import {
+  Users, Home, TrendingUp, DollarSign, Phone, Mail, Calendar,
+  Search, Filter, Plus, Eye, Edit, MessageSquare, Bell,
+  Activity, Target, Award, Clock, MapPin, Star,
+  ArrowUp, ArrowDown, MoreHorizontal, Download,
+  Briefcase, FileText, Settings, LogOut
 } from 'lucide-react'
-import customerDB from '../services/customerDatabase.js'
-import emailService from '../services/emailService.js'
+import customerDatabase from '../services/customerDatabase.js'
+import { brokerNetwork } from '../services/brokerNetwork.js'
 
-const EnhancedBrokerDashboard = () => {
-  const [customers, setCustomers] = useState([])
-  const [consultations, setConsultations] = useState([])
-  const [leads, setLeads] = useState([])
-  const [stats, setStats] = useState({})
-  const [emailLogs, setEmailLogs] = useState([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCustomer, setSelectedCustomer] = useState(null)
-  const [newNote, setNewNote] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
+function EnhancedBrokerDashboard({ onLogout }) {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [customers, setCustomers] = useState([])
+  const [leads, setLeads] = useState([])
+  const [consultations, setConsultations] = useState([])
+  const [stats, setStats] = useState({})
+  const [recentActivity, setRecentActivity] = useState([])
 
   useEffect(() => {
     loadDashboardData()
   }, [])
 
   const loadDashboardData = () => {
-    setCustomers(customerDB.getAllCustomers())
-    setConsultations(customerDB.getAllConsultations())
-    setLeads(customerDB.getAllLeads())
-    setStats(customerDB.getDashboardStats())
-    setEmailLogs(emailService.getEmailLogs())
-  }
-
-  const handleAddNote = (customerId) => {
-    if (newNote.trim()) {
-      customerDB.addCustomerNote(customerId, newNote)
-      setNewNote('')
-      loadDashboardData()
-      if (selectedCustomer && selectedCustomer.id === customerId) {
-        setSelectedCustomer(customerDB.getCustomerById(customerId))
-      }
-    }
-  }
-
-  const handleUpdateCustomerStatus = (customerId, status) => {
-    customerDB.updateCustomer(customerId, { status })
-    loadDashboardData()
-    if (selectedCustomer && selectedCustomer.id === customerId) {
-      setSelectedCustomer(customerDB.getCustomerById(customerId))
-    }
-  }
-
-  const handleTestEmail = async () => {
-    const result = await emailService.testEmail()
-    if (result.success) {
-      alert('Test email sent successfully!')
-      loadDashboardData()
-    } else {
-      alert('Failed to send test email: ' + result.error)
-    }
-  }
-
-  const filteredCustomers = searchQuery
-    ? customerDB.searchCustomers(searchQuery)
-    : customers
-
-  const filteredByStatus = filterStatus === 'all' 
-    ? filteredCustomers 
-    : filteredCustomers.filter(customer => customer.status === filterStatus)
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'new': return 'bg-blue-100 text-blue-800'
-      case 'contacted': return 'bg-yellow-100 text-yellow-800'
-      case 'active': return 'bg-green-100 text-green-800'
-      case 'closed': return 'bg-purple-100 text-purple-800'
-      case 'pending': return 'bg-orange-100 text-orange-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'new': return <AlertCircle className="h-4 w-4" />
-      case 'contacted': return <Clock className="h-4 w-4" />
-      case 'active': return <TrendingUp className="h-4 w-4" />
-      case 'closed': return <CheckCircle className="h-4 w-4" />
-      case 'pending': return <Clock className="h-4 w-4" />
-      default: return <Clock className="h-4 w-4" />
-    }
-  }
-
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800'
-      case 'medium': return 'bg-yellow-100 text-yellow-800'
-      case 'normal': return 'bg-green-100 text-green-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount)
-  }
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    // Load customers, leads, and consultations
+    const allCustomers = customerDatabase.customers || []
+    const allLeads = customerDatabase.leads || []
+    const allConsultations = customerDatabase.consultations || []
+    
+    setCustomers(allCustomers)
+    setLeads(allLeads)
+    setConsultations(allConsultations)
+    
+    // Calculate statistics
+    const today = new Date()
+    const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+    
+    const thisMonthLeads = allLeads.filter(lead => new Date(lead.createdAt) >= thisMonth)
+    const lastMonthLeads = allLeads.filter(lead => 
+      new Date(lead.createdAt) >= lastMonth && new Date(lead.createdAt) < thisMonth
+    )
+    
+    const thisMonthCustomers = allCustomers.filter(customer => new Date(customer.createdAt) >= thisMonth)
+    const thisMonthConsultations = allConsultations.filter(consultation => new Date(consultation.createdAt) >= thisMonth)
+    
+    setStats({
+      totalCustomers: allCustomers.length,
+      totalLeads: allLeads.length,
+      totalConsultations: allConsultations.length,
+      thisMonthLeads: thisMonthLeads.length,
+      lastMonthLeads: lastMonthLeads.length,
+      thisMonthCustomers: thisMonthCustomers.length,
+      thisMonthConsultations: thisMonthConsultations.length,
+      conversionRate: allLeads.length > 0 ? ((allCustomers.length / allLeads.length) * 100).toFixed(1) : 0,
+      avgResponseTime: '1.2 hours',
+      activeProperties: 6
     })
+    
+    // Generate recent activity
+    const activities = [
+      ...allLeads.slice(-5).map(lead => ({
+        id: lead.id,
+        type: 'lead',
+        message: `New lead: ${lead.name} interested in ${lead.propertyCase || 'HUD properties'}`,
+        time: lead.createdAt,
+        priority: lead.priority || 'medium'
+      })),
+      ...allConsultations.slice(-5).map(consultation => ({
+        id: consultation.id,
+        type: 'consultation',
+        message: `Consultation request: ${consultation.name} for ${consultation.consultationType}`,
+        time: consultation.createdAt,
+        priority: consultation.priority || 'medium'
+      }))
+    ].sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 10)
+    
+    setRecentActivity(activities)
   }
 
-  const exportData = () => {
-    const data = customerDB.exportData()
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `usahudhomes-data-${new Date().toISOString().split('T')[0]}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+  // Sample data for charts
+  const monthlyLeadsData = [
+    { month: 'Jan', leads: 12, customers: 8, consultations: 15 },
+    { month: 'Feb', leads: 19, customers: 12, consultations: 22 },
+    { month: 'Mar', leads: 15, customers: 10, consultations: 18 },
+    { month: 'Apr', leads: 25, customers: 18, consultations: 28 },
+    { month: 'May', leads: 22, customers: 16, consultations: 25 },
+    { month: 'Jun', leads: 30, customers: 22, consultations: 35 }
+  ]
+
+  const leadSourceData = [
+    { name: 'Website Forms', value: 45, color: '#3B82F6' },
+    { name: 'Property Consultations', value: 30, color: '#10B981' },
+    { name: 'Chatbot Interactions', value: 15, color: '#F59E0B' },
+    { name: 'Direct Referrals', value: 10, color: '#EF4444' }
+  ]
+
+  const propertyInterestData = [
+    { state: 'NC', properties: 28, value: 1250000 },
+    { state: 'TN', properties: 12, value: 580000 },
+    { state: 'SC', properties: 8, value: 420000 },
+    { state: 'VA', properties: 5, value: 310000 }
+  ]
+
+  const handleLogout = () => {
+    localStorage.removeItem('isAuthenticated')
+    localStorage.removeItem('userRole')
+    localStorage.removeItem('userEmail')
+    localStorage.removeItem('userName')
+    onLogout()
   }
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Customer Management Dashboard</h1>
-          <p className="text-lg text-gray-600">USAhudHomes.com - Marc Spencer</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={loadDashboardData} variant="outline">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Button onClick={handleTestEmail} variant="outline">
-            <Send className="h-4 w-4 mr-2" />
-            Test Email
-          </Button>
-          <Button onClick={exportData} variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export Data
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalCustomers || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              +{stats.newCustomersToday || 0} today
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Consultations</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalConsultations || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.pendingConsultations || 0} pending
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">High Priority</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.highPriorityConsultations || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Urgent responses needed
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Week</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.newCustomersThisWeek || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              New customers
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Content Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="customers">Customers</TabsTrigger>
-          <TabsTrigger value="consultations">Consultations</TabsTrigger>
-          <TabsTrigger value="emails">Email Logs</TabsTrigger>
-        </TabsList>
-
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent Customers */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Customers</CardTitle>
-                <CardDescription>Latest customer registrations</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {customers.slice(0, 5).map((customer) => (
-                    <div key={customer.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-medium">{customer.name}</p>
-                        <p className="text-sm text-gray-600">{customer.email}</p>
-                        <p className="text-xs text-gray-500">{formatDate(customer.createdAt)}</p>
-                      </div>
-                      <Badge className={getStatusColor(customer.status)}>
-                        {customer.status}
-                      </Badge>
-                    </div>
-                  ))}
-                  {customers.length === 0 && (
-                    <p className="text-gray-500 text-center py-4">No customers yet</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Consultations */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Consultations</CardTitle>
-                <CardDescription>Latest consultation requests</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {consultations.slice(0, 5).map((consultation) => (
-                    <div key={consultation.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-medium">{consultation.name}</p>
-                        <p className="text-sm text-gray-600">{consultation.consultationType}</p>
-                        <p className="text-xs text-gray-500">{formatDate(consultation.createdAt)}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Badge className={getPriorityColor(consultation.priority)}>
-                          {consultation.priority}
-                        </Badge>
-                        <Badge className={getStatusColor(consultation.status)}>
-                          {consultation.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                  {consultations.length === 0 && (
-                    <p className="text-gray-500 text-center py-4">No consultations yet</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+  const StatCard = ({ title, value, change, icon: Icon, color = "blue" }) => (
+    <Card className="hover:shadow-lg transition-shadow duration-200">
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-600">{title}</p>
+            <p className="text-2xl font-bold text-gray-900">{value}</p>
+            {change && (
+              <p className={`text-sm flex items-center mt-1 ${
+                change.startsWith('+') ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {change.startsWith('+') ? <ArrowUp className="h-3 w-3 mr-1" /> : <ArrowDown className="h-3 w-3 mr-1" />}
+                {change}
+              </p>
+            )}
           </div>
-        </TabsContent>
+          <div className={`p-3 rounded-full bg-${color}-100`}>
+            <Icon className={`h-6 w-6 text-${color}-600`} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
 
-        {/* Customers Tab */}
-        <TabsContent value="customers" className="space-y-6">
-          {/* Filters */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex flex-col lg:flex-row gap-4">
-                <div className="flex-1">
-                  <Input
-                    placeholder="Search customers by name, email, phone, or state..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-10"
-                  />
+  const QuickActionCard = ({ title, description, icon: Icon, onClick, color = "blue" }) => (
+    <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={onClick}>
+      <CardContent className="p-6">
+        <div className="flex items-center space-x-4">
+          <div className={`p-3 rounded-full bg-${color}-100 group-hover:bg-${color}-200 transition-colors`}>
+            <Icon className={`h-6 w-6 text-${color}-600`} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900">{title}</h3>
+            <p className="text-sm text-gray-600">{description}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  const renderOverview = () => (
+    <div className="space-y-6">
+      {/* Key Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Total Customers"
+          value={stats.totalCustomers || 0}
+          change={`+${stats.thisMonthCustomers || 0} this month`}
+          icon={Users}
+          color="blue"
+        />
+        <StatCard
+          title="Active Leads"
+          value={stats.totalLeads || 0}
+          change={stats.thisMonthLeads > stats.lastMonthLeads ? `+${stats.thisMonthLeads - stats.lastMonthLeads}` : `${stats.thisMonthLeads - stats.lastMonthLeads}`}
+          icon={Target}
+          color="green"
+        />
+        <StatCard
+          title="Consultations"
+          value={stats.totalConsultations || 0}
+          change={`+${stats.thisMonthConsultations || 0} this month`}
+          icon={Calendar}
+          color="purple"
+        />
+        <StatCard
+          title="Conversion Rate"
+          value={`${stats.conversionRate || 0}%`}
+          change="+2.1% vs last month"
+          icon={TrendingUp}
+          color="orange"
+        />
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Monthly Performance */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Monthly Performance</CardTitle>
+            <CardDescription>Leads, customers, and consultations over time</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={monthlyLeadsData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
+                <Area type="monotone" dataKey="leads" stackId="1" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.6} />
+                <Area type="monotone" dataKey="customers" stackId="1" stroke="#10B981" fill="#10B981" fillOpacity={0.6} />
+                <Area type="monotone" dataKey="consultations" stackId="1" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.6} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Lead Sources */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Lead Sources</CardTitle>
+            <CardDescription>Where your leads are coming from</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={leadSourceData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {leadSourceData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Common tasks and shortcuts</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <QuickActionCard
+              title="View All Leads"
+              description="Manage and follow up on leads"
+              icon={Target}
+              onClick={() => navigate('/leads')}
+              color="blue"
+            />
+            <QuickActionCard
+              title="Customer Database"
+              description="Browse customer profiles"
+              icon={Users}
+              onClick={() => setActiveTab('customers')}
+              color="green"
+            />
+            <QuickActionCard
+              title="Property Consultations"
+              description="Review consultation requests"
+              icon={Home}
+              onClick={() => setActiveTab('consultations')}
+              color="purple"
+            />
+            <QuickActionCard
+              title="Send Email Campaign"
+              description="Reach out to customers"
+              icon={Mail}
+              onClick={() => setActiveTab('communications')}
+              color="orange"
+            />
+            <QuickActionCard
+              title="Generate Reports"
+              description="Business analytics and insights"
+              icon={FileText}
+              onClick={() => setActiveTab('reports')}
+              color="red"
+            />
+            <QuickActionCard
+              title="Broker Network"
+              description="Manage referrals and partners"
+              icon={Briefcase}
+              onClick={() => setActiveTab('network')}
+              color="indigo"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recent Activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Activity</CardTitle>
+          <CardDescription>Latest leads, consultations, and customer interactions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {recentActivity.map((activity, index) => (
+              <div key={activity.id} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50">
+                <div className={`p-2 rounded-full ${
+                  activity.type === 'lead' ? 'bg-blue-100' : 'bg-green-100'
+                }`}>
+                  {activity.type === 'lead' ? 
+                    <Target className="h-4 w-4 text-blue-600" /> : 
+                    <Calendar className="h-4 w-4 text-green-600" />
+                  }
                 </div>
-                <div className="flex gap-2">
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="contacted">Contacted</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="closed">Closed</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900">{activity.message}</p>
+                  <p className="text-xs text-gray-500">{new Date(activity.time).toLocaleString()}</p>
+                </div>
+                <Badge variant={activity.priority === 'high' ? 'destructive' : 'secondary'}>
+                  {activity.priority}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+
+  const renderCustomers = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Customer Database</h2>
+        <Button onClick={() => navigate('/leads')} className="bg-blue-600 hover:bg-blue-700">
+          <Plus className="h-4 w-4 mr-2" />
+          View All Leads
+        </Button>
+      </div>
+      
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Customer List</CardTitle>
+              <CardDescription>Manage your customer database</CardDescription>
+            </div>
+            <div className="flex space-x-2">
+              <Input
+                placeholder="Search customers..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-64"
+              />
+              <Button variant="outline">
+                <Filter className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {customers.slice(0, 10).map((customer) => (
+              <div key={customer.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                <div className="flex items-center space-x-4">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Users className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{customer.name}</h3>
+                    <p className="text-sm text-gray-600">{customer.email}</p>
+                    <p className="text-xs text-gray-500">{customer.phone} • {customer.state}</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Badge variant="outline">{customer.status || 'Active'}</Badge>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => navigate(`/customer/${customer.id}`)}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
 
-          {/* Customers List */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              {filteredByStatus.map((customer) => (
-                <Card key={customer.id} className={`hover:shadow-md transition-shadow cursor-pointer ${selectedCustomer?.id === customer.id ? 'ring-2 ring-blue-500' : ''}`}
-                      onClick={() => setSelectedCustomer(customer)}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-lg font-semibold text-gray-900">{customer.name}</h3>
-                      <Badge className={getStatusColor(customer.status)}>
-                        {getStatusIcon(customer.status)}
-                        {customer.status}
-                      </Badge>
-                    </div>
-                    
-                    <div className="space-y-2 text-sm text-gray-600">
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4" />
-                        {customer.email}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4" />
-                        {customer.phone}
-                      </div>
-                      {customer.state && (
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          {customer.state}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        {formatDate(customer.createdAt)}
-                      </div>
-                    </div>
+  const renderConsultations = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Consultations</h2>
+        <Button className="bg-blue-600 hover:bg-blue-700">
+          <Plus className="h-4 w-4 mr-2" />
+          New Consultation
+        </Button>
+      </div>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Consultation Requests</CardTitle>
+          <CardDescription>Manage property consultation requests</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {consultations.slice(0, 10).map((consultation) => (
+              <div key={consultation.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                <div className="flex items-center space-x-4">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <Calendar className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{consultation.name}</h3>
+                    <p className="text-sm text-gray-600">{consultation.consultationType}</p>
+                    <p className="text-xs text-gray-500">{consultation.propertyCase} • {new Date(consultation.createdAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Badge variant={consultation.priority === 'high' ? 'destructive' : 'secondary'}>
+                    {consultation.priority || 'medium'}
+                  </Badge>
+                  <Button variant="outline" size="sm">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
 
-                    <div className="flex gap-2 mt-4">
-                      <Button size="sm" variant="outline" className="flex-1">
-                        <Phone className="h-4 w-4 mr-1" />
-                        Call
-                      </Button>
-                      <Button size="sm" variant="outline" className="flex-1">
-                        <Mail className="h-4 w-4 mr-1" />
-                        Email
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-
-              {filteredByStatus.length === 0 && (
-                <Card>
-                  <CardContent className="p-12 text-center">
-                    <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No customers found</h3>
-                    <p className="text-gray-600">Try adjusting your search or filter criteria</p>
-                  </CardContent>
-                </Card>
-              )}
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-xl font-bold text-gray-900">HUD Homes Dashboard</h1>
+              <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                Marc Spencer - Lightkeeper Realty
+              </Badge>
             </div>
-
-            {/* Customer Details Panel */}
-            <div className="lg:sticky lg:top-8">
-              {selectedCustomer ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Customer Details</CardTitle>
-                    <CardDescription>{selectedCustomer.name}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Status Update */}
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">Status</label>
-                      <Select 
-                        value={selectedCustomer.status} 
-                        onValueChange={(value) => handleUpdateCustomerStatus(selectedCustomer.id, value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="new">New</SelectItem>
-                          <SelectItem value="contacted">Contacted</SelectItem>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="closed">Closed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Customer Info */}
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Email</label>
-                        <p className="text-sm text-gray-900">{selectedCustomer.email}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Phone</label>
-                        <p className="text-sm text-gray-900">{selectedCustomer.phone}</p>
-                      </div>
-                      {selectedCustomer.state && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">State</label>
-                          <p className="text-sm text-gray-900">{selectedCustomer.state}</p>
-                        </div>
-                      )}
-                      {selectedCustomer.propertyId && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Property Interest</label>
-                          <p className="text-sm text-gray-900">{selectedCustomer.propertyId}</p>
-                        </div>
-                      )}
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Registration Date</label>
-                        <p className="text-sm text-gray-900">{formatDate(selectedCustomer.createdAt)}</p>
-                      </div>
-                    </div>
-
-                    {/* Notes */}
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">Notes</label>
-                      <div className="space-y-3">
-                        {selectedCustomer.notes && selectedCustomer.notes.length > 0 ? (
-                          selectedCustomer.notes.map((note) => (
-                            <div key={note.id} className="p-3 bg-gray-50 rounded-lg">
-                              <p className="text-sm text-gray-900">{note.text}</p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                {note.createdBy} - {formatDate(note.createdAt)}
-                              </p>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-gray-500">No notes yet</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Add Note */}
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">Add Note</label>
-                      <div className="space-y-2">
-                        <Textarea
-                          placeholder="Add a note about this customer..."
-                          value={newNote}
-                          onChange={(e) => setNewNote(e.target.value)}
-                          rows={3}
-                        />
-                        <Button 
-                          onClick={() => handleAddNote(selectedCustomer.id)}
-                          disabled={!newNote.trim()}
-                          className="w-full"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Note
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardContent className="p-12 text-center">
-                    <Eye className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a Customer</h3>
-                    <p className="text-gray-600">Click on a customer to view their details</p>
-                  </CardContent>
-                </Card>
-              )}
+            <div className="flex items-center space-x-4">
+              <Button variant="outline" size="sm">
+                <Bell className="h-4 w-4 mr-2" />
+                Notifications
+              </Button>
+              <Button variant="outline" size="sm">
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
             </div>
           </div>
-        </TabsContent>
+        </div>
+      </header>
 
-        {/* Consultations Tab */}
-        <TabsContent value="consultations" className="space-y-6">
-          <div className="space-y-4">
-            {consultations.map((consultation) => (
-              <Card key={consultation.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">{consultation.name}</h3>
-                        <Badge className={getPriorityColor(consultation.priority)}>
-                          {consultation.priority} priority
-                        </Badge>
-                        <Badge className={getStatusColor(consultation.status)}>
-                          {getStatusIcon(consultation.status)}
-                          {consultation.status}
-                        </Badge>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4" />
-                          {consultation.email}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4" />
-                          {consultation.phone}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4" />
-                          {consultation.consultationType}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          {formatDate(consultation.createdAt)}
-                        </div>
-                      </div>
-
-                      {consultation.propertyId && (
-                        <div className="mb-3">
-                          <span className="text-sm font-medium text-gray-700">Property: </span>
-                          <span className="text-sm text-gray-900">{consultation.propertyId}</span>
-                        </div>
-                      )}
-
-                      {consultation.message && (
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <p className="text-sm text-gray-700">{consultation.message}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex flex-col gap-2 lg:w-48">
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="flex-1">
-                          <Phone className="h-4 w-4 mr-1" />
-                          Call
-                        </Button>
-                        <Button size="sm" variant="outline" className="flex-1">
-                          <Mail className="h-4 w-4 mr-1" />
-                          Email
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+      {/* Navigation Tabs */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <nav className="flex space-x-8">
+            {[
+              { id: 'overview', label: 'Overview', icon: Activity },
+              { id: 'customers', label: 'Customers', icon: Users },
+              { id: 'consultations', label: 'Consultations', icon: Calendar },
+              { id: 'properties', label: 'Properties', icon: Home },
+              { id: 'communications', label: 'Communications', icon: Mail },
+              { id: 'reports', label: 'Reports', icon: FileText }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <tab.icon className="h-4 w-4" />
+                <span>{tab.label}</span>
+              </button>
             ))}
+          </nav>
+        </div>
+      </div>
 
-            {consultations.length === 0 && (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No consultations yet</h3>
-                  <p className="text-gray-600">Consultation requests will appear here</p>
-                </CardContent>
-              </Card>
-            )}
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === 'overview' && renderOverview()}
+        {activeTab === 'customers' && renderCustomers()}
+        {activeTab === 'consultations' && renderConsultations()}
+        {activeTab === 'properties' && (
+          <div className="text-center py-12">
+            <Home className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Property Management</h3>
+            <p className="text-gray-600">Property management features coming soon...</p>
           </div>
-        </TabsContent>
-
-        {/* Email Logs Tab */}
-        <TabsContent value="emails" className="space-y-6">
-          <div className="space-y-4">
-            {emailLogs.map((email) => (
-              <Card key={email.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900">{email.subject}</h3>
-                    <Badge variant="outline">
-                      <Send className="h-3 w-3 mr-1" />
-                      Sent
-                    </Badge>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      To: {email.to}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      {formatDate(email.sentAt)}
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-700 whitespace-pre-line">{email.text}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-
-            {emailLogs.length === 0 && (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <Send className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No emails sent yet</h3>
-                  <p className="text-gray-600">Email notifications will appear here</p>
-                </CardContent>
-              </Card>
-            )}
+        )}
+        {activeTab === 'communications' && (
+          <div className="text-center py-12">
+            <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Communications Center</h3>
+            <p className="text-gray-600">Email campaigns and communication tools coming soon...</p>
           </div>
-        </TabsContent>
-      </Tabs>
+        )}
+        {activeTab === 'reports' && (
+          <div className="text-center py-12">
+            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Business Reports</h3>
+            <p className="text-gray-600">Advanced reporting and analytics coming soon...</p>
+          </div>
+        )}
+      </main>
     </div>
   )
 }

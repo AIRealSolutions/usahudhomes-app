@@ -7,7 +7,7 @@ import { Lock, User, Eye, EyeOff } from 'lucide-react'
 
 function Login({ onLogin }) {
   const [credentials, setCredentials] = useState({
-    email: '',
+    username: '',
     password: ''
   })
   const [showPassword, setShowPassword] = useState(false)
@@ -22,10 +22,10 @@ function Login({ onLogin }) {
     // Simulate authentication - in production, this would call your auth API
     try {
       // Production credentials for Marc Spencer
-      if (credentials.email === 'govhome' && credentials.password === 'brutus') {
+      if (credentials.username === 'govhome' && credentials.password === 'brutus') {
         localStorage.setItem('isAuthenticated', 'true')
         localStorage.setItem('userRole', 'admin')
-        localStorage.setItem('userEmail', credentials.email)
+        localStorage.setItem('userEmail', 'marc@lightkeeper.com')
         localStorage.setItem('userName', 'Marc Spencer')
         onLogin(true)
       } else {
@@ -69,17 +69,17 @@ function Login({ onLogin }) {
             )}
             
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-gray-700">
+              <label htmlFor="username" className="text-sm font-medium text-gray-700">
                 Username
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
-                  id="email"
-                  name="email"
-                  type="email"
+                  id="username"
+                  name="username"
+                  type="text"
                   required
-                  value={credentials.email}
+                  value={credentials.username}
                   onChange={handleInputChange}
                   placeholder="Enter your username"
                   className="pl-10"
