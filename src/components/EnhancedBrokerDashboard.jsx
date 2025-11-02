@@ -429,8 +429,13 @@ function EnhancedBrokerDashboard({ onLogout }) {
                   <Badge variant={consultation.priority === 'high' ? 'destructive' : 'secondary'}>
                     {consultation.priority || 'medium'}
                   </Badge>
-                  <Button variant="outline" size="sm">
-                    <Eye className="h-4 w-4" />
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => navigate(`/lead/${consultation.id}`)}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    View Lead
                   </Button>
                 </div>
               </div>

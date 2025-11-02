@@ -13,6 +13,7 @@ import PropertyDetail from './components/PropertyDetail.jsx'
 import PropertyConsultation from './components/PropertyConsultation.jsx'
 import CustomerDetail from './components/CustomerDetail.jsx'
 import LeadsManagement from './components/LeadsManagement.jsx'
+import LeadDetail from './components/LeadDetail.jsx'
 import './App.css'
 
 // Header Component
@@ -853,9 +854,9 @@ function App() {
             <Route path="/" element={<HomePage stateStats={stateStats} onStateSelect={handleStateSelect} />} />
             <Route path="/search" element={<PropertySearch />} />
             <Route path="/property/:propertyId" element={<PropertyDetail />} />
-            <Route path="/consult/:caseNumber" element={<PropertyConsultation />} />
-            <Route path="/learn" element={<LearnPage />} />
-            <Route path="/login" element={<Login onLogin={handleLogin} />} />
+            <Route path="/customer/:customerId" element={<CustomerDetail />} />
+            <Route path="/leads" element={<LeadsManagement />} />
+            <Route path="/lead/:leadId" element={<LeadDetail />} />            <Route path="/login" element={<Login onLogin={handleLogin} />} />
             <Route path="/broker-dashboard" element={
               isAuthenticated ? (
                 <EnhancedBrokerDashboard userRole={userRole} />

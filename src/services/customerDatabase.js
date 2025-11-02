@@ -328,9 +328,210 @@ USAhudHomes.com System
       this.saveLeads();
     }
   }
+
+  // Lead status management
+  updateLeadStatus(leadId, newStatus, notes = '') {
+    const lead = this.consultations.find(c => c.id === leadId);
+    if (lead) {
+      const oldStatus = lead.status;
+      lead.status = newStatus;
+      lead.updatedAt = new Date().toISOString();
+      
+      // Add status change to interaction history
+      this.addLeadInteraction(leadId, {
+        type: 'status_change',
+        message: `Status changed from ${oldStatus} to ${newStatus}`,
+        notes: notes,
+        timestamp: new Date().toISOString(),
+        user: 'Marc Spencer'
+      });
+      
+      this.saveConsultations();
+      return lead;
+    }
+    return null;
+  }
+
+  // Lead interaction tracking
+  addLeadInteraction(leadId, interaction) {
+    const interactions = JSON.parse(localStorage.getItem('usahud_interactions') || '{}');
+    if (!interactions[leadId]) {
+      interactions[leadId] = [];
+    }
+    
+    const newInteraction = {
+      id: this.generateId(),
+      leadId,
+      ...interaction,
+      timestamp: interaction.timestamp || new Date().toISOString()
+    };
+    
+    interactions[leadId].unshift(newInteraction);
+    localStorage.setItem('usahud_interactions', JSON.stringify(interactions));
+    return newInteraction;
+  }
+
+  getLeadInteractions(leadId) {
+    const interactions = JSON.parse(localStorage.getItem('usahud_interactions') || '{}');
+    return interactions[leadId] || [];
+  }
+
+  // Lead task management
+  addLeadTask(leadId, task) {
+    const tasks = JSON.parse(localStorage.getItem('usahud_tasks') || '{}');
+    if (!tasks[leadId]) {
+      tasks[leadId] = [];
+    }
+    
+    const newTask = {
+      id: this.generateId(),
+      leadId,
+      ...task,
+      createdAt: new Date().toISOString(),
+      completed: false
+    };
+    
+    tasks[leadId].unshift(newTask);
+    localStorage.setItem('usahud_tasks', JSON.stringify(tasks));
+    return newTask;
+  }
+
+  getLeadTasks(leadId) {
+    const tasks = JSON.parse(localStorage.getItem('usahud_tasks') || '{}');
+    return tasks[leadId] || [];
+  }
+
+  updateLeadTask(leadId, taskId, updates) {
+    const tasks = JSON.parse(localStorage.getItem('usahud_tasks') || '{}');
+    if (tasks[leadId]) {
+      const taskIndex = tasks[leadId].findIndex(t => t.id === taskId);
+      if (taskIndex !== -1) {
+        tasks[leadId][taskIndex] = {
+          ...tasks[leadId][taskIndex],
+          ...updates,
+          updatedAt: new Date().toISOString()
+        };
+        localStorage.setItem('usahud_tasks', JSON.stringify(tasks));
+        return tasks[leadId][taskIndex];
+      }
+    }
+    return null;
+  }
+
+  // Lead scoring and analytics
+  calculateLeadScore(leadId) {
+    const lead = this.consultations.find(c => c.id === leadId);
+    if (!lead) return 0;
+    
+    let score = 50; // Base score
+    
+    // Engagement factors
+    const interactions = this.getLeadInteractions(leadId);
+    score += Math.min(interactions.length * 5, 30); // Up to 30 points for interactions
+    
+    // Recency factor
+    const daysSinceCreated = (Date.now() - new Date(lead.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceCreated < 1) score += 20;
+    else if (daysSinceCreated < 7) score += 10;
+    else if (daysSinceCreated > 30) score -= 10;
+    
+    // Property interest factor
+    if (lead.propertyId) score += 15;
+    if (lead.consultationType === 'financing') score += 10;
+    if (lead.consultationType === 'bidding') score += 15;
+    
+    // Contact information completeness
+    if (lead.phone) score += 10;
+    if (lead.email) score += 5;
+    
+    return Math.max(0, Math.min(100, score));
+  }
+
+  // Lead workflow automation
+  getLeadsByStatus(status) {
+    return this.consultations.filter(c => c.status === status);
+  }
+
+  getOverdueLeads() {
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    return this.consultations.filter(c => 
+      c.status === 'pending' && new Date(c.createdAt) < threeDaysAgo
+    );
+  }
+
+  getHighPriorityLeads() {
+    return this.consultations.filter(c => 
+      c.priority === 'high' || this.calculateLeadScore(c.id) > 80
+    );
+  }
 }
+
+// Lead status workflow definitions
+const statusWorkflow = {
+  'pending': {
+    label: 'New Lead',
+    color: 'bg-blue-100 text-blue-800',
+    nextSteps: ['contacted', 'qualified'],
+    autoActions: ['send_welcome_email', 'assign_to_agent']
+  },
+  'contacted': {
+    label: 'Contacted',
+    color: 'bg-yellow-100 text-yellow-800',
+    nextSteps: ['qualified', 'not_interested'],
+    autoActions: ['schedule_follow_up']
+  },
+  'qualified': {
+    label: 'Qualified',
+    color: 'bg-green-100 text-green-800',
+    nextSteps: ['proposal', 'viewing_scheduled'],
+    autoActions: ['send_property_matches']
+  },
+  'proposal': {
+    label: 'Proposal Sent',
+    color: 'bg-purple-100 text-purple-800',
+    nextSteps: ['closed', 'negotiating'],
+    autoActions: ['schedule_follow_up_call']
+  },
+  'viewing_scheduled': {
+    label: 'Viewing Scheduled',
+    color: 'bg-indigo-100 text-indigo-800',
+    nextSteps: ['proposal', 'qualified'],
+    autoActions: ['send_viewing_reminder']
+  },
+  'negotiating': {
+    label: 'Negotiating',
+    color: 'bg-orange-100 text-orange-800',
+    nextSteps: ['closed', 'lost'],
+    autoActions: ['prepare_contracts']
+  },
+  'closed': {
+    label: 'Closed Won',
+    color: 'bg-green-100 text-green-800',
+    nextSteps: [],
+    autoActions: ['send_congratulations', 'request_review']
+  },
+  'lost': {
+    label: 'Closed Lost',
+    color: 'bg-red-100 text-red-800',
+    nextSteps: [],
+    autoActions: ['send_feedback_request']
+  },
+  'not_interested': {
+    label: 'Not Interested',
+    color: 'bg-gray-100 text-gray-800',
+    nextSteps: [],
+    autoActions: ['add_to_nurture_campaign']
+  },
+  'referred': {
+    label: 'Referred',
+    color: 'bg-orange-100 text-orange-800',
+    nextSteps: [],
+    autoActions: ['notify_referring_broker']
+  }
+};
 
 // Create singleton instance
 const customerDB = new CustomerDatabase();
+customerDB.statusWorkflow = statusWorkflow;
 
 export default customerDB;
