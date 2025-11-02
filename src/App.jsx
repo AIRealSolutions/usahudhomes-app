@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input.jsx'
 import { Badge } from '@/components/ui/badge.jsx'
 import { Search, Home, MapPin, DollarSign, Users, BookOpen, Menu, X, Phone, LogOut } from 'lucide-react'
 import PropertySearch from './components/PropertySearch.jsx'
-import BrokerDashboard from './components/BrokerDashboard.jsx'
+import EnhancedBrokerDashboard from './components/EnhancedBrokerDashboard.jsx'
 import Login from './components/Login.jsx'
 import USMap from './components/USMap.jsx'
 import PropertyDetail from './components/PropertyDetail.jsx'
@@ -856,7 +856,7 @@ function App() {
             <Route path="/login" element={<Login onLogin={handleLogin} />} />
             <Route path="/broker-dashboard" element={
               isAuthenticated ? (
-                <BrokerDashboard userRole={userRole} />
+                <EnhancedBrokerDashboard userRole={userRole} />
               ) : (
                 <Login onLogin={handleLogin} redirectTo="/broker-dashboard" />
               )

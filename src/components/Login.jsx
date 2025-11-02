@@ -21,19 +21,15 @@ function Login({ onLogin }) {
 
     // Simulate authentication - in production, this would call your auth API
     try {
-      // Demo credentials for testing
-      if (credentials.email === 'broker@usahudhomes.com' && credentials.password === 'demo123') {
-        localStorage.setItem('isAuthenticated', 'true')
-        localStorage.setItem('userRole', 'broker')
-        localStorage.setItem('userEmail', credentials.email)
-        onLogin(true)
-      } else if (credentials.email === 'admin@usahudhomes.com' && credentials.password === 'admin123') {
+      // Production credentials for Marc Spencer
+      if (credentials.email === 'govhome' && credentials.password === 'brutus') {
         localStorage.setItem('isAuthenticated', 'true')
         localStorage.setItem('userRole', 'admin')
         localStorage.setItem('userEmail', credentials.email)
+        localStorage.setItem('userName', 'Marc Spencer')
         onLogin(true)
       } else {
-        setError('Invalid email or password. Try broker@usahudhomes.com / demo123 or admin@usahudhomes.com / admin123')
+        setError('Invalid username or password. Please contact support if you need assistance.')
       }
     } catch (err) {
       setError('Login failed. Please try again.')
@@ -74,7 +70,7 @@ function Login({ onLogin }) {
             
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-gray-700">
-                Email Address
+                Username
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -85,7 +81,7 @@ function Login({ onLogin }) {
                   required
                   value={credentials.email}
                   onChange={handleInputChange}
-                  placeholder="Enter your email"
+                  placeholder="Enter your username"
                   className="pl-10"
                 />
               </div>
@@ -126,11 +122,11 @@ function Login({ onLogin }) {
             </Button>
           </form>
 
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600 mb-2">Demo Credentials:</p>
-            <div className="text-xs text-gray-500 space-y-1">
-              <p><strong>Broker:</strong> broker@usahudhomes.com / demo123</p>
-              <p><strong>Admin:</strong> admin@usahudhomes.com / admin123</p>
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-800 mb-2">🏠 USAhudHomes.com</p>
+            <div className="text-xs text-blue-600">
+              <p>Secure access for HUD property management</p>
+              <p>Contact Marc Spencer: (910) 363-6147</p>
             </div>
           </div>
         </CardContent>

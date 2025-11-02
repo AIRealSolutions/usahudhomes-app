@@ -23,6 +23,8 @@ import {
   AlertCircle,
   Camera
 } from 'lucide-react'
+import customerDB from '../services/customerDatabase.js'
+import emailService from '../services/emailService.js'
 
 // Real HUD Property Database
 const RealHudProperties = {
@@ -188,14 +190,30 @@ function PropertyConsultation() {
       return
     }
 
-    // Simulate form submission
-    alert(`Thank you ${contactForm.name}! Your consultation request has been submitted for property ${caseNumber}. Marc Spencer from Lightkeeper Realty will contact you within 2 hours during business hours.`)
-    
-    setShowContactForm(false)
-    setContactForm({ name: '', email: '', phone: '', message: '', consultationType: 'general' })
+    try {
+      // Add consultation to database
+      const consultationData = {
+        ...contactForm,
+        propertyId: caseNumber,
+        propertyAddress: property ? `${property.address}, ${property.city}, ${property.state}` : 'Unknown property'
+      }
+      
+      const consultation = customerDB.addConsultation(consultationData)
+      
+      // Send email notification
+      await emailService.sendConsultationNotification(consultation)
+      
+      alert(`Thank you ${contactForm.name}! Your consultation request has been submitted for property ${caseNumber}. Marc Spencer from Lightkeeper Realty will contact you within 2 hours during business hours.`)
+      
+      setShowContactForm(false)
+      setContactForm({ name: '', email: '', phone: '', message: '', consultationType: 'general' })
+    } catch (error) {
+      console.error('Error submitting consultation:', error)
+      alert('There was an error submitting your consultation. Please try again.')
+    }
   }
 
-  const handleChatSubmit = (e) => {
+  const handleChatSubmit = async (e) => {
     e.preventDefault()
     if (!currentMessage.trim()) return
 
@@ -203,6 +221,23 @@ function PropertyConsultation() {
       type: 'user',
       message: currentMessage,
       timestamp: new Date()
+    }
+
+    // Log chat interaction as a lead
+    try {
+      const leadData = {
+        name: 'Chat User',
+        email: 'chat@usahudhomes.com',
+        phone: 'Via Chat',
+        state: property?.state || 'Unknown',
+        propertyCase: caseNumber,
+        message: currentMessage,
+        source: 'chatbot'
+      }
+      
+      customerDB.addLead(leadData)
+    } catch (error) {
+      console.error('Error logging chat interaction:', error)
     }
 
     // Simple bot responses
