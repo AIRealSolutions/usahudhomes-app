@@ -24,6 +24,14 @@ class CustomerDatabase {
     return stored ? JSON.parse(stored) : [];
   }
 
+  // Refresh data from localStorage (call this when returning to dashboard)
+  refreshData() {
+    this.customers = this.loadCustomers();
+    this.consultations = this.loadConsultations();
+    this.leads = this.loadLeads();
+    return true;
+  }
+
   // Save data to localStorage
   saveCustomers() {
     localStorage.setItem('usahud_customers', JSON.stringify(this.customers));
@@ -117,16 +125,22 @@ class CustomerDatabase {
 
   // Get all customers
   getAllCustomers() {
+    // Refresh from localStorage to ensure latest data
+    this.customers = this.loadCustomers();
     return this.customers.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
   // Get all consultations
   getAllConsultations() {
+    // Refresh from localStorage to ensure latest data
+    this.consultations = this.loadConsultations();
     return this.consultations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
   // Get all leads
   getAllLeads() {
+    // Refresh from localStorage to ensure latest data
+    this.leads = this.loadLeads();
     return this.leads.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
