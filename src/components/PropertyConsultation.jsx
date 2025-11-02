@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import RealHudDatabase from '../services/realHudDatabase.js'
+import { RealHudDatabase } from '../services/realHudDatabase.js'
 import chatbotService from '../services/chatbotService.js'
 import consultationService from '../services/consultationService.js'
 import { useParams, Link } from 'react-router-dom'
