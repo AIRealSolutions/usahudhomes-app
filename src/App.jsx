@@ -11,6 +11,8 @@ import Login from './components/Login.jsx'
 import USMap from './components/USMap.jsx'
 import PropertyDetail from './components/PropertyDetail.jsx'
 import PropertyConsultation from './components/PropertyConsultation.jsx'
+import CustomerDetail from './components/CustomerDetail.jsx'
+import LeadsManagement from './components/LeadsManagement.jsx'
 import './App.css'
 
 // Header Component
@@ -857,6 +859,20 @@ function App() {
             <Route path="/broker-dashboard" element={
               isAuthenticated ? (
                 <EnhancedBrokerDashboard userRole={userRole} />
+              ) : (
+                <Login onLogin={handleLogin} redirectTo="/broker-dashboard" />
+              )
+            } />
+            <Route path="/customer/:customerId" element={
+              isAuthenticated ? (
+                <CustomerDetail />
+              ) : (
+                <Login onLogin={handleLogin} redirectTo="/broker-dashboard" />
+              )
+            } />
+            <Route path="/leads" element={
+              isAuthenticated ? (
+                <LeadsManagement />
               ) : (
                 <Login onLogin={handleLogin} redirectTo="/broker-dashboard" />
               )
