@@ -1,7 +1,7 @@
 // Property Management Service
 // Handles CRUD operations for HUD properties
 
-import ncHudProperties from '../data/ncHudProperties.js';
+import ncHudProperties from '../data/ncHudProperties';
 
 class PropertyManagement {PropertyManagement {
   constructor() {
