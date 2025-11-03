@@ -1,7 +1,9 @@
-// Property Management Service for USAhudHomes.com
+// Property Management Service
 // Handles CRUD operations for HUD properties
 
-class PropertyManagement {
+import ncHudProperties from '../data/ncHudProperties.js';
+
+class PropertyManagement {PropertyManagement {
   constructor() {
     this.properties = this.loadProperties();
   }
@@ -22,8 +24,39 @@ class PropertyManagement {
     localStorage.setItem('usahud_properties', JSON.stringify(this.properties));
   }
 
-  // Get default properties (the 5 real HUD properties)
+  // Get default properties (25 NC HUD properties from CSV)
   getDefaultProperties() {
+    // Convert imported properties to match our schema
+    return ncHudProperties.map(prop => ({
+      id: prop.caseNumber,
+      caseNumber: prop.caseNumber,
+      address: prop.address,
+      city: prop.city,
+      state: prop.state,
+      zipCode: prop.zip,
+      county: prop.county,
+      price: prop.price,
+      bedrooms: parseInt(prop.beds) || 3,
+      bathrooms: parseInt(prop.baths) || 2,
+      sqFt: parseInt(prop.sqft) || 2000,
+      lotSize: prop.lotSize + ' acres',
+      yearBuilt: parseInt(prop.yearBuilt) || 2000,
+      status: prop.status,
+      bidDeadline: prop.bidDeadline,
+      propertyType: 'Single Family Home',
+      description: prop.description,
+      image: prop.image,
+      images: prop.images,
+      amenities: {
+        indoor: prop.features.indoor,
+        outdoor: prop.features.outdoor,
+        parking: 'Driveway'
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }));
+    
+    /* Original 5 properties - replaced with 25 NC properties
     return [
       {
         id: '387-111612',
@@ -166,6 +199,7 @@ class PropertyManagement {
         updatedAt: '2025-10-08T10:00:00Z'
       }
     ];
+    */
   }
 
   // Generate unique ID
