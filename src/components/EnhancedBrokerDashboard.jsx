@@ -20,6 +20,7 @@ import { brokerNetwork } from '../services/brokerNetwork.js'
 import PropertyAdmin from './admin/PropertyAdmin.jsx'
 import CustomerAdmin from './admin/CustomerAdmin.jsx'
 import AgentAdmin from './admin/AgentAdmin.jsx'
+import DatabaseReset from './admin/DatabaseReset.jsx'
 
 function EnhancedBrokerDashboard({ onLogout }) {
   const navigate = useNavigate()
@@ -520,7 +521,7 @@ function EnhancedBrokerDashboard({ onLogout }) {
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Admin Panel</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <button
                   onClick={() => setAdminSubTab('properties')}
                   className={`p-4 rounded-lg border-2 transition-all ${
@@ -557,11 +558,24 @@ function EnhancedBrokerDashboard({ onLogout }) {
                   <div className="font-semibold">Agents</div>
                   <div className="text-sm text-gray-600">Manage agent network</div>
                 </button>
+                <button
+                  onClick={() => setAdminSubTab('reset')}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    adminSubTab === 'reset'
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-200 hover:border-red-300'
+                  }`}
+                >
+                  <Settings className="h-8 w-8 mx-auto mb-2 text-red-600" />
+                  <div className="font-semibold">Reset Database</div>
+                  <div className="text-sm text-gray-600">Load 25 NC properties</div>
+                </button>
               </div>
             </div>
             {adminSubTab === 'properties' && <PropertyAdmin />}
             {adminSubTab === 'customers' && <CustomerAdmin />}
             {adminSubTab === 'agents' && <AgentAdmin />}
+            {adminSubTab === 'reset' && <DatabaseReset />}
           </div>
         )}
         {activeTab === 'communications' && (

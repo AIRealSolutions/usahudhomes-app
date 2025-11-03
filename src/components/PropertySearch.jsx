@@ -39,85 +39,6 @@ const PropertySearch = () => {
   const [loading, setLoading] = useState(false)
   const [favorites, setFavorites] = useState(new Set())
 
-  // Real HUD properties matching main page (NC and TN)
-  const sampleProperties = [
-    {
-      id: '387-111612',
-      address: '80 Prong Creek Ln',
-      city: 'Yanceyville',
-      state: 'NC',
-      price: 544000,
-      beds: 3,
-      baths: 2,
-      status: 'BIDS OPEN',
-      county: 'Caswell County',
-      sqft: 3073,
-      listingDate: '2025-10-15',
-      bidDeadline: '2025-11-03',
-      images: ['/property-images/387-111612.jpeg']
-    },
-    {
-      id: '387-570372',
-      address: '2105 Fathom Way',
-      city: 'Charlotte',
-      state: 'NC',
-      price: 365000,
-      beds: 4,
-      baths: 2.1,
-      status: 'BIDS OPEN',
-      county: 'Mecklenburg County',
-      sqft: 2850,
-      listingDate: '2025-10-10',
-      bidDeadline: '2025-11-03',
-      images: ['/property-images/387-570372.jpeg']
-    },
-    {
-      id: '387-412268',
-      address: '162 Black Horse Ln',
-      city: 'Kittrell',
-      state: 'NC',
-      price: 336150,
-      beds: 3,
-      baths: 3,
-      status: 'PRICE REDUCED',
-      county: 'Vance County',
-      sqft: 2650,
-      listingDate: '2025-10-05',
-      bidDeadline: '2025-11-03',
-      images: ['/property-images/387-412268.jpeg']
-    },
-    {
-      id: '381-799288',
-      address: '3009 Wynston Way',
-      city: 'Clayton',
-      state: 'NC',
-      price: 310500,
-      beds: 3,
-      baths: 2,
-      status: 'BIDS OPEN',
-      county: 'Johnston County',
-      sqft: 2200,
-      listingDate: '2025-10-12',
-      bidDeadline: '2025-11-03',
-      images: ['/property-images/381-799288.jpeg']
-    },
-    {
-      id: '482-521006',
-      address: '1234 Main St',
-      city: 'Mc Kenzie',
-      state: 'TN',
-      price: 147200,
-      beds: 4,
-      baths: 2,
-      status: 'PRICE REDUCED',
-      county: 'Carroll County',
-      sqft: 2400,
-      listingDate: '2025-10-08',
-      bidDeadline: '2025-11-03',
-      images: ['/property-images/482-521006.jpeg']
-    }
-  ]
-
   useEffect(() => {
     // Load properties from propertyManagement service
     const allProperties = propertyManagement.getAllProperties()
@@ -472,7 +393,7 @@ const PropertySearch = () => {
               status: '',
               county: ''
             })
-            setProperties(sampleProperties)
+            setProperties(propertyManagement.getAllProperties())
           }}>
             Clear All Filters
           </Button>
