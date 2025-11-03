@@ -17,7 +17,7 @@ import {
   Download,
   Upload
 } from 'lucide-react'
-import propertyManagement from '../../services/propertyManagement.js'
+import { propertyService } from '../../services/database'
 
 function PropertyAdmin() {
   const [properties, setProperties] = useState([])
@@ -57,15 +57,19 @@ function PropertyAdmin() {
     }
   }
 
-  function loadProperties() {
-    const allProperties = propertyManagement.getAllProperties()
-    setProperties(allProperties)
+  async function loadProperties() {
+    const result = await propertyService.getAllProperties()
+    if (result.success) {
+      setProperties(result.data)
+    }
   }
 
-  function handleSearch() {
+  async function handleSearch() {
     if (searchQuery.trim()) {
-      const results = propertyManagement.searchProperties(searchQuery)
-      setProperties(results)
+      const result = await propertyService.searchProperties(searchQuery)
+      if (result.success) {
+        setProperties(result.data)
+      }
     } else {
       loadProperties()
     }
@@ -86,15 +90,19 @@ function PropertyAdmin() {
     setShowForm(true)
   }
 
-  function handleDelete(property) {
+  async function handleDelete(property) {
     if (confirm(`Are you sure you want to delete ${property.address}?`)) {
-      propertyManagement.deleteProperty(property.id)
-      loadProperties()
-      alert('Property deleted successfully!')
+      const result = await propertyService.deleteProperty(property.id)
+      if (result.success) {
+        loadProperties()
+        alert('Property deleted successfully!')
+      } else {
+        alert('Error deleting property: ' + result.error)
+      }
     }
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
 
     // Validate required fields
@@ -107,24 +115,38 @@ function PropertyAdmin() {
     const propertyData = {
       ...formData,
       price: parseFloat(formData.price),
-      bedrooms: parseInt(formData.bedrooms),
-      bathrooms: parseFloat(formData.bathrooms),
-      sqFt: parseInt(formData.sqFt),
-      yearBuilt: parseInt(formData.yearBuilt)
+      beds: parseInt(formData.bedrooms) || 0,
+      baths: parseFloat(formData.bathrooms) || 0,
+      sqft: parseInt(formData.sqFt) || 0,
+      year_built: parseInt(formData.yearBuilt) || null,
+      case_number: formData.caseNumber,
+      zip_code: formData.zipCode,
+      lot_size: formData.lotSize,
+      property_type: formData.propertyType,
+      bid_deadline: formData.bidDeadline
     }
 
+    let result
     if (editingProperty) {
-      propertyManagement.updateProperty(editingProperty.id, propertyData)
-      alert('Property updated successfully!')
+      result = await propertyService.updateProperty(editingProperty.id, propertyData)
+      if (result.success) {
+        alert('Property updated successfully!')
+      }
     } else {
-      propertyManagement.addProperty(propertyData)
-      alert('Property added successfully!')
+      result = await propertyService.createProperty(propertyData)
+      if (result.success) {
+        alert('Property added successfully!')
+      }
     }
 
-    setShowForm(false)
-    setFormData(getEmptyFormData())
-    setEditingProperty(null)
-    loadProperties()
+    if (result.success) {
+      setShowForm(false)
+      setFormData(getEmptyFormData())
+      setEditingProperty(null)
+      loadProperties()
+    } else {
+      alert('Error: ' + result.error)
+    }
   }
 
   function handleCancel() {
@@ -133,30 +155,34 @@ function PropertyAdmin() {
     setEditingProperty(null)
   }
 
-  function handleExport() {
-    const data = propertyManagement.exportProperties()
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `properties_backup_${new Date().toISOString().split('T')[0]}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+  async function handleExport() {
+    const result = await propertyService.getAllProperties()
+    if (result.success) {
+      const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `properties_backup_${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
   }
 
-  function handleImport(e) {
+  async function handleImport(e) {
     const file = e.target.files[0]
     if (file) {
       const reader = new FileReader()
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
           const data = JSON.parse(event.target.result)
-          if (propertyManagement.importProperties(data)) {
-            loadProperties()
-            alert('Properties imported successfully!')
-          } else {
-            alert('Invalid import file format')
+          // Import each property
+          let successCount = 0
+          for (const property of data) {
+            const result = await propertyService.createProperty(property)
+            if (result.success) successCount++
           }
+          loadProperties()
+          alert(`Imported ${successCount} of ${data.length} properties successfully!`)
         } catch (error) {
           alert('Error importing properties: ' + error.message)
         }
@@ -165,7 +191,23 @@ function PropertyAdmin() {
     }
   }
 
-  const stats = propertyManagement.getPropertyStats()
+  const [stats, setStats] = useState({ total: 0, avgPrice: 0, bidsOpen: 0, priceReduced: 0 })
+  
+  useEffect(() => {
+    async function loadStats() {
+      const result = await propertyService.getAllProperties()
+      if (result.success) {
+        const props = result.data
+        setStats({
+          total: props.length,
+          avgPrice: props.length > 0 ? Math.round(props.reduce((sum, p) => sum + p.price, 0) / props.length) : 0,
+          bidsOpen: props.filter(p => p.status === 'BIDS OPEN').length,
+          priceReduced: props.filter(p => p.status === 'PRICE REDUCED').length
+        })
+      }
+    }
+    loadStats()
+  }, [properties])
 
   return (
     <div className="space-y-6">

@@ -21,7 +21,7 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react'
-import propertyManagement from '../services/propertyManagement.js'
+import { propertyService } from '../services/database'
 
 const PropertySearch = () => {
   const [searchQuery, setSearchQuery] = useState('')
@@ -40,35 +40,42 @@ const PropertySearch = () => {
   const [favorites, setFavorites] = useState(new Set())
 
   useEffect(() => {
-    // Load properties from propertyManagement service
-    const allProperties = propertyManagement.getAllProperties()
-    setProperties(allProperties)
+    // Load properties from Supabase
+    const loadProperties = async () => {
+      setLoading(true)
+      const result = await propertyService.getAllProperties()
+      if (result.success) {
+        setProperties(result.data)
+      }
+      setLoading(false)
+    }
+    loadProperties()
   }, [])
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     setLoading(true)
-    // Get all properties from service
-    const allProperties = propertyManagement.getAllProperties()
     
-    setTimeout(() => {
-      let filtered = allProperties.filter(property => {
-        const matchesQuery = !searchQuery || 
-          property.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          property.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          property.county.toLowerCase().includes(searchQuery.toLowerCase())
-        
-        const matchesState = !filters.state || property.state === filters.state
-        const matchesPrice = property.price >= filters.minPrice && property.price <= filters.maxPrice
-        const matchesBeds = !filters.bedrooms || property.beds >= parseInt(filters.bedrooms)
-        const matchesBaths = !filters.bathrooms || property.baths >= parseFloat(filters.bathrooms)
-        const matchesStatus = !filters.status || property.status === filters.status
-
-        return matchesQuery && matchesState && matchesPrice && matchesBeds && matchesBaths && matchesStatus
-      })
-      
-      setProperties(filtered)
-      setLoading(false)
-    }, 1000)
+    // Build Supabase filters
+    const supabaseFilters = {}
+    if (filters.state) supabaseFilters.state = filters.state
+    if (filters.minPrice > 0) supabaseFilters.minPrice = filters.minPrice
+    if (filters.maxPrice < 1000000) supabaseFilters.maxPrice = filters.maxPrice
+    if (filters.bedrooms) supabaseFilters.beds = parseInt(filters.bedrooms)
+    if (filters.bathrooms) supabaseFilters.baths = parseFloat(filters.bathrooms)
+    if (filters.status) supabaseFilters.status = filters.status
+    
+    // Search or get all properties
+    let result
+    if (searchQuery) {
+      result = await propertyService.searchProperties(searchQuery)
+    } else {
+      result = await propertyService.getAllProperties(supabaseFilters)
+    }
+    
+    if (result.success) {
+      setProperties(result.data)
+    }
+    setLoading(false)
   }
 
   const toggleFavorite = (propertyId) => {

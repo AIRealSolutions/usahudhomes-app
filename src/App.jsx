@@ -14,7 +14,7 @@ import PropertyConsultation from './components/PropertyConsultation.jsx'
 import CustomerDetail from './components/CustomerDetail.jsx'
 import LeadsManagement from './components/LeadsManagement.jsx'
 import LeadDetail from './components/LeadDetail.jsx'
-import propertyManagement from './services/propertyManagement.js'
+import { propertyService } from './services/database'
 import './App.css'
 
 // Header Component
@@ -184,9 +184,14 @@ function HomePage({ stateStats, onStateSelect }) {
   const [featuredProperties, setFeaturedProperties] = useState([])
 
   useEffect(() => {
-    // Load properties from propertyManagement service
-    const properties = propertyManagement.getAllProperties()
-    setFeaturedProperties(properties.slice(0, 6)) // Show first 6 properties
+    // Load properties from Supabase
+    const loadProperties = async () => {
+      const result = await propertyService.getFeaturedProperties(6)
+      if (result.success) {
+        setFeaturedProperties(result.data)
+      }
+    }
+    loadProperties()
   }, [])
 
   return (

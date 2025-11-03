@@ -17,7 +17,7 @@ import {
   Download,
   Upload
 } from 'lucide-react'
-import customerDB from '../../services/customerDatabase.js'
+import { customerService } from '../../services/database'
 
 function CustomerAdmin() {
   const [customers, setCustomers] = useState([])
@@ -43,15 +43,19 @@ function CustomerAdmin() {
     }
   }
 
-  function loadCustomers() {
-    const allCustomers = customerDB.getAllCustomers()
-    setCustomers(allCustomers)
+  async function loadCustomers() {
+    const result = await customerService.getAllCustomers()
+    if (result.success) {
+      setCustomers(result.data)
+    }
   }
 
-  function handleSearch() {
+  async function handleSearch() {
     if (searchQuery.trim()) {
-      const results = customerDB.searchCustomers(searchQuery)
-      setCustomers(results)
+      const result = await customerService.searchCustomers(searchQuery)
+      if (result.success) {
+        setCustomers(result.data)
+      }
     } else {
       loadCustomers()
     }
@@ -95,12 +99,17 @@ function CustomerAdmin() {
       return
     }
 
+    let result
     if (editingCustomer) {
-      customerDB.updateCustomer(editingCustomer.id, formData)
-      alert('Customer updated successfully!')
+      result = await customerService.updateCustomer(editingCustomer.id, formData)
+      if (result.success) {
+        alert('Customer updated successfully!')
+      }
     } else {
-      customerDB.addCustomer(formData)
-      alert('Customer added successfully!')
+      result = await customerService.createCustomer(formData)
+      if (result.success) {
+        alert('Customer added successfully!')
+      }
     }
 
     setShowForm(false)
@@ -115,8 +124,10 @@ function CustomerAdmin() {
     setEditingCustomer(null)
   }
 
-  function handleExport() {
-    const data = customerDB.exportData()
+  async function handleExport() {
+    const result = await customerService.getAllCustomers()
+    if (!result.success) return
+    const data = result.data
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -133,8 +144,14 @@ function CustomerAdmin() {
       reader.onload = (event) => {
         try {
           const data = JSON.parse(event.target.result)
-          customerDB.importData(data)
+          // Import each customer
+          let successCount = 0
+          for (const customer of data.customers || data) {
+            const result = await customerService.createCustomer(customer)
+            if (result.success) successCount++
+          }
           loadCustomers()
+          alert(`Imported ${successCount} customers successfully!`)
           alert('Customers imported successfully!')
         } catch (error) {
           alert('Error importing customers: ' + error.message)
@@ -144,7 +161,24 @@ function CustomerAdmin() {
     }
   }
 
-  const stats = customerDB.getDashboardStats()
+  const [stats, setStats] = useState({ totalCustomers: 0, newThisWeek: 0, totalLeads: 0, pendingConsultations: 0 })
+  
+  useEffect(() => {
+    async function loadStats() {
+      const result = await customerService.getAllCustomers()
+      if (result.success) {
+        const customers = result.data
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+        setStats({
+          totalCustomers: customers.length,
+          newThisWeek: customers.filter(c => new Date(c.created_at) > weekAgo).length,
+          totalLeads: customers.filter(c => c.status === 'lead').length,
+          pendingConsultations: customers.filter(c => c.status === 'consultation').length
+        })
+      }
+    }
+    loadStats()
+  }, [customers])
 
   return (
     <div className="space-y-6">

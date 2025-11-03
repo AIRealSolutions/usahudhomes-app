@@ -1,0 +1,331 @@
+/**
+ * Consultation & Lead Database Service
+ * Handles consultations and leads database operations with Supabase
+ */
+
+import { supabase, TABLES, formatSupabaseResponse } from '../../config/supabase'
+
+class ConsultationService {
+  /**
+   * Get all consultations
+   * @param {Object} filters - Optional filters
+   * @returns {Promise<Array>} List of consultations
+   */
+  async getAllConsultations(filters = {}) {
+    try {
+      let query = supabase
+        .from(TABLES.CONSULTATIONS)
+        .select(`
+          *,
+          customer:customers(*),
+          property:properties(*),
+          agent:agents(*)
+        `)
+        .order('created_at', { ascending: false })
+
+      if (filters.status) {
+        query = query.eq('status', filters.status)
+      }
+      if (filters.customerId) {
+        query = query.eq('customer_id', filters.customerId)
+      }
+      if (filters.propertyId) {
+        query = query.eq('property_id', filters.propertyId)
+      }
+
+      const { data, error } = await query
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error fetching consultations:', error)
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  /**
+   * Get consultation by ID
+   * @param {string} id - Consultation UUID
+   * @returns {Promise<Object>} Consultation details
+   */
+  async getConsultationById(id) {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.CONSULTATIONS)
+        .select(`
+          *,
+          customer:customers(*),
+          property:properties(*),
+          agent:agents(*)
+        `)
+        .eq('id', id)
+        .single()
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error fetching consultation:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
+   * Add new consultation
+   * @param {Object} consultationData - Consultation information
+   * @returns {Promise<Object>} Created consultation
+   */
+  async addConsultation(consultationData) {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.CONSULTATIONS)
+        .insert([{
+          customer_id: consultationData.customerId,
+          property_id: consultationData.propertyId,
+          agent_id: consultationData.agentId,
+          case_number: consultationData.caseNumber,
+          consultation_type: consultationData.consultationType || 'property_inquiry',
+          status: consultationData.status || 'pending',
+          scheduled_date: consultationData.scheduledDate,
+          notes: consultationData.notes,
+          customer_name: consultationData.customerName,
+          customer_email: consultationData.customerEmail,
+          customer_phone: consultationData.customerPhone,
+          message: consultationData.message
+        }])
+        .select()
+        .single()
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error adding consultation:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
+   * Update consultation
+   * @param {string} id - Consultation ID
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<Object>} Updated consultation
+   */
+  async updateConsultation(id, updates) {
+    try {
+      const updateData = {}
+      
+      if (updates.status) updateData.status = updates.status
+      if (updates.scheduledDate) updateData.scheduled_date = updates.scheduledDate
+      if (updates.notes) updateData.notes = updates.notes
+      if (updates.agentId) updateData.agent_id = updates.agentId
+
+      const { data, error } = await supabase
+        .from(TABLES.CONSULTATIONS)
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single()
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error updating consultation:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
+   * Delete consultation
+   * @param {string} id - Consultation ID
+   * @returns {Promise<Object>} Result
+   */
+  async deleteConsultation(id) {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.CONSULTATIONS)
+        .delete()
+        .eq('id', id)
+        .select()
+        .single()
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error deleting consultation:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
+   * Get consultation statistics
+   * @returns {Promise<Object>} Statistics
+   */
+  async getConsultationStats() {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.CONSULTATIONS)
+        .select('status')
+
+      if (error) throw error
+
+      const stats = {
+        total: data.length,
+        pending: data.filter(c => c.status === 'pending').length,
+        scheduled: data.filter(c => c.status === 'scheduled').length,
+        completed: data.filter(c => c.status === 'completed').length,
+        cancelled: data.filter(c => c.status === 'cancelled').length
+      }
+
+      return { success: true, data: stats }
+    } catch (error) {
+      console.error('Error getting consultation stats:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  // ============================================
+  // LEADS MANAGEMENT
+  // ============================================
+
+  /**
+   * Get all leads
+   * @param {Object} filters - Optional filters
+   * @returns {Promise<Array>} List of leads
+   */
+  async getAllLeads(filters = {}) {
+    try {
+      let query = supabase
+        .from(TABLES.LEADS)
+        .select(`
+          *,
+          customer:customers(*),
+          property:properties(*),
+          agent:agents(*)
+        `)
+        .order('created_at', { ascending: false })
+
+      if (filters.status) {
+        query = query.eq('status', filters.status)
+      }
+      if (filters.priority) {
+        query = query.eq('priority', filters.priority)
+      }
+      if (filters.customerId) {
+        query = query.eq('customer_id', filters.customerId)
+      }
+
+      const { data, error } = await query
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error fetching leads:', error)
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  /**
+   * Add new lead
+   * @param {Object} leadData - Lead information
+   * @returns {Promise<Object>} Created lead
+   */
+  async addLead(leadData) {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.LEADS)
+        .insert([{
+          customer_id: leadData.customerId,
+          property_id: leadData.propertyId,
+          agent_id: leadData.agentId,
+          status: leadData.status || 'new',
+          priority: leadData.priority || 'medium',
+          source: leadData.source,
+          notes: leadData.notes,
+          follow_up_date: leadData.followUpDate
+        }])
+        .select()
+        .single()
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error adding lead:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
+   * Update lead
+   * @param {string} id - Lead ID
+   * @param {Object} updates - Fields to update
+   * @returns {Promise<Object>} Updated lead
+   */
+  async updateLead(id, updates) {
+    try {
+      const updateData = {}
+      
+      if (updates.status) updateData.status = updates.status
+      if (updates.priority) updateData.priority = updates.priority
+      if (updates.notes) updateData.notes = updates.notes
+      if (updates.followUpDate) updateData.follow_up_date = updates.followUpDate
+      if (updates.agentId) updateData.agent_id = updates.agentId
+
+      const { data, error } = await supabase
+        .from(TABLES.LEADS)
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single()
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error updating lead:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
+   * Delete lead
+   * @param {string} id - Lead ID
+   * @returns {Promise<Object>} Result
+   */
+  async deleteLead(id) {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.LEADS)
+        .delete()
+        .eq('id', id)
+        .select()
+        .single()
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error deleting lead:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
+   * Get lead statistics
+   * @returns {Promise<Object>} Statistics
+   */
+  async getLeadStats() {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.LEADS)
+        .select('status, priority')
+
+      if (error) throw error
+
+      const stats = {
+        total: data.length,
+        new: data.filter(l => l.status === 'new').length,
+        contacted: data.filter(l => l.status === 'contacted').length,
+        qualified: data.filter(l => l.status === 'qualified').length,
+        converted: data.filter(l => l.status === 'converted').length,
+        highPriority: data.filter(l => l.priority === 'high').length
+      }
+
+      return { success: true, data: stats }
+    } catch (error) {
+      console.error('Error getting lead stats:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+}
+
+// Export singleton instance
+export const consultationService = new ConsultationService()
+export default consultationService

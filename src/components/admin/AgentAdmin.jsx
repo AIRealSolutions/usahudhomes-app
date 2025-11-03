@@ -18,7 +18,7 @@ import {
   Upload,
   Building
 } from 'lucide-react'
-import agentManagement from '../../services/agentManagement.js'
+import { agentService } from '../../services/database'
 
 function AgentAdmin() {
   const [agents, setAgents] = useState([])
@@ -53,15 +53,19 @@ function AgentAdmin() {
     }
   }
 
-  function loadAgents() {
-    const allAgents = agentManagement.getAllAgents()
-    setAgents(allAgents)
+  async function loadAgents() {
+    const result = await agentService.getAllAgents()
+    if (result.success) {
+      setAgents(result.data)
+    }
   }
 
   function handleSearch() {
     if (searchQuery.trim()) {
-      const results = agentManagement.searchAgents(searchQuery)
-      setAgents(results)
+      const result = await agentService.searchAgents(searchQuery)
+      if (result.success) {
+        setAgents(result.data)
+      }
     } else {
       loadAgents()
     }
@@ -100,8 +104,12 @@ function AgentAdmin() {
     
     if (confirm(`Are you sure you want to delete ${agent.name}?`)) {
       try {
-        agentManagement.deleteAgent(agent.id)
-        loadAgents()
+        const result = await agentService.deleteAgent(agent.id)
+        if (result.success) {
+          loadAgents()
+        } else {
+          alert('Error: ' + result.error)
+        }
         alert('Agent deleted successfully!')
       } catch (error) {
         alert(error.message)
@@ -122,12 +130,17 @@ function AgentAdmin() {
       yearsExperience: parseInt(formData.yearsExperience) || 0
     }
 
+    let result
     if (editingAgent) {
-      agentManagement.updateAgent(editingAgent.id, agentData)
-      alert('Agent updated successfully!')
+      result = await agentService.updateAgent(editingAgent.id, agentData)
+      if (result.success) {
+        alert('Agent updated successfully!')
+      }
     } else {
-      agentManagement.addAgent(agentData)
-      alert('Agent added successfully!')
+      result = await agentService.createAgent(agentData)
+      if (result.success) {
+        alert('Agent added successfully!')
+      }
     }
 
     setShowForm(false)
@@ -142,8 +155,10 @@ function AgentAdmin() {
     setEditingAgent(null)
   }
 
-  function handleExport() {
-    const data = agentManagement.exportAgents()
+  async function handleExport() {
+    const result = await agentService.getAllAgents()
+    if (!result.success) return
+    const data = result.data
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -160,8 +175,13 @@ function AgentAdmin() {
       reader.onload = (event) => {
         try {
           const data = JSON.parse(event.target.result)
-          if (agentManagement.importAgents(data)) {
-            loadAgents()
+          let successCount = 0
+          for (const agent of data.agents || data) {
+            const result = await agentService.createAgent(agent)
+            if (result.success) successCount++
+          }
+          loadAgents()
+          alert(`Imported ${successCount} agents successfully!`)
             alert('Agents imported successfully!')
           } else {
             alert('Invalid import file format')
@@ -188,7 +208,23 @@ function AgentAdmin() {
     setFormData({...formData, specialties: newSpecialties})
   }
 
-  const stats = agentManagement.getAgentStats()
+  const [stats, setStats] = useState({ total: 0, active: 0, totalListings: 0, totalSales: 0 })
+  
+  useEffect(() => {
+    async function loadStats() {
+      const result = await agentService.getAllAgents()
+      if (result.success) {
+        const agents = result.data
+        setStats({
+          total: agents.length,
+          active: agents.filter(a => a.status === 'active').length,
+          totalListings: agents.reduce((sum, a) => sum + (a.listings || 0), 0),
+          totalSales: agents.reduce((sum, a) => sum + (a.sales || 0), 0)
+        })
+      }
+    }
+    loadStats()
+  }, [agents])
 
   return (
     <div className="space-y-6">

@@ -23,132 +23,10 @@ import {
   AlertCircle,
   Camera
 } from 'lucide-react'
-import customerDB from '../services/customerDatabase.js'
+import { propertyService, consultationService, customerService } from '../services/database'
 import emailService from '../services/emailService.js'
 
-// Real HUD Property Database
-const RealHudProperties = {
-  '387-111612': {
-    caseNumber: '387-111612',
-    address: '80 Prong Creek Ln',
-    city: 'Yanceyville',
-    state: 'NC',
-    zipCode: '27379',
-    county: 'Caswell County',
-    price: 544000,
-    bedrooms: 3,
-    bathrooms: 2,
-    sqFt: 3073,
-    lotSize: '5.52 acres',
-    yearBuilt: 2005,
-    status: 'BIDS OPEN',
-    bidDeadline: '2025-11-03T23:59:59',
-    propertyType: 'Single Family Home',
-    description: 'Beautiful single-family home on 5.52 acres in Caswell County. This spacious property features 3 bedrooms, 2 bathrooms, and 3,073 square feet of living space.',
-    images: ['/property-images/387-111612.jpeg'],
-    amenities: {
-      indoor: ['Fireplace', 'Open Floor Plan', 'Master Suite', 'Walk-in Closets'],
-      outdoor: ['Patio/Deck', 'Porch', 'Large Lot'],
-      parking: 'Garage (2 spaces)'
-    }
-  },
-  '387-570372': {
-    caseNumber: '387-570372',
-    address: '2105 Fathom Way',
-    city: 'Charlotte',
-    state: 'NC',
-    zipCode: '28269',
-    county: 'Mecklenburg County',
-    price: 365000,
-    bedrooms: 4,
-    bathrooms: 2.1,
-    sqFt: 2850,
-    lotSize: '0.25 acres',
-    yearBuilt: 2008,
-    status: 'BIDS OPEN',
-    bidDeadline: '2025-11-03T23:59:59',
-    propertyType: 'Single Family Home',
-    description: 'Modern two-story home in desirable Charlotte neighborhood. Features 4 bedrooms, 2.1 bathrooms, and 2,850 square feet of well-designed living space.',
-    images: ['/property-images/387-570372.jpeg'],
-    amenities: {
-      indoor: ['Modern Kitchen', 'Family Room', 'Master Suite', 'Hardwood Floors'],
-      outdoor: ['Back Deck', 'Fenced Yard'],
-      parking: 'Attached Garage (2 spaces)'
-    }
-  },
-  '387-412268': {
-    caseNumber: '387-412268',
-    address: '162 Black Horse Ln',
-    city: 'Kittrell',
-    state: 'NC',
-    zipCode: '27544',
-    county: 'Vance County',
-    price: 336150,
-    bedrooms: 3,
-    bathrooms: 3,
-    sqFt: 2650,
-    lotSize: '1.8 acres',
-    yearBuilt: 2001,
-    status: 'PRICE REDUCED',
-    bidDeadline: '2025-11-03T23:59:59',
-    propertyType: 'Single Family Home',
-    description: 'Elegant two-story home on 1.8 acres in Vance County. Features 3 bedrooms, 3 bathrooms, and 2,650 square feet with quality construction.',
-    images: ['/property-images/387-412268.jpeg'],
-    amenities: {
-      indoor: ['Formal Dining Room', 'Family Room', 'Master Suite'],
-      outdoor: ['Front Porch', 'Private Setting', 'Mature Trees'],
-      parking: 'Attached Garage (2 spaces)'
-    }
-  },
-  '381-799288': {
-    caseNumber: '381-799288',
-    address: '3009 Wynston Way',
-    city: 'Clayton',
-    state: 'NC',
-    zipCode: '27520',
-    county: 'Johnston County',
-    price: 310500,
-    bedrooms: 3,
-    bathrooms: 2,
-    sqFt: 2200,
-    lotSize: '0.3 acres',
-    yearBuilt: 2015,
-    status: 'BIDS OPEN',
-    bidDeadline: '2025-11-03T23:59:59',
-    propertyType: 'Single Family Home',
-    description: 'Clean single-story ranch home in Johnston County. Features 3 bedrooms, 2 bathrooms, and 2,200 square feet with modern styling.',
-    images: ['/property-images/381-799288.jpeg'],
-    amenities: {
-      indoor: ['Open Floor Plan', 'Modern Kitchen', 'Master Suite'],
-      outdoor: ['Back Patio', 'Landscaped Yard'],
-      parking: 'Attached Garage (2 spaces)'
-    }
-  },
-  '482-521006': {
-    caseNumber: '482-521006',
-    address: '1234 Main St',
-    city: 'Mc Kenzie',
-    state: 'TN',
-    zipCode: '38201',
-    county: 'Carroll County',
-    price: 147200,
-    bedrooms: 4,
-    bathrooms: 2,
-    sqFt: 2400,
-    lotSize: '0.5 acres',
-    yearBuilt: 1995,
-    status: 'PRICE REDUCED',
-    bidDeadline: '2025-11-03T23:59:59',
-    propertyType: 'Single Family Home',
-    description: 'Spacious four-bedroom home in Carroll County, Tennessee. Features 4 bedrooms, 2 bathrooms, and 2,400 square feet at an excellent price.',
-    images: ['/property-images/482-521006.jpeg'],
-    amenities: {
-      indoor: ['Large Living Room', 'Dining Room', 'Four Bedrooms'],
-      outdoor: ['Front Porch', 'Large Lot'],
-      parking: 'Carport'
-    }
-  }
-};
+
 
 function PropertyConsultation() {
   const { caseNumber } = useParams()
@@ -167,19 +45,16 @@ function PropertyConsultation() {
   })
 
   useEffect(() => {
-    // Load property data
-    const foundProperty = RealHudProperties[caseNumber]
-    setProperty(foundProperty)
-    setLoading(false)
-
-    // Initialize chatbot
-    if (foundProperty) {
-      setChatMessages([{
-        type: 'bot',
-        message: `Hello! I'm here to help you with the ${foundProperty.address} property in ${foundProperty.city}, ${foundProperty.state}. This ${foundProperty.bedrooms} bedroom, ${foundProperty.bathrooms} bathroom home is priced at $${foundProperty.price.toLocaleString()}. What would you like to know?`,
-        timestamp: new Date()
-      }])
+    // Load property from Supabase by case number
+    const loadProperty = async () => {
+      setLoading(true)
+      const result = await propertyService.getPropertyByCaseNumber(caseNumber)
+      if (result.success) {
+        setProperty(result.data)
+      }
+      setLoading(false)
     }
+    loadProperty()
   }, [caseNumber])
 
   const handleContactSubmit = async (e) => {

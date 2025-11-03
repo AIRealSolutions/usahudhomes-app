@@ -22,6 +22,7 @@ import {
   Share2,
   Camera
 } from 'lucide-react'
+import { propertyService } from '../services/database'
 
 function PropertyDetail() {
   const { propertyId } = useParams()
@@ -38,12 +39,16 @@ function PropertyDetail() {
   })
 
   useEffect(() => {
-    // Load property from propertyManagement service
-    setTimeout(() => {
-      const foundProperty = propertyManagement.getPropertyById(propertyId)
-      setProperty(foundProperty)
+    // Load property from Supabase
+    const loadProperty = async () => {
+      setLoading(true)
+      const result = await propertyService.getPropertyById(propertyId)
+      if (result.success) {
+        setProperty(result.data)
+      }
       setLoading(false)
-    }, 500)
+    }
+    loadProperty()
   }, [propertyId])
 
   const handleContactSubmit = (e) => {
