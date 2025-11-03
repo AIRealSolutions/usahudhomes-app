@@ -17,10 +17,14 @@ import {
 } from 'lucide-react'
 import customerDatabase from '../services/customerDatabase.js'
 import { brokerNetwork } from '../services/brokerNetwork.js'
+import PropertyAdmin from './admin/PropertyAdmin.jsx'
+import CustomerAdmin from './admin/CustomerAdmin.jsx'
+import AgentAdmin from './admin/AgentAdmin.jsx'
 
 function EnhancedBrokerDashboard({ onLogout }) {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
+  const [adminSubTab, setAdminSubTab] = useState('properties')
   const [searchTerm, setSearchTerm] = useState('')
   const [customers, setCustomers] = useState([])
   const [leads, setLeads] = useState([])
@@ -486,7 +490,8 @@ function EnhancedBrokerDashboard({ onLogout }) {
               { id: 'consultations', label: 'Consultations', icon: Calendar },
               { id: 'properties', label: 'Properties', icon: Home },
               { id: 'communications', label: 'Communications', icon: Mail },
-              { id: 'reports', label: 'Reports', icon: FileText }
+              { id: 'reports', label: 'Reports', icon: FileText },
+              { id: 'admin', label: 'Admin Panel', icon: Settings }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -510,11 +515,53 @@ function EnhancedBrokerDashboard({ onLogout }) {
         {activeTab === 'overview' && renderOverview()}
         {activeTab === 'customers' && renderCustomers()}
         {activeTab === 'consultations' && renderConsultations()}
-        {activeTab === 'properties' && (
-          <div className="text-center py-12">
-            <Home className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Property Management</h3>
-            <p className="text-gray-600">Property management features coming soon...</p>
+        {activeTab === 'properties' && <PropertyAdmin />}
+        {activeTab === 'admin' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Admin Panel</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <button
+                  onClick={() => setAdminSubTab('properties')}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    adminSubTab === 'properties'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-blue-300'
+                  }`}
+                >
+                  <Home className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+                  <div className="font-semibold">Properties</div>
+                  <div className="text-sm text-gray-600">Manage HUD properties</div>
+                </button>
+                <button
+                  onClick={() => setAdminSubTab('customers')}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    adminSubTab === 'customers'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-blue-300'
+                  }`}
+                >
+                  <Users className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                  <div className="font-semibold">Customers</div>
+                  <div className="text-sm text-gray-600">Manage customer database</div>
+                </button>
+                <button
+                  onClick={() => setAdminSubTab('agents')}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    adminSubTab === 'agents'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-blue-300'
+                  }`}
+                >
+                  <Briefcase className="h-8 w-8 mx-auto mb-2 text-purple-600" />
+                  <div className="font-semibold">Agents</div>
+                  <div className="text-sm text-gray-600">Manage agent network</div>
+                </button>
+              </div>
+            </div>
+            {adminSubTab === 'properties' && <PropertyAdmin />}
+            {adminSubTab === 'customers' && <CustomerAdmin />}
+            {adminSubTab === 'agents' && <AgentAdmin />}
           </div>
         )}
         {activeTab === 'communications' && (
