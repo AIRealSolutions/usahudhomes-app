@@ -123,25 +123,25 @@ class PropertyService {
       const { data, error } = await supabase
         .from(TABLES.PROPERTIES)
         .insert([{
-          case_number: propertyData.caseNumber,
+          case_number: propertyData.case_number || propertyData.caseNumber,
           address: propertyData.address,
           city: propertyData.city,
           state: propertyData.state,
-          zip_code: propertyData.zipCode,
+          zip_code: propertyData.zip_code || propertyData.zipCode,
           county: propertyData.county,
           price: propertyData.price,
           beds: propertyData.beds,
           baths: propertyData.baths,
-          sq_ft: propertyData.sqFt,
-          lot_size: propertyData.lotSize,
-          year_built: propertyData.yearBuilt,
+          sq_ft: propertyData.sq_ft || propertyData.sqFt,
+          lot_size: propertyData.lot_size || propertyData.lotSize,
+          year_built: propertyData.year_built || propertyData.yearBuilt,
           status: propertyData.status || 'AVAILABLE',
-          property_type: propertyData.propertyType || 'Single Family',
+          property_type: propertyData.property_type || propertyData.propertyType || 'Single Family',
           description: propertyData.description,
           features: propertyData.features || [],
           images: propertyData.images || [],
-          main_image: propertyData.mainImage,
-          bid_deadline: propertyData.bidDeadline,
+          main_image: propertyData.main_image || propertyData.mainImage,
+          bid_deadline: propertyData.bid_deadline || propertyData.bidDeadline,
           is_active: true
         }])
         .select()
@@ -164,26 +164,26 @@ class PropertyService {
     try {
       const updateData = {}
       
-      if (updates.caseNumber) updateData.case_number = updates.caseNumber
+      if (updates.case_number || updates.caseNumber) updateData.case_number = updates.case_number || updates.caseNumber
       if (updates.address) updateData.address = updates.address
       if (updates.city) updateData.city = updates.city
       if (updates.state) updateData.state = updates.state
-      if (updates.zipCode) updateData.zip_code = updates.zipCode
+      if (updates.zip_code || updates.zipCode) updateData.zip_code = updates.zip_code || updates.zipCode
       if (updates.county) updateData.county = updates.county
       if (updates.price !== undefined) updateData.price = updates.price
       if (updates.beds !== undefined) updateData.beds = updates.beds
       if (updates.baths !== undefined) updateData.baths = updates.baths
-      if (updates.sqFt !== undefined) updateData.sq_ft = updates.sqFt
-      if (updates.lotSize) updateData.lot_size = updates.lotSize
-      if (updates.yearBuilt) updateData.year_built = updates.yearBuilt
+      if (updates.sq_ft !== undefined || updates.sqFt !== undefined) updateData.sq_ft = updates.sq_ft || updates.sqFt
+      if (updates.lot_size || updates.lotSize) updateData.lot_size = updates.lot_size || updates.lotSize
+      if (updates.year_built || updates.yearBuilt) updateData.year_built = updates.year_built || updates.yearBuilt
       if (updates.status) updateData.status = updates.status
-      if (updates.propertyType) updateData.property_type = updates.propertyType
-      if (updates.description) updateData.description = updates.description
+      if (updates.property_type || updates.propertyType) updateData.property_type = updates.property_type || updates.propertyType
+      if (updates.description !== undefined) updateData.description = updates.description
       if (updates.features) updateData.features = updates.features
       if (updates.images) updateData.images = updates.images
-      if (updates.mainImage) updateData.main_image = updates.mainImage
-      if (updates.bidDeadline) updateData.bid_deadline = updates.bidDeadline
-      if (updates.isActive !== undefined) updateData.is_active = updates.isActive
+      if (updates.main_image || updates.mainImage) updateData.main_image = updates.main_image || updates.mainImage
+      if (updates.bid_deadline || updates.bidDeadline) updateData.bid_deadline = updates.bid_deadline || updates.bidDeadline
+      if (updates.is_active !== undefined || updates.isActive !== undefined) updateData.is_active = updates.is_active !== undefined ? updates.is_active : updates.isActive
 
       const { data, error } = await supabase
         .from(TABLES.PROPERTIES)
