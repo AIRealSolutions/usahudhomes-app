@@ -66,22 +66,36 @@ function PropertyConsultation() {
     }
 
     try {
-      // Add consultation to database
+      // Add consultation to Supabase database
       const consultationData = {
-        ...contactForm,
-        propertyId: caseNumber,
-        propertyAddress: property ? `${property.address}, ${property.city}, ${property.state}` : 'Unknown property'
+        caseNumber: caseNumber,
+        propertyId: property?.id,
+        customerName: contactForm.name,
+        customerEmail: contactForm.email,
+        customerPhone: contactForm.phone,
+        message: contactForm.message,
+        consultationType: contactForm.consultationType,
+        status: 'pending'
       }
       
-      const consultation = customerDB.addConsultation(consultationData)
+      const result = await consultationService.addConsultation(consultationData)
       
-      // Send email notification
-      await emailService.sendConsultationNotification(consultation)
-      
-      alert(`Thank you ${contactForm.name}! Your consultation request has been submitted for property ${caseNumber}. Marc Spencer from Lightkeeper Realty will contact you within 2 hours during business hours.`)
-      
-      setShowContactForm(false)
-      setContactForm({ name: '', email: '', phone: '', message: '', consultationType: 'general' })
+      if (result.success) {
+        // Send email notification
+        try {
+          await emailService.sendConsultationNotification(result.data)
+        } catch (emailError) {
+          console.error('Email notification failed:', emailError)
+          // Continue even if email fails
+        }
+        
+        alert(`Thank you ${contactForm.name}! Your consultation request has been submitted for property ${caseNumber}. Marc Spencer from Lightkeeper Realty will contact you within 2 hours during business hours.`)
+        
+        setShowContactForm(false)
+        setContactForm({ name: '', email: '', phone: '', message: '', consultationType: 'general' })
+      } else {
+        throw new Error(result.error || 'Failed to save consultation')
+      }
     } catch (error) {
       console.error('Error submitting consultation:', error)
       alert('There was an error submitting your consultation. Please try again.')
@@ -97,23 +111,23 @@ function PropertyConsultation() {
       message: currentMessage,
       timestamp: new Date()
     }
-
-    // Log chat interaction as a lead
+    // Log chat interaction as a consultation in Supabase
     try {
-      const leadData = {
-        name: 'Chat User',
-        email: 'chat@usahudhomes.com',
-        phone: 'Via Chat',
-        state: property?.state || 'Unknown',
-        propertyCase: caseNumber,
+      const consultationData = {
+        caseNumber: caseNumber,
+        propertyId: property?.id,
+        customerName: 'Chat User',
+        customerEmail: 'chat@usahudhomes.com',
+        customerPhone: 'Via Chat',
         message: currentMessage,
-        source: 'chatbot'
+        consultationType: 'chatbot',
+        status: 'chat'
       }
       
-      customerDB.addLead(leadData)
+      await consultationService.addConsultation(consultationData)
     } catch (error) {
       console.error('Error logging chat interaction:', error)
-    }
+    }}
 
     // Simple bot responses
     let botResponse = "I'd be happy to help you with that! For detailed information about this property, please contact Marc Spencer at (910) 363-6147 or submit the consultation form."
@@ -242,7 +256,7 @@ function PropertyConsultation() {
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <Square className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-              <div className="font-semibold">{property.sqft ? property.sqft.toLocaleString() : 'N/A'}</div>
+              <div className="font-semibold">{property.sq_ft ? property.sq_ft.toLocaleString() : 'N/A'}</div>
               <div className="text-sm text-gray-600">Sq Ft</div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
@@ -292,11 +306,11 @@ function PropertyConsultation() {
               <CardContent>
                 <p className="text-gray-700 leading-relaxed mb-4">{property.description}</p>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {property.features && property.features.length > 0 && (
                   <div>
-                    <h3 className="font-semibold text-lg mb-3">Indoor Features</h3>
-                    <ul className="space-y-2">
-                      {property.amenities.indoor.map((feature, index) => (
+                    <h3 className="font-semibold text-lg mb-3">Property Features</h3>
+                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {property.features.map((feature, index) => (
                         <li key={index} className="flex items-center gap-2 text-sm">
                           <CheckCircle className="h-4 w-4 text-green-600" />
                           {feature}
@@ -304,19 +318,7 @@ function PropertyConsultation() {
                       ))}
                     </ul>
                   </div>
-                  
-                  <div>
-                    <h3 className="font-semibold text-lg mb-3">Outdoor Features</h3>
-                    <ul className="space-y-2">
-                      {property.amenities.outdoor.map((feature, index) => (
-                        <li key={index} className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>

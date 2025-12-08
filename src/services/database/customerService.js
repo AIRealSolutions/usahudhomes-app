@@ -107,24 +107,28 @@ class CustomerService {
       const { data, error } = await supabase
         .from(TABLES.CUSTOMERS)
         .insert([{
-          first_name: customerData.firstName,
-          last_name: customerData.lastName,
+          first_name: customerData.firstName || customerData.first_name,
+          last_name: customerData.lastName || customerData.last_name,
           email: customerData.email,
           phone: customerData.phone,
           address: customerData.address,
           city: customerData.city,
           state: customerData.state,
-          zip_code: customerData.zipCode,
+          zip_code: customerData.zipCode || customerData.zip_code,
           status: customerData.status || 'new',
-          lead_source: customerData.leadSource,
+          lead_source: customerData.leadSource || customerData.lead_source,
           notes: customerData.notes,
           tags: customerData.tags || [],
           is_active: true
         }])
         .select()
-        .single()
 
-      return formatSupabaseResponse(data, error)
+      if (error) {
+        console.error('Supabase insert error:', error)
+        return { success: false, error: error.message, data: null }
+      }
+
+      return { success: true, data: data && data.length > 0 ? data[0] : null }
     } catch (error) {
       console.error('Error adding customer:', error)
       return { success: false, error: error.message, data: null }
@@ -141,28 +145,38 @@ class CustomerService {
     try {
       const updateData = {}
       
-      if (updates.firstName) updateData.first_name = updates.firstName
-      if (updates.lastName) updateData.last_name = updates.lastName
+      if (updates.firstName || updates.first_name) updateData.first_name = updates.firstName || updates.first_name
+      if (updates.lastName || updates.last_name) updateData.last_name = updates.lastName || updates.last_name
       if (updates.email) updateData.email = updates.email
       if (updates.phone) updateData.phone = updates.phone
       if (updates.address) updateData.address = updates.address
       if (updates.city) updateData.city = updates.city
       if (updates.state) updateData.state = updates.state
-      if (updates.zipCode) updateData.zip_code = updates.zipCode
+      if (updates.zipCode || updates.zip_code) updateData.zip_code = updates.zipCode || updates.zip_code
       if (updates.status) updateData.status = updates.status
-      if (updates.leadSource) updateData.lead_source = updates.leadSource
+      if (updates.leadSource || updates.lead_source) updateData.lead_source = updates.leadSource || updates.lead_source
       if (updates.notes) updateData.notes = updates.notes
       if (updates.tags) updateData.tags = updates.tags
-      if (updates.isActive !== undefined) updateData.is_active = updates.isActive
+      if (updates.isActive !== undefined || updates.is_active !== undefined) updateData.is_active = updates.isActive !== undefined ? updates.isActive : updates.is_active
+
+      updateData.updated_at = new Date().toISOString()
 
       const { data, error } = await supabase
         .from(TABLES.CUSTOMERS)
         .update(updateData)
         .eq('id', id)
         .select()
-        .single()
 
-      return formatSupabaseResponse(data, error)
+      if (error) {
+        console.error('Supabase update error:', error)
+        return { success: false, error: error.message, data: null }
+      }
+
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Customer not found', data: null }
+      }
+
+      return { success: true, data: data[0] }
     } catch (error) {
       console.error('Error updating customer:', error)
       return { success: false, error: error.message, data: null }
@@ -178,12 +192,23 @@ class CustomerService {
     try {
       const { data, error } = await supabase
         .from(TABLES.CUSTOMERS)
-        .update({ is_active: false })
+        .update({ 
+          is_active: false,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', id)
         .select()
-        .single()
 
-      return formatSupabaseResponse(data, error)
+      if (error) {
+        console.error('Supabase delete error:', error)
+        return { success: false, error: error.message, data: null }
+      }
+
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Customer not found', data: null }
+      }
+
+      return { success: true, data: data[0] }
     } catch (error) {
       console.error('Error deleting customer:', error)
       return { success: false, error: error.message, data: null }

@@ -91,9 +91,13 @@ class ConsultationService {
           message: consultationData.message
         }])
         .select()
-        .single()
 
-      return formatSupabaseResponse(data, error)
+      if (error) {
+        console.error('Supabase insert error:', error)
+        return { success: false, error: error.message, data: null }
+      }
+
+      return { success: true, data: data && data.length > 0 ? data[0] : null }
     } catch (error) {
       console.error('Error adding consultation:', error)
       return { success: false, error: error.message, data: null }
@@ -120,9 +124,17 @@ class ConsultationService {
         .update(updateData)
         .eq('id', id)
         .select()
-        .single()
 
-      return formatSupabaseResponse(data, error)
+      if (error) {
+        console.error('Supabase update error:', error)
+        return { success: false, error: error.message, data: null }
+      }
+
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Consultation not found', data: null }
+      }
+
+      return { success: true, data: data[0] }
     } catch (error) {
       console.error('Error updating consultation:', error)
       return { success: false, error: error.message, data: null }
@@ -141,9 +153,17 @@ class ConsultationService {
         .delete()
         .eq('id', id)
         .select()
-        .single()
 
-      return formatSupabaseResponse(data, error)
+      if (error) {
+        console.error('Supabase delete error:', error)
+        return { success: false, error: error.message, data: null }
+      }
+
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Consultation not found', data: null }
+      }
+
+      return { success: true, data: data[0] }
     } catch (error) {
       console.error('Error deleting consultation:', error)
       return { success: false, error: error.message, data: null }
