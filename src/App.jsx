@@ -281,18 +281,18 @@ function FeaturedProperties({ properties }) {
           {properties.map((property) => (
             <Card key={property.id} className="hover:shadow-lg transition-shadow">
               <div className="h-48 bg-gradient-to-br from-gray-200 to-gray-300 rounded-t-lg overflow-hidden">
-                {property.image ? (
+                {property.main_image ? (
                   <img 
-                    src={property.image} 
+                    src={property.main_image} 
                     alt={`${property.address} - ${property.city}, ${property.state}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
+                      e.target.style.display = 'none'
+                      e.target.nextElementSibling.style.display = 'flex'
                     }}
                   />
                 ) : null}
-                <div className="w-full h-full flex items-center justify-center" style={{display: property.image ? 'none' : 'flex'}}>
+                <div className="w-full h-full flex items-center justify-center" style={{display: property.main_image ? 'none' : 'flex'}}>
                   <Home className="h-16 w-16 text-gray-400" />
                 </div>
               </div>

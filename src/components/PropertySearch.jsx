@@ -288,9 +288,24 @@ const PropertySearch = () => {
           {properties.map((property) => (
             <Card key={property.id} className="group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
               <div className="relative">
-                <div className="h-48 bg-gradient-to-br from-gray-200 to-gray-300 rounded-t-lg flex items-center justify-center overflow-hidden">
-                  <Home className="h-16 w-16 text-gray-400" />
-                  {/* In production, replace with actual property images */}
+                <div className="h-48 bg-gradient-to-br from-gray-200 to-gray-300 rounded-t-lg overflow-hidden">
+                  {property.main_image ? (
+                    <img 
+                      src={property.main_image} 
+                      alt={`${property.address} - Property Photo`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextElementSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div 
+                    className="w-full h-full flex items-center justify-center"
+                    style={{display: property.main_image ? 'none' : 'flex'}}
+                  >
+                    <Home className="h-16 w-16 text-gray-400" />
+                  </div>
                 </div>
                 
                 {/* Status Badge */}
