@@ -232,22 +232,22 @@ function PropertyConsultation() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <Bed className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-              <div className="font-semibold">{property.bedrooms}</div>
+              <div className="font-semibold">{property.beds}</div>
               <div className="text-sm text-gray-600">Bedrooms</div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <Bath className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-              <div className="font-semibold">{property.bathrooms}</div>
+              <div className="font-semibold">{property.baths}</div>
               <div className="text-sm text-gray-600">Bathrooms</div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <Square className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-              <div className="font-semibold">{property.sqFt.toLocaleString()}</div>
+              <div className="font-semibold">{property.sqft?.toLocaleString()}</div>
               <div className="text-sm text-gray-600">Sq Ft</div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <Calendar className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-              <div className="font-semibold">{property.yearBuilt}</div>
+              <div className="font-semibold">{property.year_built}</div>
               <div className="text-sm text-gray-600">Year Built</div>
             </div>
           </div>
