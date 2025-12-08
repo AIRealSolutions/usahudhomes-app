@@ -67,9 +67,19 @@ class CustomerService {
         .select('*')
         .eq('email', email)
         .eq('is_active', true)
-        .single()
 
-      return formatSupabaseResponse(data, error)
+      // If no customer found, return success: false with null data
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Customer not found', data: null }
+      }
+
+      if (error) {
+        console.error('Supabase error:', error)
+        return { success: false, error: error.message, data: null }
+      }
+
+      // Return the first customer found
+      return { success: true, data: data[0] }
     } catch (error) {
       console.error('Error fetching customer:', error)
       return { success: false, error: error.message, data: null }

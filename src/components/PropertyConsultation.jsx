@@ -66,8 +66,46 @@ function PropertyConsultation() {
     }
 
     try {
-      // Add consultation to Supabase database
+      // Step 1: Check if customer exists by email
+      let customerId = null
+      const existingCustomer = await customerService.getCustomerByEmail(contactForm.email)
+      
+      if (existingCustomer.success && existingCustomer.data) {
+        // Customer exists, use their ID
+        customerId = existingCustomer.data.id
+        console.log('Existing customer found:', customerId)
+      } else {
+        // Step 2: Create new customer/lead record
+        const nameParts = contactForm.name.trim().split(' ')
+        const firstName = nameParts[0] || contactForm.name
+        const lastName = nameParts.slice(1).join(' ') || ''
+        
+        const customerData = {
+          firstName: firstName,
+          lastName: lastName,
+          email: contactForm.email,
+          phone: contactForm.phone,
+          state: property?.state || 'NC',
+          status: 'new',
+          leadSource: 'consultation_form',
+          notes: `Interested in property ${caseNumber} - ${property?.address || 'Unknown address'}`,
+          tags: ['consultation', 'website_lead', caseNumber]
+        }
+        
+        const customerResult = await customerService.addCustomer(customerData)
+        
+        if (customerResult.success) {
+          customerId = customerResult.data.id
+          console.log('New customer created:', customerId)
+        } else {
+          console.error('Failed to create customer:', customerResult.error)
+          // Continue anyway - consultation can still be saved without customer link
+        }
+      }
+      
+      // Step 3: Add consultation to Supabase database
       const consultationData = {
+        customerId: customerId,
         caseNumber: caseNumber,
         propertyId: property?.id,
         customerName: contactForm.name,
