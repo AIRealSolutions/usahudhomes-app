@@ -172,7 +172,7 @@ function AgentAdmin() {
     const file = e.target.files[0]
     if (file) {
       const reader = new FileReader()
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
           const data = JSON.parse(event.target.result)
           let successCount = 0
