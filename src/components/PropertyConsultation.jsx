@@ -127,7 +127,7 @@ function PropertyConsultation() {
       await consultationService.addConsultation(consultationData)
     } catch (error) {
       console.error('Error logging chat interaction:', error)
-    }}
+    }
 
     // Simple bot responses
     let botResponse = "I'd be happy to help you with that! For detailed information about this property, please contact Marc Spencer at (910) 363-6147 or submit the consultation form."
