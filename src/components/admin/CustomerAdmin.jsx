@@ -91,7 +91,7 @@ function CustomerAdmin() {
     }
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
 
     if (!formData.name || !formData.email || !formData.phone) {

@@ -60,7 +60,7 @@ function AgentAdmin() {
     }
   }
 
-  function handleSearch() {
+  async function handleSearch() {
     if (searchQuery.trim()) {
       const result = await agentService.searchAgents(searchQuery)
       if (result.success) {
@@ -96,7 +96,7 @@ function AgentAdmin() {
     setShowForm(true)
   }
 
-  function handleDelete(agent) {
+  async function handleDelete(agent) {
     if (agent.id === 'agent_marc_spencer') {
       alert('Cannot delete the primary agent (Marc Spencer)')
       return
@@ -117,7 +117,7 @@ function AgentAdmin() {
     }
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
 
     if (!formData.name || !formData.email || !formData.phone) {
@@ -168,7 +168,7 @@ function AgentAdmin() {
     URL.revokeObjectURL(url)
   }
 
-  function handleImport(e) {
+  async function handleImport(e) {
     const file = e.target.files[0]
     if (file) {
       const reader = new FileReader()

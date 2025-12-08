@@ -40,7 +40,7 @@ function Header({ isAuthenticated, onLogout }) {
           <div className="flex items-center">
             <Link to="/" className="flex items-center">
               <Home className="h-8 w-8 text-blue-600 mr-2" />
-              <span className="text-2xl font-bold text-gray-900">USAhudHomes.com</span>
+              <span className="text-2xl font-bold text-gray-900">USAHUDhomes.com</span>
             </Link>
           </div>
           
@@ -576,7 +576,7 @@ function Footer() {
           <div>
             <div className="flex items-center mb-4">
               <Home className="h-8 w-8 text-blue-400 mr-2" />
-              <span className="text-xl font-bold">USAhudHomes.com</span>
+              <span className="text-xl font-bold">USAHUDhomes.com</span>
             </div>
             <p className="text-gray-400 text-sm">
               Your trusted source for HUD homes and government foreclosure properties nationwide.
@@ -615,7 +615,7 @@ function Footer() {
         </div>
         
         <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
-          <p>&copy; 2025 USAhudHomes.com. All rights reserved. | Privacy Policy | Terms of Service</p>
+          <p>&copy; 2025 USAHUDhomes.com. All rights reserved. | Privacy Policy | Terms of Service</p>
         </div>
       </div>
     </footer>

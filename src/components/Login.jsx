@@ -123,7 +123,7 @@ function Login({ onLogin }) {
           </form>
 
           <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-800 mb-2">🏠 USAhudHomes.com</p>
+            <p className="text-sm text-blue-800 mb-2">🏠 USAHUDhomes.com</p>
             <div className="text-xs text-blue-600">
               <p>Secure access for HUD property management</p>
               <p>Contact Marc Spencer: (910) 363-6147</p>
