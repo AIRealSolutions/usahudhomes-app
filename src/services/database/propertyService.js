@@ -145,9 +145,14 @@ class PropertyService {
           is_active: true
         }])
         .select()
-        .single()
 
-      return formatSupabaseResponse(data, error)
+      if (error) {
+        console.error('Supabase insert error:', error)
+        return { success: false, error: error.message, data: null }
+      }
+
+      // Return the first inserted row
+      return { success: true, data: data && data.length > 0 ? data[0] : null }
     } catch (error) {
       console.error('Error adding property:', error)
       return { success: false, error: error.message, data: null }
@@ -185,14 +190,27 @@ class PropertyService {
       if (updates.bid_deadline || updates.bidDeadline) updateData.bid_deadline = updates.bid_deadline || updates.bidDeadline
       if (updates.is_active !== undefined || updates.isActive !== undefined) updateData.is_active = updates.is_active !== undefined ? updates.is_active : updates.isActive
 
+      // Add updated_at timestamp
+      updateData.updated_at = new Date().toISOString()
+
       const { data, error } = await supabase
         .from(TABLES.PROPERTIES)
         .update(updateData)
         .eq('id', id)
         .select()
-        .single()
 
-      return formatSupabaseResponse(data, error)
+      if (error) {
+        console.error('Supabase update error:', error)
+        return { success: false, error: error.message, data: null }
+      }
+
+      // Check if any rows were updated
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Property not found', data: null }
+      }
+
+      // Return the first (and should be only) updated row
+      return { success: true, data: data[0] }
     } catch (error) {
       console.error('Error updating property:', error)
       return { success: false, error: error.message, data: null }
@@ -208,12 +226,24 @@ class PropertyService {
     try {
       const { data, error } = await supabase
         .from(TABLES.PROPERTIES)
-        .update({ is_active: false })
+        .update({ 
+          is_active: false,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', id)
         .select()
-        .single()
 
-      return formatSupabaseResponse(data, error)
+      if (error) {
+        console.error('Supabase delete error:', error)
+        return { success: false, error: error.message, data: null }
+      }
+
+      // Check if any rows were updated
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Property not found', data: null }
+      }
+
+      return { success: true, data: data[0] }
     } catch (error) {
       console.error('Error deleting property:', error)
       return { success: false, error: error.message, data: null }
