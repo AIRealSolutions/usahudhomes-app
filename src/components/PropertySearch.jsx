@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { Button } from '@/components/ui/button.jsx'
@@ -349,7 +350,7 @@ const PropertySearch = () => {
                     {formatPrice(property.price)}
                   </span>
                   <span className="text-sm text-gray-500">
-                    Case #{property.id}
+                    Case #{property.case_number || property.caseNumber}
                   </span>
                 </div>
 
@@ -369,13 +370,17 @@ const PropertySearch = () => {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button className="flex-1 bg-blue-600 hover:bg-blue-700">
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Details
-                  </Button>
-                  <Button variant="outline" className="flex-1">
-                    Submit Interest
-                  </Button>
+                  <Link to={`/consult/${property.case_number || property.caseNumber}`} className="flex-1">
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Details
+                    </Button>
+                  </Link>
+                  <Link to={`/consult/${property.case_number || property.caseNumber}`} className="flex-1">
+                    <Button variant="outline" className="w-full">
+                      Submit Interest
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>

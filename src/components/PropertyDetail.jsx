@@ -189,7 +189,7 @@ function PropertyDetail() {
                       </div>
                     )}
                     <div className="text-sm text-gray-600">
-                      Case #{property.id}
+                      Case #{property.case_number || property.caseNumber}
                     </div>
                   </div>
                 </div>
@@ -410,7 +410,7 @@ function PropertyDetail() {
                 </div>
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-gray-400" />
-                  <span>HUD Case #{property.id}</span>
+                  <span>HUD Case #{property.case_number || property.caseNumber}</span>
                 </div>
               </CardContent>
             </Card>

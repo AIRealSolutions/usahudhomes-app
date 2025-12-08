@@ -216,7 +216,7 @@ I wanted to share this HUD property that matches your criteria:
 
 Property: ${property.address}
 Price: $${property.price.toLocaleString()}
-Case #: ${property.id}
+Case #: ${property.case_number || property.caseNumber}
 
 ${propertyShareData.message}
 
@@ -228,7 +228,7 @@ Special HUD Financing Available:
 ` : ''}
 
 To view full details and schedule a consultation, visit:
-https://usahudhomes-app.vercel.app/consult/${property.id}
+https://usahudhomes-app.vercel.app/consult/${property.case_number || property.caseNumber}
 
 Best regards,
 Marc Spencer
