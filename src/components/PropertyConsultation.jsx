@@ -165,7 +165,7 @@ function PropertyConsultation() {
     )
   }
 
-  const daysRemaining = Math.ceil((new Date(property.bidDeadline) - new Date()) / (1000 * 60 * 60 * 24))
+  const daysRemaining = Math.ceil((new Date(property.bid_deadline) - new Date()) / (1000 * 60 * 60 * 24))
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -197,7 +197,7 @@ function PropertyConsultation() {
           <div className="flex justify-between items-start mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{property.address}</h1>
-              <p className="text-xl text-gray-600">{property.city}, {property.state} {property.zipCode}</p>
+              <p className="text-xl text-gray-600">{property.city}, {property.state} {property.zip_code}</p>
               <p className="text-lg text-gray-500">{property.county}</p>
             </div>
             <div className="text-right">
@@ -208,7 +208,7 @@ function PropertyConsultation() {
                 {property.status}
               </Badge>
               <div className="text-sm text-gray-600">
-                Case #{property.caseNumber}
+                Case #{property.case_number}
               </div>
             </div>
           </div>
