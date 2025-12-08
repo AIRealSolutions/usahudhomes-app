@@ -165,7 +165,7 @@ function PropertyConsultation() {
     )
   }
 
-  const daysRemaining = Math.ceil((new Date(property.bid_deadline) - new Date()) / (1000 * 60 * 60 * 24))
+  const daysRemaining = property.bid_deadline ? Math.ceil((new Date(property.bid_deadline) - new Date()) / (1000 * 60 * 60 * 24)) : null
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -197,7 +197,7 @@ function PropertyConsultation() {
           <div className="flex justify-between items-start mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{property.address}</h1>
-              <p className="text-xl text-gray-600">{property.city}, {property.state} {property.zip_code}</p>
+              <p className="text-xl text-gray-600">{property.city}, {property.state} {property.zip_code || ''}</p>
               <p className="text-lg text-gray-500">{property.county}</p>
             </div>
             <div className="text-right">
@@ -214,7 +214,7 @@ function PropertyConsultation() {
           </div>
 
           {/* Urgency Banner */}
-          {daysRemaining <= 7 && (
+          {daysRemaining !== null && daysRemaining <= 7 && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
               <div className="flex items-center gap-2 text-red-800">
                 <AlertCircle className="h-5 w-5" />
@@ -232,22 +232,22 @@ function PropertyConsultation() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <Bed className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-              <div className="font-semibold">{property.beds}</div>
+              <div className="font-semibold">{property.beds || 'N/A'}</div>
               <div className="text-sm text-gray-600">Bedrooms</div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <Bath className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-              <div className="font-semibold">{property.baths}</div>
+              <div className="font-semibold">{property.baths || 'N/A'}</div>
               <div className="text-sm text-gray-600">Bathrooms</div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <Square className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-              <div className="font-semibold">{property.sqft?.toLocaleString()}</div>
+              <div className="font-semibold">{property.sqft ? property.sqft.toLocaleString() : 'N/A'}</div>
               <div className="text-sm text-gray-600">Sq Ft</div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <Calendar className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-              <div className="font-semibold">{property.year_built}</div>
+              <div className="font-semibold">{property.year_built || 'N/A'}</div>
               <div className="text-sm text-gray-600">Year Built</div>
             </div>
           </div>
