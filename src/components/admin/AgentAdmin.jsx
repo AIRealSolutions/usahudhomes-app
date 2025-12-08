@@ -182,10 +182,6 @@ function AgentAdmin() {
           }
           loadAgents()
           alert(`Imported ${successCount} agents successfully!`)
-            alert('Agents imported successfully!')
-          } else {
-            alert('Invalid import file format')
-          }
         } catch (error) {
           alert('Error importing agents: ' + error.message)
         }
