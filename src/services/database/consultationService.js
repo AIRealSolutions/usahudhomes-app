@@ -411,3 +411,244 @@ class ConsultationService {
 // Export singleton instance
 export const consultationService = new ConsultationService()
 export default consultationService
+
+  /**
+   * Get consultations for a specific broker
+   * @param {string} brokerId - Broker UUID
+   * @param {Object} filters - Optional filters
+   * @returns {Promise<Array>} List of consultations
+   */
+  async getBrokerConsultations(brokerId, filters = {}) {
+    try {
+      let query = supabase
+        .from(TABLES.CONSULTATIONS)
+        .select(`
+          *,
+          customer:customers(*),
+          property:properties(*)
+        `)
+        .eq('assigned_broker_id', brokerId)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+
+      if (filters.status) {
+        query = query.eq('status', filters.status)
+      }
+
+      const { data, error } = await query
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error fetching broker consultations:', error)
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  /**
+   * Get pending referrals for a broker
+   * @param {string} brokerId - Broker UUID
+   * @returns {Promise<Array>} List of pending referrals
+   */
+  async getPendingReferrals(brokerId) {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.CONSULTATIONS)
+        .select(`
+          *,
+          customer:customers(*),
+          property:properties(*)
+        `)
+        .eq('assigned_broker_id', brokerId)
+        .eq('status', 'referred')
+        .eq('is_deleted', false)
+        .order('referred_at', { ascending: true })
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error fetching pending referrals:', error)
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  /**
+   * Assign consultation to broker
+   * @param {string} consultationId - Consultation UUID
+   * @param {string} brokerId - Broker UUID
+   * @param {number} expiresHours - Hours until referral expires (default 24)
+   * @returns {Promise<Object>} Result
+   */
+  async assignToBroker(consultationId, brokerId, expiresHours = 24) {
+    try {
+      const { data, error } = await supabase.rpc('assign_consultation_to_broker', {
+        p_consultation_id: consultationId,
+        p_broker_id: brokerId,
+        p_expires_hours: expiresHours
+      })
+
+      if (error) throw error
+
+      return { success: true, data }
+    } catch (error) {
+      console.error('Error assigning consultation to broker:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Accept referral
+   * @param {string} consultationId - Consultation UUID
+   * @param {string} brokerId - Broker UUID
+   * @param {string} notes - Optional notes
+   * @returns {Promise<Object>} Result
+   */
+  async acceptReferral(consultationId, brokerId, notes = null) {
+    try {
+      const { data, error } = await supabase.rpc('accept_referral', {
+        p_consultation_id: consultationId,
+        p_broker_id: brokerId,
+        p_notes: notes
+      })
+
+      if (error) throw error
+
+      return { success: true, data }
+    } catch (error) {
+      console.error('Error accepting referral:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Decline referral
+   * @param {string} consultationId - Consultation UUID
+   * @param {string} brokerId - Broker UUID
+   * @param {string} reason - Decline reason
+   * @param {string} notes - Optional notes
+   * @returns {Promise<Object>} Result
+   */
+  async declineReferral(consultationId, brokerId, reason, notes = null) {
+    try {
+      const { data, error} = await supabase.rpc('decline_referral', {
+        p_consultation_id: consultationId,
+        p_broker_id: brokerId,
+        p_reason: reason,
+        p_notes: notes
+      })
+
+      if (error) throw error
+
+      return { success: true, data }
+    } catch (error) {
+      console.error('Error declining referral:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Log communication activity
+   * @param {string} consultationId - Consultation UUID
+   * @param {string} brokerId - Broker UUID
+   * @param {string} activityType - Type of activity
+   * @param {Object} activityData - Additional activity data
+   * @returns {Promise<Object>} Result
+   */
+  async logCommunication(consultationId, brokerId, activityType, activityData = {}) {
+    try {
+      const { data, error } = await supabase.rpc('log_communication', {
+        p_consultation_id: consultationId,
+        p_broker_id: brokerId,
+        p_activity_type: activityType,
+        p_activity_data: activityData
+      })
+
+      if (error) throw error
+
+      return { success: true, data }
+    } catch (error) {
+      console.error('Error logging communication:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Get activity history for a consultation
+   * @param {string} consultationId - Consultation UUID
+   * @returns {Promise<Array>} Activity history
+   */
+  async getActivityHistory(consultationId) {
+    try {
+      const { data, error } = await supabase
+        .from('activity_log')
+        .select(`
+          *,
+          broker:profiles(first_name, last_name, email)
+        `)
+        .eq('consultation_id', consultationId)
+        .order('created_at', { ascending: false })
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error fetching activity history:', error)
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  /**
+   * Get broker statistics
+   * @param {string} brokerId - Broker UUID
+   * @returns {Promise<Object>} Broker stats
+   */
+  async getBrokerStats(brokerId) {
+    try {
+      const { data, error } = await supabase
+        .from('broker_stats')
+        .select('*')
+        .eq('broker_id', brokerId)
+        .single()
+
+      if (error) throw error
+
+      return { success: true, data: data || {} }
+    } catch (error) {
+      console.error('Error fetching broker stats:', error)
+      return { success: false, error: error.message, data: {} }
+    }
+  }
+
+  /**
+   * Update consultation status
+   * @param {string} consultationId - Consultation UUID
+   * @param {string} status - New status
+   * @param {Object} additionalData - Additional data to update
+   * @returns {Promise<Object>} Result
+   */
+  async updateStatus(consultationId, status, additionalData = {}) {
+    try {
+      const updateData = {
+        status,
+        updated_at: new Date().toISOString(),
+        ...additionalData
+      }
+
+      const { data, error } = await supabase
+        .from(TABLES.CONSULTATIONS)
+        .update(updateData)
+        .eq('id', consultationId)
+        .select()
+
+      if (error) throw error
+
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Consultation not found' }
+      }
+
+      return { success: true, data: data[0] }
+    } catch (error) {
+      console.error('Error updating consultation status:', error)
+      return { success: false, error: error.message }
+    }
+  }
+}
+
+export const consultationService = new ConsultationService()
+export default consultationService
