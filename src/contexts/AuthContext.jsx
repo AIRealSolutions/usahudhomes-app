@@ -33,6 +33,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true)
       
+      // Try Supabase auth first
       const result = await authService.getSession()
       
       if (result.success && result.data) {
@@ -48,17 +49,53 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem('userProfile', JSON.stringify(result.data.profile))
         }
       } else {
-        setUser(null)
-        setProfile(null)
-        setRole(null)
-        localStorage.removeItem('userRole')
-        localStorage.removeItem('userProfile')
+        // Fallback to legacy localStorage auth (temporary during transition)
+        const legacyAuth = localStorage.getItem('isAuthenticated')
+        const legacyRole = localStorage.getItem('userRole')
+        const legacyEmail = localStorage.getItem('userEmail')
+        
+        if (legacyAuth === 'true' && legacyRole) {
+          console.log('Using legacy auth during transition')
+          // Create a mock user object for legacy auth
+          setUser({ email: legacyEmail || 'legacy@user.com' })
+          setProfile({ 
+            email: legacyEmail || 'legacy@user.com',
+            role: legacyRole,
+            first_name: 'Legacy',
+            last_name: 'User'
+          })
+          setRole(legacyRole)
+        } else {
+          setUser(null)
+          setProfile(null)
+          setRole(null)
+          localStorage.removeItem('userRole')
+          localStorage.removeItem('userProfile')
+        }
       }
     } catch (error) {
       console.error('Error initializing auth:', error)
-      setUser(null)
-      setProfile(null)
-      setRole(null)
+      
+      // Fallback to legacy auth on error
+      const legacyAuth = localStorage.getItem('isAuthenticated')
+      const legacyRole = localStorage.getItem('userRole')
+      const legacyEmail = localStorage.getItem('userEmail')
+      
+      if (legacyAuth === 'true' && legacyRole) {
+        console.log('Using legacy auth after error')
+        setUser({ email: legacyEmail || 'legacy@user.com' })
+        setProfile({ 
+          email: legacyEmail || 'legacy@user.com',
+          role: legacyRole,
+          first_name: 'Legacy',
+          last_name: 'User'
+        })
+        setRole(legacyRole)
+      } else {
+        setUser(null)
+        setProfile(null)
+        setRole(null)
+      }
     } finally {
       setLoading(false)
       setInitialized(true)
