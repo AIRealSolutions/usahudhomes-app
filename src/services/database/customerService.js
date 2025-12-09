@@ -17,6 +17,7 @@ class CustomerService {
         .from(TABLES.CUSTOMERS)
         .select('*')
         .eq('is_active', true)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false })
 
       if (filters.status) {
@@ -203,6 +204,8 @@ class CustomerService {
       const { data, error } = await supabase
         .from(TABLES.CUSTOMERS)
         .update({ 
+          is_deleted: true,
+          deleted_at: new Date().toISOString(),
           is_active: false,
           updated_at: new Date().toISOString()
         })
@@ -210,7 +213,7 @@ class CustomerService {
         .select()
 
       if (error) {
-        console.error('Supabase delete error:', error)
+        console.error('Supabase soft delete error:', error)
         return { success: false, error: error.message, data: null }
       }
 
@@ -219,6 +222,64 @@ class CustomerService {
       }
 
       return { success: true, data: data[0] }
+    } catch (error) {
+      console.error('Error soft deleting customer:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
+   * Restore deleted customer
+   * @param {string} id - Customer ID
+   * @returns {Promise<Object>} Result
+   */
+  async restoreCustomer(id) {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.CUSTOMERS)
+        .update({
+          is_deleted: false,
+          deleted_at: null,
+          is_active: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+
+      if (error) {
+        console.error('Supabase restore error:', error)
+        return { success: false, error: error.message, data: null }
+      }
+
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Customer not found', data: null }
+      }
+
+      return { success: true, data: data[0] }
+    } catch (error) {
+      console.error('Error restoring customer:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
+   * Get deleted customers (for admin audit)
+   * @returns {Promise<Array>} List of deleted customers
+   */
+  async getDeletedCustomers() {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.CUSTOMERS)
+        .select('*')
+        .eq('is_deleted', true)
+        .order('deleted_at', { ascending: false })
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error fetching deleted customers:', error)
+      return { success: false, error: error.message, data: [] }
+    }
+  }
     } catch (error) {
       console.error('Error deleting customer:', error)
       return { success: false, error: error.message, data: null }

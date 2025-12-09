@@ -21,6 +21,7 @@ class ConsultationService {
           property:properties(*),
           agent:agents(*)
         `)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false })
 
       if (filters.status) {
@@ -142,7 +143,7 @@ class ConsultationService {
   }
 
   /**
-   * Delete consultation
+   * Delete consultation (soft delete)
    * @param {string} id - Consultation ID
    * @returns {Promise<Object>} Result
    */
@@ -150,12 +151,16 @@ class ConsultationService {
     try {
       const { data, error } = await supabase
         .from(TABLES.CONSULTATIONS)
-        .delete()
+        .update({
+          is_deleted: true,
+          deleted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
         .eq('id', id)
         .select()
 
       if (error) {
-        console.error('Supabase delete error:', error)
+        console.error('Supabase soft delete error:', error)
         return { success: false, error: error.message, data: null }
       }
 
@@ -165,8 +170,65 @@ class ConsultationService {
 
       return { success: true, data: data[0] }
     } catch (error) {
-      console.error('Error deleting consultation:', error)
+      console.error('Error soft deleting consultation:', error)
       return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
+   * Restore deleted consultation
+   * @param {string} id - Consultation ID
+   * @returns {Promise<Object>} Result
+   */
+  async restoreConsultation(id) {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.CONSULTATIONS)
+        .update({
+          is_deleted: false,
+          deleted_at: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+
+      if (error) {
+        console.error('Supabase restore error:', error)
+        return { success: false, error: error.message, data: null }
+      }
+
+      if (!data || data.length === 0) {
+        return { success: false, error: 'Consultation not found', data: null }
+      }
+
+      return { success: true, data: data[0] }
+    } catch (error) {
+      console.error('Error restoring consultation:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
+   * Get deleted consultations (for admin audit)
+   * @returns {Promise<Array>} List of deleted consultations
+   */
+  async getDeletedConsultations() {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.CONSULTATIONS)
+        .select(`
+          *,
+          customer:customers(*),
+          property:properties(*),
+          agent:agents(*)
+        `)
+        .eq('is_deleted', true)
+        .order('deleted_at', { ascending: false })
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error fetching deleted consultations:', error)
+      return { success: false, error: error.message, data: [] }
     }
   }
 
