@@ -280,11 +280,6 @@ class CustomerService {
       return { success: false, error: error.message, data: [] }
     }
   }
-    } catch (error) {
-      console.error('Error deleting customer:', error)
-      return { success: false, error: error.message, data: null }
-    }
-  }
 
   /**
    * Get customer statistics
