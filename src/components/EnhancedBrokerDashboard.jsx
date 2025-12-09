@@ -20,6 +20,7 @@ import { brokerNetwork } from '../services/brokerNetwork.js'
 import PropertyAdmin from './admin/PropertyAdmin.jsx'
 import CustomerAdmin from './admin/CustomerAdmin.jsx'
 import AgentAdmin from './admin/AgentAdmin.jsx'
+import ConsultationAdmin from './admin/ConsultationAdmin.jsx'
 import DatabaseReset from './admin/DatabaseReset.jsx'
 
 function EnhancedBrokerDashboard({ onLogout }) {
@@ -521,7 +522,7 @@ function EnhancedBrokerDashboard({ onLogout }) {
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Admin Panel</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
                 <button
                   onClick={() => setAdminSubTab('properties')}
                   className={`p-4 rounded-lg border-2 transition-all ${
@@ -545,6 +546,18 @@ function EnhancedBrokerDashboard({ onLogout }) {
                   <Users className="h-8 w-8 mx-auto mb-2 text-green-600" />
                   <div className="font-semibold">Customers</div>
                   <div className="text-sm text-gray-600">Manage customer database</div>
+                </button>
+                <button
+                  onClick={() => setAdminSubTab('consultations')}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    adminSubTab === 'consultations'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-blue-300'
+                  }`}
+                >
+                  <MessageSquare className="h-8 w-8 mx-auto mb-2 text-orange-600" />
+                  <div className="font-semibold">Consultations</div>
+                  <div className="text-sm text-gray-600">View consultation requests</div>
                 </button>
                 <button
                   onClick={() => setAdminSubTab('agents')}
@@ -574,6 +587,7 @@ function EnhancedBrokerDashboard({ onLogout }) {
             </div>
             {adminSubTab === 'properties' && <PropertyAdmin />}
             {adminSubTab === 'customers' && <CustomerAdmin />}
+            {adminSubTab === 'consultations' && <ConsultationAdmin />}
             {adminSubTab === 'agents' && <AgentAdmin />}
             {adminSubTab === 'reset' && <DatabaseReset />}
           </div>
