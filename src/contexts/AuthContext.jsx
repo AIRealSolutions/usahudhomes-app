@@ -278,7 +278,7 @@ export const AuthProvider = ({ children }) => {
   const getDashboardRoute = () => {
     switch (role) {
       case 'admin':
-        return '/admin-dashboard'
+        return '/broker-dashboard' // Admin goes to broker dashboard (main page)
       case 'broker':
         return '/broker-dashboard'
       case 'end_user':

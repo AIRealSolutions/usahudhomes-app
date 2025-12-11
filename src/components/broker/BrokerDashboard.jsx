@@ -10,7 +10,8 @@ import {
   TrendingUp,
   Search,
   Filter,
-  RefreshCw
+  RefreshCw,
+  Settings
 } from 'lucide-react'
 import PendingReferralCard from './PendingReferralCard'
 import ConsultationCard from './ConsultationCard'
@@ -118,6 +119,17 @@ const BrokerDashboard = () => {
             </div>
             
             <div className="flex items-center gap-4">
+              {/* Admin Dashboard Link (for admins only) */}
+              {profile?.role === 'admin' && (
+                <a
+                  href="/admin"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors"
+                >
+                  <Settings className="w-5 h-5" />
+                  <span className="hidden sm:inline">Admin Dashboard</span>
+                </a>
+              )}
+
               {/* Notifications */}
               <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
                 <Bell className="w-6 h-6" />
