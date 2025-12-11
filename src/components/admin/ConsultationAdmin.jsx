@@ -16,7 +16,8 @@ import {
   Clock,
   Filter,
   Download,
-  Eye
+  Eye,
+  UserPlus
 } from 'lucide-react'
 import { consultationService, customerService, propertyService } from '../../services/database'
 
@@ -112,6 +113,27 @@ function ConsultationAdmin() {
       loadConsultations()
     } else {
       alert('Failed to delete consultation')
+    }
+  }
+
+  async function referToBroker(consultation) {
+    // Get broker ID from prompt (in a real app, this would be a modal with broker selection)
+    const brokerEmail = prompt('Enter broker email to refer this lead to:')
+    if (!brokerEmail) return
+
+    // For now, we'll just update the status to 'referred' and add a note
+    // In the future, this should:
+    // 1. Show a modal with list of available brokers
+    // 2. Assign the consultation to the selected broker
+    // 3. Send notification to the broker
+    // 4. Update status to 'referred'
+    
+    const result = await consultationService.referConsultation(consultation.id, brokerEmail)
+    if (result.success) {
+      alert(`Lead referred to ${brokerEmail} successfully!`)
+      loadConsultations()
+    } else {
+      alert('Failed to refer lead. Please try again.')
     }
   }
 
@@ -376,6 +398,14 @@ function ConsultationAdmin() {
                       <div className="flex md:flex-col gap-2">
                         {consultation.status === 'pending' && (
                           <>
+                            <Button
+                              size="sm"
+                              onClick={() => referToBroker(consultation)}
+                              className="bg-purple-600 hover:bg-purple-700"
+                            >
+                              <UserPlus className="h-4 w-4 mr-1" />
+                              Refer Lead
+                            </Button>
                             <Button
                               size="sm"
                               onClick={() => updateConsultationStatus(consultation.id, 'scheduled')}
