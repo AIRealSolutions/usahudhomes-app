@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input.jsx'
 import { Badge } from '@/components/ui/badge.jsx'
 import { Search, Home, MapPin, DollarSign, Users, BookOpen, Menu, X, Phone, LogOut } from 'lucide-react'
 import PropertySearch from './components/PropertySearch.jsx'
-import EnhancedBrokerDashboard from './components/EnhancedBrokerDashboard.jsx'
+import AdminDashboard from './components/AdminDashboard.jsx'
 import Login from './components/Login.jsx'
 import USMap from './components/USMap.jsx'
 import BrokerDashboard from './components/broker/BrokerDashboard.jsx'
@@ -705,7 +705,7 @@ function App() {
             } />
             <Route path="/admin-dashboard" element={
               <ProtectedRoute allowedRoles={['admin']}>
-                <EnhancedBrokerDashboard userRole={userRole} />
+                <AdminDashboard />
               </ProtectedRoute>
             } />
             <Route path="/unauthorized" element={<Unauthorized />} />
