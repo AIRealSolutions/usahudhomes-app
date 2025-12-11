@@ -104,10 +104,14 @@ export const AuthProvider = ({ children }) => {
 
   // Set up auth state listener
   useEffect(() => {
+    // Only set up listener after initial auth is complete
+    if (!initialized) return
+
     const { data: { subscription } } = authService.onAuthStateChange(
       async (event, session, profileData) => {
         console.log('Auth state changed:', event)
         
+        // Don't update loading state from listener to avoid conflicts
         if (session?.user) {
           setUser(session.user)
           setProfile(profileData)
@@ -126,15 +130,13 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem('userRole')
           localStorage.removeItem('userProfile')
         }
-        
-        setLoading(false)
       }
     )
 
     return () => {
       subscription?.unsubscribe()
     }
-  }, [])
+  }, [initialized])
 
   // Sign up
   const signUp = async (userData) => {
