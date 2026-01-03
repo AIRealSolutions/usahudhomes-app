@@ -9,38 +9,60 @@
  * @returns {Promise<boolean>} Success status
  */
 export async function sendConsultationNotification(consultation) {
+  console.log('=== NOTIFICATION SERVICE CALLED ===')
+  console.log('Consultation data received:', JSON.stringify(consultation, null, 2))
+  
   try {
-    console.log('Sending notification for:', consultation.customer_name)
+    console.log('Attempting to send notification...')
+    
+    const payload = {
+      customer_name: consultation.customer_name,
+      customer_email: consultation.customer_email,
+      customer_phone: consultation.customer_phone,
+      case_number: consultation.case_number,
+      property_address: consultation.property_address,
+      state: consultation.state,
+      message: consultation.message
+    }
+    
+    console.log('API payload:', JSON.stringify(payload, null, 2))
     
     // Call the serverless function
+    console.log('Calling /api/send-notification...')
     const response = await fetch('/api/send-notification', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        customer_name: consultation.customer_name,
-        customer_email: consultation.customer_email,
-        customer_phone: consultation.customer_phone,
-        case_number: consultation.case_number,
-        property_address: consultation.property_address,
-        state: consultation.state,
-        message: consultation.message
-      })
+      body: JSON.stringify(payload)
     })
     
+    console.log('API response status:', response.status)
+    console.log('API response ok:', response.ok)
+    
     if (!response.ok) {
-      const error = await response.json()
-      console.error('Notification API error:', error)
+      const errorText = await response.text()
+      console.error('Notification API error response:', errorText)
+      try {
+        const errorJson = JSON.parse(errorText)
+        console.error('Notification API error (parsed):', errorJson)
+      } catch (e) {
+        console.error('Could not parse error as JSON')
+      }
       return false
     }
     
     const data = await response.json()
-    console.log('Notification sent successfully:', data)
+    console.log('✅ Notification sent successfully!', data)
     return true
     
   } catch (error) {
-    console.error('Error sending notification:', error)
+    console.error('❌ ERROR sending notification:', error)
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    })
     return false
   }
 }

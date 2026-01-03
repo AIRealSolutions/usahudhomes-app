@@ -101,11 +101,19 @@ class ConsultationService {
 
       // Send notification email
       const consultation = data && data.length > 0 ? data[0] : null
+      console.log('Consultation data for notification:', consultation)
       if (consultation) {
+        console.log('Calling sendConsultationNotification...')
         // Send notification asynchronously (don't wait for it)
-        sendConsultationNotification(consultation).catch(err => {
-          console.error('Failed to send notification:', err)
-        })
+        sendConsultationNotification(consultation)
+          .then(success => {
+            console.log('Notification result:', success ? 'SUCCESS' : 'FAILED')
+          })
+          .catch(err => {
+            console.error('Failed to send notification:', err)
+          })
+      } else {
+        console.warn('No consultation data to send notification for')
       }
 
       return { success: true, data: consultation }
