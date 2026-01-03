@@ -359,11 +359,37 @@ function LeadCaptureForm() {
     propertyId: ''
   })
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     console.log('Lead submitted:', formData)
-    // Here we would integrate with Firebase to save the lead
-    alert('Thank you for your interest! A HUD-registered broker will contact you soon.')
+    
+    try {
+      // Save to database using consultationService
+      const consultationData = {
+        customerName: formData.name,
+        customerEmail: formData.email,
+        customerPhone: formData.phone,
+        caseNumber: formData.propertyId || null,
+        state: formData.state,
+        message: 'Lead from homepage form',
+        consultationType: 'general'
+      }
+      
+      const { consultationService } = await import('./services/database')
+      const result = await consultationService.addConsultation(consultationData)
+      
+      if (result.success) {
+        alert('Thank you for your interest! A HUD-registered broker will contact you soon.')
+        // Reset form
+        setFormData({ name: '', email: '', phone: '', state: '', propertyId: '' })
+      } else {
+        console.error('Failed to save lead:', result.error)
+        alert('There was an error submitting your information. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error submitting lead:', error)
+      alert('There was an error submitting your information. Please try again.')
+    }
   }
 
   return (
