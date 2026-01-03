@@ -4,6 +4,7 @@
  */
 
 import { supabase, TABLES, formatSupabaseResponse } from '../../config/supabase'
+import { sendConsultationNotification } from '../notificationService'
 
 class ConsultationService {
   /**
@@ -98,7 +99,16 @@ class ConsultationService {
         return { success: false, error: error.message, data: null }
       }
 
-      return { success: true, data: data && data.length > 0 ? data[0] : null }
+      // Send notification email
+      const consultation = data && data.length > 0 ? data[0] : null
+      if (consultation) {
+        // Send notification asynchronously (don't wait for it)
+        sendConsultationNotification(consultation).catch(err => {
+          console.error('Failed to send notification:', err)
+        })
+      }
+
+      return { success: true, data: consultation }
     } catch (error) {
       console.error('Error adding consultation:', error)
       return { success: false, error: error.message, data: null }
