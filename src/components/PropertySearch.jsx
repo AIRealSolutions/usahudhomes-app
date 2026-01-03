@@ -23,6 +23,7 @@ import {
   ChevronUp
 } from 'lucide-react'
 import { propertyService } from '../services/database'
+import { getImageUrl } from '../utils/imageUtils'
 
 const PropertySearch = () => {
   const [searchQuery, setSearchQuery] = useState('')
@@ -291,7 +292,7 @@ const PropertySearch = () => {
                 <div className="h-48 bg-gradient-to-br from-gray-200 to-gray-300 rounded-t-lg overflow-hidden">
                   {property.main_image ? (
                     <img 
-                      src={property.main_image} 
+                      src={getImageUrl(property.main_image)} 
                       alt={`${property.address} - Property Photo`}
                       className="w-full h-full object-cover"
                       onError={(e) => {

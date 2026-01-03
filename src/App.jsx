@@ -19,6 +19,7 @@ import CustomerDetail from './components/CustomerDetail.jsx'
 import LeadsManagement from './components/LeadsManagement.jsx'
 import LeadDetail from './components/LeadDetail.jsx'
 import { propertyService } from './services/database'
+import { getImageUrl } from './utils/imageUtils'
 import './App.css'
 
 // Header Component
@@ -287,7 +288,7 @@ function FeaturedProperties({ properties }) {
               <div className="h-48 bg-gradient-to-br from-gray-200 to-gray-300 rounded-t-lg overflow-hidden">
                 {property.main_image ? (
                   <img 
-                    src={property.main_image} 
+                    src={getImageUrl(property.main_image)} 
                     alt={`${property.address} - ${property.city}, ${property.state}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {

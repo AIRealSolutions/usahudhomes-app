@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { propertyService, consultationService, customerService } from '../services/database'
 import emailService from '../services/emailService.js'
+import { getImageUrl } from '../utils/imageUtils'
 
 
 
@@ -315,7 +316,7 @@ function PropertyConsultation() {
                   <div className="aspect-video bg-gradient-to-br from-gray-200 to-gray-300 rounded-t-lg overflow-hidden">
                     {(property.main_image || (property.images && property.images[0])) ? (
                       <img 
-                        src={property.main_image || property.images[0]} 
+                        src={getImageUrl(property.main_image || property.images[0])} 
                         alt={`${property.address} - Main View`}
                         className="w-full h-full object-cover"
                         onError={(e) => {
