@@ -24,7 +24,6 @@ import {
   Camera
 } from 'lucide-react'
 import { propertyService, consultationService, customerService } from '../services/database'
-import emailService from '../services/emailService.js'
 import { getImageUrl } from '../utils/imageUtils'
 
 
@@ -120,14 +119,7 @@ function PropertyConsultation() {
       const result = await consultationService.addConsultation(consultationData)
       
       if (result.success) {
-        // Send email notification
-        try {
-          await emailService.sendConsultationNotification(result.data)
-        } catch (emailError) {
-          console.error('Email notification failed:', emailError)
-          // Continue even if email fails
-        }
-        
+        // Notification is automatically sent by consultationService
         alert(`Thank you ${contactForm.name}! Your consultation request has been submitted for property ${caseNumber}. Marc Spencer from Lightkeeper Realty will contact you within 2 hours during business hours.`)
         
         setShowContactForm(false)
