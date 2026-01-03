@@ -317,7 +317,7 @@ function FeaturedProperties({ properties }) {
                   <span className="text-2xl font-bold text-green-600">
                     ${property.price.toLocaleString()}
                   </span>
-                  <span className="text-sm text-gray-500">Case #{property.caseNumber}</span>
+                  <span className="text-sm text-gray-500">Case #{property.case_number}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-sm text-gray-600 mb-4">
                   <span>{property.beds} beds</span>
@@ -327,7 +327,7 @@ function FeaturedProperties({ properties }) {
                 <div className="text-xs text-gray-500 mb-4">
                   Built {property.yearBuilt} • {property.lotSize}
                 </div>
-                <Link to={`/consult/${property.caseNumber}`}>
+                <Link to={`/consult/${property.case_number}`}>
                   <Button className="w-full bg-blue-600 hover:bg-blue-700">
                     View Details & Schedule Consultation
                   </Button>
