@@ -3,7 +3,7 @@
  * Sends email notifications for new consultation inquiries
  */
 
-const NOTIFICATION_EMAIL = '9103636147@verizon.net'
+const NOTIFICATION_EMAIL = '9103636147@vtext.com'
 const NOTIFICATION_API_URL = 'https://api.usahudhomes.com/send-notification' // You'll need to set this up
 
 /**
