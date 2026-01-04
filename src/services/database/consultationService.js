@@ -5,6 +5,7 @@
 
 import { supabase, TABLES, formatSupabaseResponse } from '../../config/supabase'
 import { sendConsultationNotification } from '../notificationService'
+import { autoAssignService } from './autoAssignService'
 
 class ConsultationService {
   /**
@@ -112,6 +113,17 @@ class ConsultationService {
           .catch(err => {
             console.error('Failed to send notification:', err)
           })
+        
+        // Auto-assign to agent if enabled
+        if (autoAssignService.isAutoAssignEnabled()) {
+          autoAssignService.autoAssignConsultation(consultation)
+            .then(result => {
+              console.log('Auto-assignment result:', result.success ? 'SUCCESS' : 'FAILED')
+            })
+            .catch(err => {
+              console.error('Failed to auto-assign:', err)
+            })
+        }
       } else {
         console.warn('No consultation data to send notification for')
       }
