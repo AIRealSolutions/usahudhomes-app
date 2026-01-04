@@ -24,7 +24,13 @@ const PendingReferralCard = ({ referral, agentId, onAction }) => {
   const [showDeclineModal, setShowDeclineModal] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const customer = referral.customer || {}
+  // Use joined customer data if available, otherwise fallback to embedded fields
+  const customer = referral.customer || {
+    first_name: referral.customer_name?.split(' ')[0] || '',
+    last_name: referral.customer_name?.split(' ').slice(1).join(' ') || '',
+    email: referral.customer_email || '',
+    phone: referral.customer_phone || ''
+  }
   const property = referral.property || {}
 
   // Calculate time remaining

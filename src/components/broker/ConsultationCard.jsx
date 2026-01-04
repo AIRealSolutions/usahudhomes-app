@@ -18,7 +18,13 @@ const ConsultationCard = ({ consultation, onUpdate }) => {
   const [showDetails, setShowDetails] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
 
-  const customer = consultation.customer || {}
+  // Use joined customer data if available, otherwise fallback to embedded fields
+  const customer = consultation.customer || {
+    first_name: consultation.customer_name?.split(' ')[0] || '',
+    last_name: consultation.customer_name?.split(' ').slice(1).join(' ') || '',
+    email: consultation.customer_email || '',
+    phone: consultation.customer_phone || ''
+  }
   const property = consultation.property || {}
 
   const statusConfig = {
