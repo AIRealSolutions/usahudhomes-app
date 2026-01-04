@@ -25,7 +25,28 @@ function AIMarketingAssistant({ property }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [copiedIndex, setCopiedIndex] = useState(null)
+  const [customerContext, setCustomerContext] = useState(null)
+  const [loadingContext, setLoadingContext] = useState(true)
   const messagesEndRef = useRef(null)
+
+  // Load customer context on mount
+  useEffect(() => {
+    async function loadCustomerContext() {
+      setLoadingContext(true)
+      const context = await marketingAI.getCustomerContext(property)
+      setCustomerContext(context)
+      setLoadingContext(false)
+      
+      // Update welcome message with customer insights
+      if (context.success && context.insights && context.insights.totalInterested > 0) {
+        setMessages([{
+          role: 'assistant',
+          content: `Hi! I'm your AI marketing assistant. I can help you create compelling marketing content for ${property.address}.\n\n📊 **Customer Interest**: ${context.insights.totalInterested} people have shown interest in this property! I can use this data to create personalized, targeted marketing content. What would you like to create today?`
+        }])
+      }
+    }
+    loadCustomerContext()
+  }, [property])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -44,7 +65,7 @@ function AIMarketingAssistant({ property }) {
     setLoading(true)
 
     try {
-      const result = await marketingAI.chat(property, [...messages, userMessage])
+      const result = await marketingAI.chat(property, [...messages, userMessage], customerContext)
       
       if (result.success) {
         setMessages(prev => [...prev, result.message])
@@ -71,16 +92,16 @@ function AIMarketingAssistant({ property }) {
     try {
       switch (action) {
         case 'facebook':
-          result = await marketingAI.generateSocialPost(property, 'facebook')
+          result = await marketingAI.generateSocialPost(property, 'facebook', customerContext)
           break
         case 'twitter':
-          result = await marketingAI.generateSocialPost(property, 'twitter')
+          result = await marketingAI.generateSocialPost(property, 'twitter', customerContext)
           break
         case 'linkedin':
-          result = await marketingAI.generateSocialPost(property, 'linkedin')
+          result = await marketingAI.generateSocialPost(property, 'linkedin', customerContext)
           break
         case 'email':
-          result = await marketingAI.generateSocialPost(property, 'email')
+          result = await marketingAI.generateSocialPost(property, 'email', customerContext)
           break
         case 'description':
           result = await marketingAI.generateDescription(property, 'standard')

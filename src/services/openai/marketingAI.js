@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { customerService, consultationService } from '../database'
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -12,9 +13,58 @@ const openai = new OpenAI({
  */
 export const marketingAI = {
   /**
+   * Get customer context for property
+   * Fetches interested customers and consultations for personalized marketing
+   */
+  async getCustomerContext(property) {
+    try {
+      // Get consultations for this property
+      const consultations = await consultationService.getConsultationsByProperty(property.case_number)
+      
+      // Get unique customer IDs from consultations
+      const customerIds = [...new Set(consultations.map(c => c.customer_id).filter(Boolean))]
+      
+      // Get customer details
+      const customers = await Promise.all(
+        customerIds.map(id => customerService.getCustomerById(id))
+      )
+      
+      // Filter out null results
+      const validCustomers = customers.filter(Boolean)
+      
+      // Analyze customer data
+      const customerInsights = {
+        totalInterested: consultations.length,
+        uniqueCustomers: validCustomers.length,
+        consultationTypes: [...new Set(consultations.map(c => c.consultation_type))],
+        customerStates: [...new Set(validCustomers.map(c => c.state).filter(Boolean))],
+        averageEngagement: consultations.filter(c => c.status === 'completed').length,
+        pendingConsultations: consultations.filter(c => c.status === 'pending').length,
+        commonQuestions: consultations.map(c => c.message).filter(Boolean)
+      }
+      
+      return {
+        success: true,
+        consultations,
+        customers: validCustomers,
+        insights: customerInsights
+      }
+    } catch (error) {
+      console.error('Error fetching customer context:', error)
+      return {
+        success: false,
+        error: error.message,
+        consultations: [],
+        customers: [],
+        insights: null
+      }
+    }
+  },
+
+  /**
    * Generate platform-specific social media post
    */
-  async generateSocialPost(property, platform) {
+  async generateSocialPost(property, platform, customerContext = null) {
     const platformGuidelines = {
       facebook: {
         maxLength: 500,
@@ -44,6 +94,20 @@ export const marketingAI = {
 
     const guidelines = platformGuidelines[platform] || platformGuidelines.facebook
 
+    // Build customer context section if available
+    let customerContextSection = ''
+    if (customerContext && customerContext.insights) {
+      const insights = customerContext.insights
+      customerContextSection = `\n\nCustomer Interest Data:
+- ${insights.totalInterested} people have shown interest in this property
+- ${insights.uniqueCustomers} unique customers
+- ${insights.pendingConsultations} pending consultations
+- Common interests: ${insights.consultationTypes.join(', ')}
+- Interested buyers from: ${insights.customerStates.join(', ')}
+
+Use this data to create urgency and social proof in your post.`
+    }
+
     const prompt = `Generate a ${platform} post for this HUD home property:
 
 Property Details:
@@ -56,7 +120,7 @@ Property Details:
 - Year Built: ${property.yearBuilt || 'N/A'}
 - Status: ${property.status}
 - County: ${property.county || 'N/A'}
-- FHA Insurable: ${property.fhaInsurable ? 'Yes' : 'No'}
+- FHA Insurable: ${property.fhaInsurable ? 'Yes' : 'No'}${customerContextSection}
 
 Platform Guidelines:
 - Maximum length: ${guidelines.maxLength} characters
@@ -234,7 +298,7 @@ Format as JSON.`
   /**
    * Chat with AI assistant about property marketing
    */
-  async chat(property, messages) {
+  async chat(property, messages, customerContext = null) {
     const systemPrompt = `You are a professional real estate marketing assistant specializing in HUD homes and government foreclosures. You help agents and brokers create effective marketing content, answer questions about property marketing strategies, and provide expert advice.
 
 Current Property Context:
@@ -245,6 +309,16 @@ Current Property Context:
 - Bathrooms: ${property.bathrooms || 'N/A'}
 - Square Feet: ${property.sqft?.toLocaleString() || 'N/A'}
 - Status: ${property.status}
+
+Customer Interest Data:
+${customerContext && customerContext.insights ? `
+- ${customerContext.insights.totalInterested} people interested
+- ${customerContext.insights.uniqueCustomers} unique customers
+- ${customerContext.insights.pendingConsultations} pending consultations
+- Interested from: ${customerContext.insights.customerStates.join(', ')}
+- Consultation types: ${customerContext.insights.consultationTypes.join(', ')}
+
+You can use this customer data to create personalized, targeted marketing content that addresses real buyer interest and creates urgency.` : '- No customer interest data available yet'}
 
 You can help with:
 - Generating social media posts

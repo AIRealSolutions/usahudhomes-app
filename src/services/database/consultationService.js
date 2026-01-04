@@ -776,8 +776,51 @@ class ConsultationService {
       return { success: false, error: error.message }
     }
   }
+
+  /**
+   * Get consultations by property case number
+   * @param {string} caseNumber - Property case number
+   * @returns {Promise<Array>} List of consultations for the property
+   */
+  async getConsultationsByProperty(caseNumber) {
+    try {
+      // First get the property by case number
+      const { data: properties, error: propError } = await supabase
+        .from(TABLES.PROPERTIES)
+        .select('id')
+        .eq('case_number', caseNumber)
+        .single()
+
+      if (propError || !properties) {
+        return []
+      }
+
+      // Then get consultations for that property
+      const { data, error } = await supabase
+        .from(TABLES.CONSULTATIONS)
+        .select(`
+          *,
+          customer:customers(*),
+          agent:agents(*)
+        `)
+        .eq('property_id', properties.id)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching consultations by property:', error)
+        return []
+      }
+
+      return data || []
+    } catch (error) {
+      console.error('Error in getConsultationsByProperty:', error)
+      return []
+    }
+  }
 }
 
 // Export singleton instance
 export const consultationService = new ConsultationService()
+
 export default consultationService
