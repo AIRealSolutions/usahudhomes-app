@@ -229,6 +229,116 @@ class CustomerService {
   }
 
   /**
+   * Delete customer and all references (CASCADE DELETE)
+   * This will permanently delete:
+   * - All consultations/leads associated with this customer
+   * - All activities related to those consultations
+   * - The customer record itself
+   * @param {string} customerId - Customer ID or email
+   * @returns {Promise<Object>} Result with deletion counts
+   */
+  async deleteCustomerWithReferences(customerId) {
+    try {
+      console.log('Starting cascade delete for customer:', customerId)
+      
+      // First, get the customer to verify it exists
+      let customer
+      if (customerId.includes('@')) {
+        // If email provided, look up by email
+        const result = await this.getCustomerByEmail(customerId)
+        if (!result.success) {
+          return { success: false, error: 'Customer not found', data: null }
+        }
+        customer = result.data
+      } else {
+        // Look up by ID
+        const result = await this.getCustomerById(customerId)
+        if (!result.success) {
+          return { success: false, error: 'Customer not found', data: null }
+        }
+        customer = result.data
+      }
+
+      const customerIdToDelete = customer.id
+      console.log('Found customer to delete:', customerIdToDelete)
+
+      // Step 1: Get all consultations for this customer
+      const { data: consultations, error: consultError } = await supabase
+        .from(TABLES.CONSULTATIONS)
+        .select('id')
+        .eq('customer_id', customerIdToDelete)
+
+      if (consultError) {
+        console.error('Error fetching consultations:', consultError)
+        return { success: false, error: consultError.message, data: null }
+      }
+
+      const consultationIds = consultations?.map(c => c.id) || []
+      console.log(`Found ${consultationIds.length} consultations to delete`)
+
+      // Step 2: Delete all activities related to these consultations
+      let activitiesDeleted = 0
+      if (consultationIds.length > 0) {
+        const { error: activitiesError, count } = await supabase
+          .from(TABLES.ACTIVITIES)
+          .delete()
+          .in('consultation_id', consultationIds)
+
+        if (activitiesError) {
+          console.warn('Error deleting activities:', activitiesError)
+        } else {
+          activitiesDeleted = count || 0
+          console.log(`Deleted ${activitiesDeleted} activities`)
+        }
+      }
+
+      // Step 3: Delete all consultations for this customer
+      let consultationsDeleted = 0
+      if (consultationIds.length > 0) {
+        const { error: consultDeleteError, count } = await supabase
+          .from(TABLES.CONSULTATIONS)
+          .delete()
+          .eq('customer_id', customerIdToDelete)
+
+        if (consultDeleteError) {
+          console.error('Error deleting consultations:', consultDeleteError)
+          return { success: false, error: consultDeleteError.message, data: null }
+        }
+        consultationsDeleted = count || consultationIds.length
+        console.log(`Deleted ${consultationsDeleted} consultations`)
+      }
+
+      // Step 4: Delete the customer record itself (HARD DELETE)
+      const { error: customerDeleteError } = await supabase
+        .from(TABLES.CUSTOMERS)
+        .delete()
+        .eq('id', customerIdToDelete)
+
+      if (customerDeleteError) {
+        console.error('Error deleting customer:', customerDeleteError)
+        return { success: false, error: customerDeleteError.message, data: null }
+      }
+
+      console.log('Customer deleted successfully')
+
+      return {
+        success: true,
+        data: {
+          customerId: customerIdToDelete,
+          customerName: `${customer.first_name} ${customer.last_name}`,
+          customerEmail: customer.email,
+          consultationsDeleted,
+          activitiesDeleted,
+          message: `Successfully deleted customer and ${consultationsDeleted} consultation(s)`
+        }
+      }
+    } catch (error) {
+      console.error('Error in cascade delete:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
    * Restore deleted customer
    * @param {string} id - Customer ID
    * @returns {Promise<Object>} Result

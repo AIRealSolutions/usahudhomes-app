@@ -82,12 +82,59 @@ function CustomerAdmin() {
     setShowForm(true)
   }
 
-  function handleDelete(customer) {
-    if (confirm(`Are you sure you want to delete ${customer.name}?`)) {
-      // Note: customerDB doesn't have a delete method, so we'll need to add it
-      // For now, we'll just show an alert
-      alert('Delete functionality will be added to customerDatabase service')
-      // TODO: Add deleteCustomer method to customerDatabase.js
+  async function handleDelete(customer) {
+    // Get customer name for display
+    const customerName = customer.name || `${customer.first_name} ${customer.last_name}` || customer.email
+    
+    // First confirmation with warning
+    const firstConfirm = confirm(
+      `⚠️ WARNING: PERMANENT DELETE\n\n` +
+      `You are about to permanently delete:\n` +
+      `Customer: ${customerName}\n` +
+      `Email: ${customer.email}\n\n` +
+      `This will also delete:\n` +
+      `• All consultations/leads for this customer\n` +
+      `• All activities and notes\n` +
+      `• All related records\n\n` +
+      `This action CANNOT be undone!\n\n` +
+      `Click OK to continue, or Cancel to abort.`
+    )
+    
+    if (!firstConfirm) {
+      return // User cancelled
+    }
+    
+    // Second confirmation to prevent accidental deletion
+    const secondConfirm = confirm(
+      `FINAL CONFIRMATION\n\n` +
+      `Are you absolutely sure you want to permanently delete ${customerName} and all associated records?\n\n` +
+      `Type OK to confirm deletion.`
+    )
+    
+    if (!secondConfirm) {
+      return // User cancelled
+    }
+    
+    try {
+      // Call the cascade delete method
+      const result = await customerService.deleteCustomerWithReferences(customer.id)
+      
+      if (result.success) {
+        alert(
+          `✅ Customer Deleted Successfully\n\n` +
+          `Customer: ${result.data.customerName}\n` +
+          `Consultations deleted: ${result.data.consultationsDeleted}\n` +
+          `Activities deleted: ${result.data.activitiesDeleted}\n\n` +
+          `All references have been permanently removed.`
+        )
+        // Reload the customer list
+        loadCustomers()
+      } else {
+        alert(`❌ Error deleting customer:\n\n${result.error}\n\nPlease try again or contact support.`)
+      }
+    } catch (error) {
+      console.error('Error in handleDelete:', error)
+      alert(`❌ Unexpected error:\n\n${error.message}\n\nPlease try again or contact support.`)
     }
   }
 
