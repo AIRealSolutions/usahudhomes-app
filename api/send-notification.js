@@ -24,7 +24,10 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Email service not configured' })
     }
 
-    const NOTIFICATION_EMAIL = '9103636147@vtext.com' // Verizon SMS gateway
+    const NOTIFICATION_EMAILS = [
+      'marcspencer28461@gmail.com',  // Primary email
+      '9103636147@vtext.com'          // Verizon SMS gateway
+    ]
     const FROM_EMAIL = 'notifications@usahudhomes.com'
 
     // Format phone number for links
@@ -81,7 +84,7 @@ View: https://usahudhomes.com/broker-dashboard
 </div>
 `
 
-    console.log('Sending notification to:', NOTIFICATION_EMAIL)
+    console.log('Sending notification to:', NOTIFICATION_EMAILS.join(', '))
 
     // Send via Resend API
     const response = await fetch('https://api.resend.com/emails', {
@@ -92,7 +95,7 @@ View: https://usahudhomes.com/broker-dashboard
       },
       body: JSON.stringify({
         from: FROM_EMAIL,
-        to: [NOTIFICATION_EMAIL],
+        to: NOTIFICATION_EMAILS,
         subject: subject,
         text: textMessage,
         html: htmlMessage
