@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { propertyService } from '../../services/database'
+import AIMarketingAssistant from './AIMarketingAssistant'
 import { getImageUrl } from '../../utils/imageUtils'
 import {
   ArrowLeft,
@@ -412,6 +413,8 @@ Generated: ${new Date().toLocaleString()}
 
           {activeTab === 'marketing' && (
             <div className="space-y-6">
+              {/* AI Marketing Assistant */}
+              <AIMarketingAssistant property={property} />
               {/* Social Media Sharing */}
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
