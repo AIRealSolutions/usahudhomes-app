@@ -451,7 +451,7 @@ class ConsultationService {
           customer:customers(*),
           property:properties(*)
         `)
-        .eq('assigned_broker_id', brokerId)
+        .eq('agent_id', brokerId)
         .eq('is_deleted', false)
         .order('created_at', { ascending: false })
 
@@ -482,7 +482,7 @@ class ConsultationService {
           customer:customers(*),
           property:properties(*)
         `)
-        .eq('assigned_broker_id', brokerId)
+        .eq('agent_id', brokerId)
         .eq('status', 'referred')
         .eq('is_deleted', false)
         .order('referred_at', { ascending: true })

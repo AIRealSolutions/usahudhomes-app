@@ -21,6 +21,7 @@ const BrokerDashboard = () => {
   const { user, profile, logout } = useAuth()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [agentId, setAgentId] = useState(null)
   const [stats, setStats] = useState({})
   const [pendingReferrals, setPendingReferrals] = useState([])
   const [activeConsultations, setActiveConsultations] = useState([])
@@ -29,10 +30,32 @@ const BrokerDashboard = () => {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (profile?.id) {
-      loadDashboardData()
+    if (profile?.email) {
+      fetchAgentId()
     }
   }, [profile])
+
+  useEffect(() => {
+    if (agentId) {
+      loadDashboardData()
+    }
+  }, [agentId, statusFilter])
+
+  const fetchAgentId = async () => {
+    try {
+      // Look up agent by email
+      const { agentService } = await import('../../services/database')
+      const result = await agentService.getAgentByEmail(profile.email)
+      if (result.success && result.data) {
+        setAgentId(result.data.id)
+      } else {
+        setError('Agent profile not found. Please contact admin.')
+      }
+    } catch (err) {
+      console.error('Error fetching agent ID:', err)
+      setError('Failed to load agent profile.')
+    }
+  }
 
   const loadDashboardData = async () => {
     try {
@@ -40,19 +63,19 @@ const BrokerDashboard = () => {
       setError(null)
 
       // Load broker stats
-      const statsResult = await consultationService.getBrokerStats(profile.id)
+      const statsResult = await consultationService.getBrokerStats(agentId)
       if (statsResult.success) {
         setStats(statsResult.data)
       }
 
       // Load pending referrals
-      const referralsResult = await consultationService.getPendingReferrals(profile.id)
+      const referralsResult = await consultationService.getPendingReferrals(agentId)
       if (referralsResult.success) {
         setPendingReferrals(referralsResult.data)
       }
 
       // Load active consultations
-      const consultationsResult = await consultationService.getBrokerConsultations(profile.id, {
+      const consultationsResult = await consultationService.getBrokerConsultations(agentId, {
         status: statusFilter === 'all' ? null : statusFilter
       })
       if (consultationsResult.success) {
