@@ -14,7 +14,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Unauthorized from './components/Unauthorized.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
 import { HelmetProvider } from 'react-helmet-async'
-import PropertyDetail from './components/PropertyDetail.jsx'
+import PropertyDetail from './components/PropertyDetailTest.jsx'
 import PropertyConsultation from './components/PropertyConsultation.jsx'
 import CustomerDetail from './components/CustomerDetail.jsx'
 import LeadsManagement from './components/LeadsManagement.jsx'
@@ -724,7 +724,7 @@ function App() {
             <Routes>
             <Route path="/" element={<HomePage stateStats={stateStats} onStateSelect={handleStateSelect} />} />
             <Route path="/search" element={<PropertySearch />} />
-            <Route path="/property/:caseNumber" element={<PropertyDetail />} />
+            <Route path="/property/:caseNumber" element={<PropertyDetail />} /> {/* Using PropertyDetailTest temporarily */}
             <Route path="/consult/:caseNumber" element={<PropertyConsultation />} />
             <Route path="/customer/:customerId" element={<CustomerDetail />} />
             <Route path="/leads" element={<LeadsManagement />} />
