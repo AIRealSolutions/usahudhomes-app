@@ -149,6 +149,10 @@ class ConsultationService {
       if (updates.scheduledDate) updateData.scheduled_date = updates.scheduledDate
       if (updates.notes) updateData.notes = updates.notes
       if (updates.agentId) updateData.agent_id = updates.agentId
+      if (updates.agent_id) updateData.agent_id = updates.agent_id
+      if (updates.consultation_type) updateData.consultation_type = updates.consultation_type
+      if (updates.case_number !== undefined) updateData.case_number = updates.case_number
+      if (updates.message !== undefined) updateData.message = updates.message
 
       const { data, error } = await supabase
         .from(TABLES.CONSULTATIONS)
