@@ -25,6 +25,7 @@ function ConsultationAdmin() {
   const [consultations, setConsultations] = useState([])
   const [filteredConsultations, setFilteredConsultations] = useState([])
   const [agents, setAgents] = useState([])
+  const [selectedAgents, setSelectedAgents] = useState({}) // Track selected agent for each consultation
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -127,9 +128,18 @@ function ConsultationAdmin() {
     }
   }
 
-  async function referToAgent(consultationId, agentId) {
+  function handleAgentSelection(consultationId, agentId) {
+    setSelectedAgents(prev => ({
+      ...prev,
+      [consultationId]: agentId
+    }))
+  }
+
+  async function referToAgent(consultationId) {
+    const agentId = selectedAgents[consultationId]
+    
     if (!agentId) {
-      alert('Please select an agent')
+      alert('Please select an agent first')
       return
     }
 
@@ -154,6 +164,14 @@ function ConsultationAdmin() {
       })
       
       alert(`Lead successfully referred to ${agent.first_name} ${agent.last_name}!`)
+      
+      // Clear selection
+      setSelectedAgents(prev => {
+        const newState = { ...prev }
+        delete newState[consultationId]
+        return newState
+      })
+      
       loadConsultations()
     } else {
       alert('Failed to refer lead. Please try again.')
@@ -421,15 +439,15 @@ function ConsultationAdmin() {
                       <div className="flex md:flex-col gap-2">
                         {consultation.status === 'pending' && (
                           <>
-                            {/* Agent Selection Dropdown */}
-                            <div className="flex gap-2">
+                            {/* Agent Selection Dropdown and Send Button */}
+                            <div className="flex gap-2 items-center">
                               <select
-                                onChange={(e) => referToAgent(consultation.id, e.target.value)}
+                                value={selectedAgents[consultation.id] || ''}
+                                onChange={(e) => handleAgentSelection(consultation.id, e.target.value)}
                                 className="px-3 py-2 text-sm border rounded-md bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                defaultValue=""
                               >
                                 <option value="" disabled>
-                                  Refer to Agent...
+                                  Select Agent...
                                 </option>
                                 {agents.map((agent) => (
                                   <option key={agent.id} value={agent.id}>
@@ -437,6 +455,15 @@ function ConsultationAdmin() {
                                   </option>
                                 ))}
                               </select>
+                              <Button
+                                size="sm"
+                                onClick={() => referToAgent(consultation.id)}
+                                disabled={!selectedAgents[consultation.id]}
+                                className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                              >
+                                <UserPlus className="h-4 w-4 mr-1" />
+                                Send Lead
+                              </Button>
                             </div>
                             <Button
                               size="sm"
