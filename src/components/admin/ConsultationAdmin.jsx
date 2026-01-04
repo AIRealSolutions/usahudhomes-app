@@ -129,14 +129,21 @@ function ConsultationAdmin() {
   }
 
   function handleAgentSelection(consultationId, agentId) {
-    setSelectedAgents(prev => ({
-      ...prev,
-      [consultationId]: agentId
-    }))
+    console.log('Agent selected:', { consultationId, agentId })
+    setSelectedAgents(prev => {
+      const newState = {
+        ...prev,
+        [consultationId]: agentId
+      }
+      console.log('Updated selectedAgents state:', newState)
+      return newState
+    })
   }
 
   async function referToAgent(consultationId) {
+    console.log('referToAgent called for consultation:', consultationId)
     const agentId = selectedAgents[consultationId]
+    console.log('Selected agent ID:', agentId)
     
     if (!agentId) {
       alert('Please select an agent first')
