@@ -441,6 +441,14 @@ function ConsultationAdmin() {
                               <span>Case #{consultation.case_number}</span>
                             </div>
                           )}
+                          {consultation.agent && (
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <UserPlus className="h-4 w-4" />
+                              <span className="font-medium text-blue-600">
+                                Assigned to: {consultation.agent.first_name} {consultation.agent.last_name}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         
                         {consultation.message && (
