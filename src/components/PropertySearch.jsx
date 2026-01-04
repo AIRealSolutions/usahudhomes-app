@@ -386,7 +386,7 @@ const PropertySearch = () => {
                 </div>
 
                 <div className="flex gap-2">
-                  <Link to={`/consult/${property.case_number || property.caseNumber}`} className="flex-1">
+                  <Link to={`/property/${property.case_number || property.caseNumber}`} className="flex-1">
                     <Button className="w-full bg-blue-600 hover:bg-blue-700">
                       <Eye className="h-4 w-4 mr-2" />
                       View Details

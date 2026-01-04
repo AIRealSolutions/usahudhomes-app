@@ -714,7 +714,7 @@ function PropertyAdmin() {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => navigate(`/admin/property/${property.id}`)}
+                    onClick={() => navigate(`/admin/property/${property.case_number}`)}
                     title="View Details & Marketing"
                   >
                     <Eye className="h-4 w-4" />

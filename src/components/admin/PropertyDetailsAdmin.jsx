@@ -32,7 +32,7 @@ import {
 } from 'lucide-react'
 
 const PropertyDetailsAdmin = () => {
-  const { propertyId } = useParams()
+  const { caseNumber } = useParams()
   const navigate = useNavigate()
   const [property, setProperty] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -41,12 +41,12 @@ const PropertyDetailsAdmin = () => {
 
   useEffect(() => {
     loadProperty()
-  }, [propertyId])
+  }, [caseNumber])
 
   async function loadProperty() {
     setLoading(true)
     try {
-      const result = await propertyService.getPropertyById(propertyId)
+      const result = await propertyService.getPropertyByCaseNumber(caseNumber)
       if (result.success && result.data) {
         setProperty(result.data)
       }
@@ -58,7 +58,7 @@ const PropertyDetailsAdmin = () => {
   }
 
   const getPropertyUrl = () => {
-    return `${window.location.origin}/property/${property.id}`
+    return `${window.location.origin}/property/${property.case_number}`
   }
 
   const copyToClipboard = (text) => {

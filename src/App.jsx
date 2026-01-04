@@ -724,7 +724,7 @@ function App() {
             <Routes>
             <Route path="/" element={<HomePage stateStats={stateStats} onStateSelect={handleStateSelect} />} />
             <Route path="/search" element={<PropertySearch />} />
-            <Route path="/property/:propertyId" element={<PropertyDetail />} />
+            <Route path="/property/:caseNumber" element={<PropertyDetail />} />
             <Route path="/consult/:caseNumber" element={<PropertyConsultation />} />
             <Route path="/customer/:customerId" element={<CustomerDetail />} />
             <Route path="/leads" element={<LeadsManagement />} />
@@ -744,7 +744,7 @@ function App() {
                 <CustomerDetailsPage />
               </ProtectedRoute>
             } />
-            <Route path="/admin/property/:propertyId" element={
+            <Route path="/admin/property/:caseNumber" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <PropertyDetailsAdmin />
               </ProtectedRoute>

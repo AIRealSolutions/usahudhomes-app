@@ -25,7 +25,7 @@ import {
 import { propertyService } from '../services/database'
 
 function PropertyDetail() {
-  const { propertyId } = useParams()
+  const { caseNumber } = useParams()
   const navigate = useNavigate()
   const [property, setProperty] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -42,14 +42,14 @@ function PropertyDetail() {
     // Load property from Supabase
     const loadProperty = async () => {
       setLoading(true)
-      const result = await propertyService.getPropertyById(propertyId)
+      const result = await propertyService.getPropertyByCaseNumber(caseNumber)
       if (result.success) {
         setProperty(result.data)
       }
       setLoading(false)
     }
     loadProperty()
-  }, [propertyId])
+  }, [caseNumber])
 
   const handleContactSubmit = (e) => {
     e.preventDefault()

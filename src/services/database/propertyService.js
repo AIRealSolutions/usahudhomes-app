@@ -93,6 +93,27 @@ class PropertyService {
   }
 
   /**
+   * Get property by case number
+   * @param {string} caseNumber - Property case number
+   * @returns {Promise<Object>} Property details
+   */
+  async getPropertyByCaseNumber(caseNumber) {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.PROPERTIES)
+        .select('*')
+        .eq('case_number', caseNumber)
+        .eq('is_active', true)
+        .single()
+
+      return formatSupabaseResponse(data, error)
+    } catch (error) {
+      console.error('Error fetching property by case number:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
    * Search properties
    * @param {string} searchTerm - Search term
    * @returns {Promise<Array>} Matching properties
