@@ -151,19 +151,23 @@ function ConsultationAdmin() {
     }
 
     const agent = agents.find(a => a.id === agentId)
+    console.log('Agent found:', agent)
     if (!agent) {
       alert('Agent not found')
       return
     }
 
-    // Create referral using referralService
-    const result = await referralService.createReferral({
-      consultation_id: consultationId,
-      agent_id: agentId,
-      status: 'referred'
-    })
+    try {
+      console.log('Creating referral...')
+      // Create referral using referralService
+      const result = await referralService.createReferral({
+        consultation_id: consultationId,
+        agent_id: agentId,
+        status: 'referred'
+      })
+      console.log('Referral result:', result)
 
-    if (result.success) {
+      if (result.success) {
       // Update consultation status
       await consultationService.updateConsultation(consultationId, { 
         status: 'scheduled',
@@ -180,8 +184,12 @@ function ConsultationAdmin() {
       })
       
       loadConsultations()
-    } else {
-      alert('Failed to refer lead. Please try again.')
+      } else {
+        alert('Failed to refer lead. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error referring lead:', error)
+      alert(`Error: ${error.message || 'Failed to refer lead'}`)
     }
   }
 
