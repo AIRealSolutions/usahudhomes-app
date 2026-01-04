@@ -25,7 +25,9 @@ import {
 import { propertyService } from '../services/database'
 
 function PropertyDetail() {
+  console.log('PropertyDetail component mounting')
   const { caseNumber } = useParams()
+  console.log('Case number from URL:', caseNumber)
   const navigate = useNavigate()
   const [property, setProperty] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -41,12 +43,18 @@ function PropertyDetail() {
   useEffect(() => {
     // Load property from Supabase
     const loadProperty = async () => {
+      console.log('Loading property for case number:', caseNumber)
       setLoading(true)
       const result = await propertyService.getPropertyByCaseNumber(caseNumber)
+      console.log('Property load result:', result)
       if (result.success) {
+        console.log('Property data:', result.data)
         setProperty(result.data)
+      } else {
+        console.error('Failed to load property:', result.error)
       }
       setLoading(false)
+      console.log('Loading complete, property:', result.data)
     }
     loadProperty()
   }, [caseNumber])
