@@ -241,19 +241,24 @@ Generated: ${new Date().toLocaleString()}
               {/* Quick Actions */}
               <div className="flex gap-2 ml-4">
                 <button
-                  onClick={() => window.open(getPropertyUrl(), '_blank')}
+                  onClick={() => {
+                    if (property?.case_number) {
+                      window.open(`/property/${property.case_number}`, '_blank')
+                    }
+                  }}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
                   title="View Public Page"
+                  disabled={!property?.case_number}
                 >
                   <ExternalLink className="w-4 h-4" />
                   <span className="hidden sm:inline">View Live</span>
                 </button>
                 <button
-                  onClick={() => navigate(`/admin-dashboard?edit=${property.id}`)}
+                  onClick={() => navigate('/admin-dashboard', { state: { editPropertyId: property.id } })}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                   title="Edit Property"
                 >
-                  <Edit className="w-4 h-4" />
+                  <Edit className="w-4 w-4" />
                   <span className="hidden sm:inline">Edit</span>
                 </button>
               </div>
