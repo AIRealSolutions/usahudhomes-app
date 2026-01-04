@@ -222,6 +222,7 @@ const BrokerDashboard = () => {
                 <PendingReferralCard 
                   key={referral.id} 
                   referral={referral}
+                  agentId={agentId}
                   onAction={handleReferralAction}
                 />
               ))}

@@ -18,7 +18,7 @@ import {
 import AcceptReferralModal from './AcceptReferralModal'
 import DeclineReferralModal from './DeclineReferralModal'
 
-const PendingReferralCard = ({ referral, onAction }) => {
+const PendingReferralCard = ({ referral, agentId, onAction }) => {
   const { profile } = useAuth()
   const [showAcceptModal, setShowAcceptModal] = useState(false)
   const [showDeclineModal, setShowDeclineModal] = useState(false)
@@ -55,7 +55,7 @@ const PendingReferralCard = ({ referral, onAction }) => {
     try {
       const result = await consultationService.acceptReferral(
         referral.id,
-        profile.id,
+        agentId,
         notes
       )
       
@@ -78,7 +78,7 @@ const PendingReferralCard = ({ referral, onAction }) => {
     try {
       const result = await consultationService.declineReferral(
         referral.id,
-        profile.id,
+        agentId,
         reason,
         notes
       )
