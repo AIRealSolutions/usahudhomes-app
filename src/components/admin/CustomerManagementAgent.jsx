@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { customerAI } from '../../services/openai/customerAI'
-import { propertyService } from '../../services/database'
+import { propertyService, eventService } from '../../services/database'
+import { openGmailCompose } from '../../services/gmailHelper'
 import { 
   Bot, 
   Send, 
@@ -125,6 +126,48 @@ function CustomerManagementAgent({ customer, events, consultations }) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSendViaGmail = (emailContent) => {
+    // Parse email content to extract subject and body
+    const lines = emailContent.split('\n')
+    let subject = ''
+    let body = ''
+    let isBody = false
+
+    for (const line of lines) {
+      if (line.toLowerCase().startsWith('subject:')) {
+        subject = line.substring(line.indexOf(':') + 1).trim()
+      } else if (line.trim() === '' && subject) {
+        isBody = true
+      } else if (isBody) {
+        body += line + '\n'
+      }
+    }
+
+    // If no subject found, use first line as subject
+    if (!subject && lines.length > 0) {
+      subject = lines[0]
+      body = lines.slice(1).join('\n')
+    }
+
+    // Open Gmail compose with pre-filled content
+    openGmailCompose({
+      to: customer.email,
+      subject: subject,
+      body: body.trim()
+    })
+
+    // Log email event
+    eventService.logEmailSent({
+      customerId: customer.id,
+      recipient: customer.email,
+      subject: subject,
+      message: body.trim(),
+      method: 'gmail_compose'
+    }).catch(error => {
+      console.error('Failed to log email event:', error)
+    })
   }
 
   const handleRecommendProperties = async () => {
@@ -268,22 +311,33 @@ function CustomerManagementAgent({ customer, events, consultations }) {
             >
               <div className="whitespace-pre-wrap text-sm">{message.content}</div>
               {message.role === 'assistant' && (
-                <button
-                  onClick={() => copyToClipboard(message.content, index)}
-                  className="mt-2 text-xs text-gray-500 hover:text-gray-700 flex items-center space-x-1"
-                >
-                  {copiedIndex === index ? (
-                    <>
-                      <Check className="w-3 h-3" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" />
-                      <span>Copy</span>
-                    </>
+                <div className="mt-2 flex items-center space-x-3">
+                  <button
+                    onClick={() => copyToClipboard(message.content, index)}
+                    className="text-xs text-gray-500 hover:text-gray-700 flex items-center space-x-1"
+                  >
+                    {copiedIndex === index ? (
+                      <>
+                        <Check className="w-3 h-3" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+                  {message.content.toLowerCase().includes('subject:') && (
+                    <button
+                      onClick={() => handleSendViaGmail(message.content)}
+                      className="text-xs text-blue-500 hover:text-blue-700 flex items-center space-x-1"
+                    >
+                      <Mail className="w-3 h-3" />
+                      <span>Send via Gmail</span>
+                    </button>
                   )}
-                </button>
+                </div>
               )}
             </div>
           </div>
