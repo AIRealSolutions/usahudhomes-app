@@ -130,8 +130,18 @@ function ConsultationAdmin() {
     try {
       console.log('Saving consultation:', editingConsultation.id, editForm)
       
-      // If agent_id changed and new agent is selected, create referral
-      if (editForm.agent_id && editForm.agent_id !== editingConsultation.agent_id) {
+      const agentChanged = editForm.agent_id && editForm.agent_id !== editingConsultation.agent_id
+      
+      // Update consultation first
+      const updateResult = await consultationService.updateConsultation(editingConsultation.id, editForm)
+      
+      if (!updateResult.success) {
+        alert('Failed to update consultation: ' + (updateResult.error || 'Unknown error'))
+        return
+      }
+      
+      // If agent changed, create referral to notify the new broker
+      if (agentChanged) {
         console.log('Agent changed, creating referral...')
         const referralResult = await referralService.createReferral({
           consultation_id: editingConsultation.id,
@@ -140,22 +150,17 @@ function ConsultationAdmin() {
         })
         
         if (!referralResult.success) {
-          alert('Failed to assign broker: ' + (referralResult.error || 'Unknown error'))
-          return
+          console.warn('Referral notification failed:', referralResult.error)
+          // Don't block the update, just warn
+        } else {
+          console.log('Referral created successfully')
         }
-        console.log('Referral created successfully')
       }
-
-      // Update consultation
-      const updateResult = await consultationService.updateConsultation(editingConsultation.id, editForm)
       
-      if (updateResult.success) {
-        alert('Consultation updated successfully!')
-        closeEditModal()
-        loadConsultations() // Reload to show changes
-      } else {
-        alert('Failed to update consultation: ' + (updateResult.error || 'Unknown error'))
-      }
+      // Close modal and reload data
+      closeEditModal()
+      await loadConsultations() // Reload to show changes
+      
     } catch (error) {
       console.error('Error saving consultation:', error)
       alert('Failed to save consultation: ' + error.message)

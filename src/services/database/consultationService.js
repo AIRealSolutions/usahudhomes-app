@@ -531,15 +531,18 @@ class ConsultationService {
    */
   async acceptReferral(consultationId, brokerId, notes = null) {
     try {
-      const { data, error } = await supabase.rpc('accept_referral', {
-        p_consultation_id: consultationId,
-        p_broker_id: brokerId,
-        p_notes: notes
-      })
-
-      if (error) throw error
-
-      return { success: true, data }
+      // Import referralService
+      const { referralService } = await import('./referralService')
+      
+      // Use referralService.acceptReferral which directly updates the status
+      const result = await referralService.acceptReferral(consultationId, brokerId)
+      
+      // If notes provided, update them separately
+      if (result.success && notes) {
+        await this.updateConsultation(consultationId, { notes })
+      }
+      
+      return result
     } catch (error) {
       console.error('Error accepting referral:', error)
       return { success: false, error: error.message }
