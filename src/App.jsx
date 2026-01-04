@@ -13,12 +13,14 @@ import BrokerDashboard from './components/broker/BrokerDashboard.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Unauthorized from './components/Unauthorized.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
+import { HelmetProvider } from 'react-helmet-async'
 import PropertyDetail from './components/PropertyDetail.jsx'
 import PropertyConsultation from './components/PropertyConsultation.jsx'
 import CustomerDetail from './components/CustomerDetail.jsx'
 import LeadsManagement from './components/LeadsManagement.jsx'
 import LeadDetail from './components/LeadDetail.jsx'
 import CustomerDetailsPage from './components/admin/CustomerDetailsPage.jsx'
+import PropertyDetailsAdmin from './components/admin/PropertyDetailsAdmin.jsx'
 import { propertyService } from './services/database'
 import { getImageUrl } from './utils/imageUtils'
 import './App.css'
@@ -713,8 +715,9 @@ function App() {
   }
 
   return (
-    <AuthProvider>
-      <Router>
+    <HelmetProvider>
+      <AuthProvider>
+        <Router>
         <div className="min-h-screen bg-white">
           <Header isAuthenticated={isAuthenticated} onLogout={handleLogout} />
           <main>
@@ -741,6 +744,11 @@ function App() {
                 <CustomerDetailsPage />
               </ProtectedRoute>
             } />
+            <Route path="/admin/property/:propertyId" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <PropertyDetailsAdmin />
+              </ProtectedRoute>
+            } />
             <Route path="/unauthorized" element={<Unauthorized />} />
             <Route path="/customer/:customerId" element={
               isAuthenticated ? (
@@ -760,8 +768,9 @@ function App() {
           </main>
           <Footer />
         </div>
-      </Router>
-    </AuthProvider>
+        </Router>
+      </AuthProvider>
+    </HelmetProvider>
   )
 }
 

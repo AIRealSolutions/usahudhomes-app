@@ -17,12 +17,15 @@ import {
   Download,
   Upload,
   Image as ImageIcon,
-  Loader2
+  Loader2,
+  Eye
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { propertyService } from '../../services/database'
 import { supabase } from '../../config/supabase'
 
 function PropertyAdmin() {
+  const navigate = useNavigate()
   const [properties, setProperties] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -708,6 +711,14 @@ function PropertyAdmin() {
                   </div>
                 </div>
                 <div className="flex gap-2 ml-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => navigate(`/admin/property/${property.id}`)}
+                    title="View Details & Marketing"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => handleEdit(property)}>
                     <Edit className="h-4 w-4" />
                   </Button>
