@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { customerService, eventService } from '../../services/database'
+import { useAuth } from '../../contexts/AuthContext'
+import LogEventModal from './LogEventModal'
 import { 
   ArrowLeft, 
   User, 
@@ -17,17 +19,26 @@ import {
   FileText,
   AlertCircle,
   TrendingUp,
-  Activity
+  Activity,
+  Plus,
+  X
 } from 'lucide-react'
 
 const CustomerDetailsPage = () => {
   const { customerId } = useParams()
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const [customer, setCustomer] = useState(null)
   const [events, setEvents] = useState([])
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, communication, consultation, status
+  
+  // Modal states
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [showSMSModal, setShowSMSModal] = useState(false)
+  const [showCallModal, setShowCallModal] = useState(false)
+  const [showNoteModal, setShowNoteModal] = useState(false)
 
   useEffect(() => {
     loadCustomerData()
@@ -57,6 +68,77 @@ const CustomerDetailsPage = () => {
       console.error('Error loading customer data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSaveEvent = async (eventType, formData) => {
+    try {
+      let result
+      
+      switch (eventType) {
+        case 'email':
+          result = await eventService.logEmailSent(
+            customerId,
+            null, // no consultation_id
+            profile?.id,
+            {
+              to: customer.email,
+              subject: formData.subject,
+              body: formData.message
+            }
+          )
+          break
+          
+        case 'sms':
+          result = await eventService.logSMSSent(
+            customerId,
+            null,
+            profile?.id,
+            {
+              to: customer.phone,
+              message: formData.message
+            }
+          )
+          break
+          
+        case 'call':
+          result = await eventService.logCallMade(
+            customerId,
+            null,
+            profile?.id,
+            {
+              phone: customer.phone,
+              duration: formData.duration,
+              outcome: formData.outcome,
+              notes: formData.notes
+            }
+          )
+          break
+          
+        case 'note':
+          result = await eventService.logNoteAdded(
+            customerId,
+            null,
+            profile?.id,
+            {
+              note: formData.notes
+            }
+          )
+          break
+          
+        default:
+          throw new Error('Unknown event type')
+      }
+      
+      if (result.success) {
+        // Reload events to show the new one
+        await loadCustomerData()
+      } else {
+        throw new Error(result.error || 'Failed to save event')
+      }
+    } catch (error) {
+      console.error('Error saving event:', error)
+      throw error
     }
   }
 
@@ -165,11 +247,11 @@ const CustomerDetailsPage = () => {
           </button>
 
           <div className="flex items-start justify-between">
-            <div className="flex items-start gap-4">
+            <div className="flex items-start gap-4 flex-1">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
                 <User className="w-8 h-8 text-blue-600" />
               </div>
-              <div>
+              <div className="flex-1">
                 <h1 className="text-3xl font-bold text-gray-900">
                   {customer.first_name} {customer.last_name}
                 </h1>
@@ -211,6 +293,42 @@ const CustomerDetailsPage = () => {
                   )}
                 </div>
               </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex gap-2 ml-4">
+              <button
+                onClick={() => setShowEmailModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                title="Send Email"
+              >
+                <Mail className="w-4 h-4" />
+                <span className="hidden sm:inline">Email</span>
+              </button>
+              <button
+                onClick={() => setShowSMSModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                title="Send SMS"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span className="hidden sm:inline">SMS</span>
+              </button>
+              <button
+                onClick={() => setShowCallModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                title="Log Call"
+              >
+                <PhoneCall className="w-4 h-4" />
+                <span className="hidden sm:inline">Call</span>
+              </button>
+              <button
+                onClick={() => setShowNoteModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                title="Add Note"
+              >
+                <FileText className="w-4 h-4" />
+                <span className="hidden sm:inline">Note</span>
+              </button>
             </div>
           </div>
         </div>
@@ -406,6 +524,43 @@ const CustomerDetailsPage = () => {
           </div>
         </div>
       </div>
+      
+      {/* Event Logging Modals */}
+      {customer && (
+        <>
+          <LogEventModal
+            isOpen={showEmailModal}
+            onClose={() => setShowEmailModal(false)}
+            onSave={(formData) => handleSaveEvent('email', formData)}
+            eventType="email"
+            customer={customer}
+          />
+          
+          <LogEventModal
+            isOpen={showSMSModal}
+            onClose={() => setShowSMSModal(false)}
+            onSave={(formData) => handleSaveEvent('sms', formData)}
+            eventType="sms"
+            customer={customer}
+          />
+          
+          <LogEventModal
+            isOpen={showCallModal}
+            onClose={() => setShowCallModal(false)}
+            onSave={(formData) => handleSaveEvent('call', formData)}
+            eventType="call"
+            customer={customer}
+          />
+          
+          <LogEventModal
+            isOpen={showNoteModal}
+            onClose={() => setShowNoteModal(false)}
+            onSave={(formData) => handleSaveEvent('note', formData)}
+            eventType="note"
+            customer={customer}
+          />
+        </>
+      )}
     </div>
   )
 }
