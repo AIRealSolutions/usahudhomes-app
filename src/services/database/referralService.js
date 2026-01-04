@@ -379,6 +379,29 @@ class ReferralService {
       return { success: false, error: error.message, data: null }
     }
   }
+
+  /**
+   * Create a referral (alias for assignConsultationToAgent)
+   * @param {Object} referralData - Referral data
+   * @param {string} referralData.consultation_id - Consultation UUID
+   * @param {string} referralData.agent_id - Agent UUID
+   * @param {string} referralData.status - Referral status (optional)
+   * @returns {Promise<Object>} Created referral
+   */
+  async createReferral({ consultation_id, agent_id, status = 'referred' }) {
+    console.log('createReferral called with:', { consultation_id, agent_id, status })
+    
+    try {
+      // Use the existing assignConsultationToAgent method
+      const result = await this.assignConsultationToAgent(consultation_id, agent_id)
+      console.log('assignConsultationToAgent result:', result)
+      
+      return result
+    } catch (error) {
+      console.error('Error in createReferral:', error)
+      return { success: false, error: error.message, data: null }
+    }
+  }
 }
 
 // Export singleton instance
