@@ -18,6 +18,7 @@ import PropertyConsultation from './components/PropertyConsultation.jsx'
 import CustomerDetail from './components/CustomerDetail.jsx'
 import LeadsManagement from './components/LeadsManagement.jsx'
 import LeadDetail from './components/LeadDetail.jsx'
+import CustomerDetailsPage from './components/admin/CustomerDetailsPage.jsx'
 import { propertyService } from './services/database'
 import { getImageUrl } from './utils/imageUtils'
 import './App.css'
@@ -733,6 +734,11 @@ function App() {
             <Route path="/admin-dashboard" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/customer/:customerId" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <CustomerDetailsPage />
               </ProtectedRoute>
             } />
             <Route path="/unauthorized" element={<Unauthorized />} />

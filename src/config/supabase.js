@@ -34,7 +34,8 @@ export const TABLES = {
   AGENTS: 'agents',
   CONSULTATIONS: 'consultations',
   LEADS: 'leads',
-  ACTIVITIES: 'activities'
+  ACTIVITIES: 'activities',
+  CUSTOMER_EVENTS: 'customer_events'
 }
 
 // Helper function to check if Supabase is configured

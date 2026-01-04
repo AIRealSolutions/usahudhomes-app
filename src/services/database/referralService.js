@@ -115,6 +115,22 @@ class ReferralService {
 
       // Log activity
       await this.logReferralActivity(consultationId, agentId, 'accepted')
+      
+      // Log event
+      if (data && data.customer_id) {
+        const { eventService } = await import('./eventService')
+        const agentResult = await agentService.getAgentById(agentId)
+        const agentName = agentResult.success && agentResult.data
+          ? `${agentResult.data.first_name} ${agentResult.data.last_name}`
+          : 'Unknown Agent'
+        
+        eventService.logReferralAccepted(
+          data.customer_id,
+          consultationId,
+          agentId,
+          agentName
+        ).catch(err => console.error('Failed to log referral accepted event:', err))
+      }
 
       return formatSupabaseResponse(data, null)
     } catch (error) {

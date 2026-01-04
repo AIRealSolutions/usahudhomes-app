@@ -74,6 +74,20 @@ const SMSComposer = ({ consultation, customer, property, onSend, onCancel }) => 
       )
 
       if (result.success) {
+        // Log event
+        if (consultation.customer_id) {
+          const { eventService } = await import('../../services/database/eventService')
+          eventService.logSMSSent(
+            consultation.customer_id,
+            consultation.id,
+            profile.id,
+            {
+              to: customer.phone,
+              message: message
+            }
+          ).catch(err => console.error('Failed to log SMS event:', err))
+        }
+        
         // Open SMS app (works on mobile devices)
         const smsLink = `sms:${customer.phone}?body=${encodeURIComponent(message)}`
         window.location.href = smsLink

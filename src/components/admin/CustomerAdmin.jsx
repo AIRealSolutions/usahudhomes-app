@@ -15,11 +15,14 @@ import {
   Save,
   X,
   Download,
-  Upload
+  Upload,
+  Eye
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { customerService } from '../../services/database'
 
 function CustomerAdmin() {
+  const navigate = useNavigate()
   const [customers, setCustomers] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -470,6 +473,14 @@ function CustomerAdmin() {
                   </div>
                 </div>
                 <div className="flex gap-2 ml-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => navigate(`/admin/customer/${customer.id}`)}
+                    title="View Details"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => handleEdit(customer)}>
                     <Edit className="h-4 w-4" />
                   </Button>

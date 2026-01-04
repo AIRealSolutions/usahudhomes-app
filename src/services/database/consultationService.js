@@ -150,6 +150,16 @@ class ConsultationService {
       const consultation = data && data.length > 0 ? data[0] : null
       console.log('Consultation data for notification:', consultation)
       if (consultation) {
+        // Log consultation creation event
+        if (customerId) {
+          const { eventService } = await import('./eventService')
+          eventService.logConsultationCreated(customerId, consultation.id, {
+            type: consultation.consultation_type,
+            caseNumber: consultation.case_number,
+            message: consultation.message
+          }).catch(err => console.error('Failed to log consultation created event:', err))
+        }
+        
         console.log('Calling sendConsultationNotification...')
         // Send notification asynchronously (don't wait for it)
         sendConsultationNotification(consultation)
@@ -189,6 +199,13 @@ class ConsultationService {
    */
   async updateConsultation(id, updates) {
     try {
+      // Get existing consultation to detect changes
+      const { data: existing } = await supabase
+        .from(TABLES.CONSULTATIONS)
+        .select('*')
+        .eq('id', id)
+        .single()
+      
       const updateData = {}
       
       if (updates.status) updateData.status = updates.status
@@ -215,7 +232,41 @@ class ConsultationService {
         return { success: false, error: 'Consultation not found', data: null }
       }
 
-      return { success: true, data: data[0] }
+      const updated = data[0]
+      
+      // Log events for significant changes
+      if (existing && updated.customer_id) {
+        const { eventService } = await import('./eventService')
+        
+        // Log agent assignment
+        if (existing.agent_id !== updated.agent_id && updated.agent_id) {
+          const { agentService } = await import('./agentService')
+          const agentResult = await agentService.getAgentById(updated.agent_id)
+          const agentName = agentResult.success && agentResult.data 
+            ? `${agentResult.data.first_name} ${agentResult.data.last_name}`
+            : 'Unknown Agent'
+          
+          eventService.logConsultationAssigned(
+            updated.customer_id,
+            updated.id,
+            updated.agent_id,
+            agentName
+          ).catch(err => console.error('Failed to log assignment event:', err))
+        }
+        
+        // Log status change
+        if (existing.status !== updated.status) {
+          eventService.logStatusChanged(
+            updated.customer_id,
+            updated.id,
+            updated.agent_id,
+            existing.status,
+            updated.status
+          ).catch(err => console.error('Failed to log status change event:', err))
+        }
+      }
+
+      return { success: true, data: updated }
     } catch (error) {
       console.error('Error updating consultation:', error)
       return { success: false, error: error.message, data: null }

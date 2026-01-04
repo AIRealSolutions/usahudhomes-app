@@ -68,6 +68,18 @@ const ConsultationCard = ({ consultation, onUpdate }) => {
         'call_made',
         { phone: customer.phone }
       )
+      
+      // Log event
+      if (consultation.customer_id) {
+        const { eventService } = await import('../../services/database/eventService')
+        eventService.logCallMade(
+          consultation.customer_id,
+          consultation.id,
+          profile.id,
+          { phone: customer.phone }
+        ).catch(err => console.error('Failed to log call event:', err))
+      }
+      
       // Open phone dialer
       window.location.href = `tel:${customer.phone}`
     }

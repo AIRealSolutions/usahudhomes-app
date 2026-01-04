@@ -190,6 +190,21 @@ ${profile.email || '[Your Email]'}`
       )
 
       if (result.success) {
+        // Log event
+        if (consultation.customer_id) {
+          const { eventService } = await import('../../services/database/eventService')
+          eventService.logEmailSent(
+            consultation.customer_id,
+            consultation.id,
+            profile.id,
+            {
+              to: customer.email,
+              subject: subject,
+              body: body
+            }
+          ).catch(err => console.error('Failed to log email event:', err))
+        }
+        
         // In a real app, this would actually send the email via an email service
         // For now, we just open the user's email client
         const mailtoLink = `mailto:${customer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
