@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Input } from '@/components/ui/input.jsx'
@@ -19,11 +19,12 @@ import {
   Eye,
   UserPlus
 } from 'lucide-react'
-import { consultationService, customerService, propertyService } from '../../services/database'
+import { consultationService, customerService, propertyService, agentService, referralService } from '../../services/database'
 
 function ConsultationAdmin() {
   const [consultations, setConsultations] = useState([])
   const [filteredConsultations, setFilteredConsultations] = useState([])
+  const [agents, setAgents] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -38,6 +39,7 @@ function ConsultationAdmin() {
 
   useEffect(() => {
     loadConsultations()
+    loadAgents()
   }, [])
 
   useEffect(() => {
@@ -53,6 +55,15 @@ function ConsultationAdmin() {
       calculateStats(consultationsData)
     }
     setLoading(false)
+  }
+
+  async function loadAgents() {
+    const result = await agentService.getAllAgents()
+    if (result.success) {
+      // Only show active agents
+      const activeAgents = (result.data || []).filter(agent => agent.is_active)
+      setAgents(activeAgents)
+    }
   }
 
   function calculateStats(data) {
@@ -116,21 +127,33 @@ function ConsultationAdmin() {
     }
   }
 
-  async function referToBroker(consultation) {
-    // Get broker ID from prompt (in a real app, this would be a modal with broker selection)
-    const brokerEmail = prompt('Enter broker email to refer this lead to:')
-    if (!brokerEmail) return
+  async function referToAgent(consultationId, agentId) {
+    if (!agentId) {
+      alert('Please select an agent')
+      return
+    }
 
-    // For now, we'll just update the status to 'referred' and add a note
-    // In the future, this should:
-    // 1. Show a modal with list of available brokers
-    // 2. Assign the consultation to the selected broker
-    // 3. Send notification to the broker
-    // 4. Update status to 'referred'
-    
-    const result = await consultationService.referConsultation(consultation.id, brokerEmail)
+    const agent = agents.find(a => a.id === agentId)
+    if (!agent) {
+      alert('Agent not found')
+      return
+    }
+
+    // Create referral using referralService
+    const result = await referralService.createReferral({
+      consultation_id: consultationId,
+      agent_id: agentId,
+      status: 'referred'
+    })
+
     if (result.success) {
-      alert(`Lead referred to ${brokerEmail} successfully!`)
+      // Update consultation status
+      await consultationService.updateConsultation(consultationId, { 
+        status: 'scheduled',
+        assigned_agent_id: agentId 
+      })
+      
+      alert(`Lead successfully referred to ${agent.first_name} ${agent.last_name}!`)
       loadConsultations()
     } else {
       alert('Failed to refer lead. Please try again.')
@@ -398,14 +421,23 @@ function ConsultationAdmin() {
                       <div className="flex md:flex-col gap-2">
                         {consultation.status === 'pending' && (
                           <>
-                            <Button
-                              size="sm"
-                              onClick={() => referToBroker(consultation)}
-                              className="bg-purple-600 hover:bg-purple-700"
-                            >
-                              <UserPlus className="h-4 w-4 mr-1" />
-                              Refer Lead
-                            </Button>
+                            {/* Agent Selection Dropdown */}
+                            <div className="flex gap-2">
+                              <select
+                                onChange={(e) => referToAgent(consultation.id, e.target.value)}
+                                className="px-3 py-2 text-sm border rounded-md bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                defaultValue=""
+                              >
+                                <option value="" disabled>
+                                  Refer to Agent...
+                                </option>
+                                {agents.map((agent) => (
+                                  <option key={agent.id} value={agent.id}>
+                                    {agent.first_name} {agent.last_name} ({agent.states_covered?.join(', ')})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                             <Button
                               size="sm"
                               onClick={() => updateConsultationStatus(consultation.id, 'scheduled')}
@@ -446,14 +478,14 @@ function ConsultationAdmin() {
                           </Button>
                         )}
                         {consultation.status === 'completed' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => deleteConsultation(consultation.id)}
-                            className="text-red-600 hover:bg-red-50"
-                          >
-                            Delete
-                          </Button>
+                          <Badge className="bg-green-100 text-green-800">
+                            Completed
+                          </Badge>
+                        )}
+                        {consultation.status === 'cancelled' && (
+                          <Badge className="bg-red-100 text-red-800">
+                            Cancelled
+                          </Badge>
                         )}
                       </div>
                     </div>
