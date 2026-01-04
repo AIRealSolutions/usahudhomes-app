@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { customerService, eventService } from '../../services/database'
 import { useAuth } from '../../contexts/AuthContext'
 import LogEventModal from './LogEventModal'
+import CustomerManagementAgent from './CustomerManagementAgent'
 import { 
   ArrowLeft, 
   User, 
@@ -390,11 +391,17 @@ const CustomerDetailsPage = () => {
             </div>
           )}
         </div>
-      )}
-
-      {/* Timeline */}
+      )}      {/* AI Customer Management Agent */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-white rounded-lg shadow">
+        <CustomerManagementAgent 
+          customer={customer}
+          events={events}
+          consultations={[]} // Will be populated from consultations service
+        />
+      </div>
+
+      {/* Activity Timeline */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">  <div className="bg-white rounded-lg shadow">
           {/* Filter Tabs */}
           <div className="border-b border-gray-200 px-6 py-4">
             <div className="flex items-center justify-between">
