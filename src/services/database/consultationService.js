@@ -77,10 +77,56 @@ class ConsultationService {
    */
   async addConsultation(consultationData) {
     try {
+      let customerId = consultationData.customerId
+      
+      // If no customerId provided, create or find customer by email
+      if (!customerId && consultationData.customerEmail) {
+        console.log('No customerId provided, checking for existing customer...')
+        
+        // Import customerService
+        const { customerService } = await import('./customerService')
+        
+        // Check if customer exists by email
+        const existingCustomer = await customerService.getCustomerByEmail(consultationData.customerEmail)
+        
+        if (existingCustomer.success && existingCustomer.data) {
+          // Customer exists, use their ID
+          customerId = existingCustomer.data.id
+          console.log('Found existing customer:', customerId)
+        } else {
+          // Customer doesn't exist, create new one
+          console.log('Creating new customer profile...')
+          
+          // Parse name into first and last
+          const nameParts = (consultationData.customerName || '').split(' ')
+          const firstName = nameParts[0] || ''
+          const lastName = nameParts.slice(1).join(' ') || ''
+          
+          const newCustomer = await customerService.addCustomer({
+            first_name: firstName,
+            last_name: lastName,
+            email: consultationData.customerEmail,
+            phone: consultationData.customerPhone,
+            state: consultationData.state,
+            status: 'new',
+            lead_source: 'website',
+            notes: consultationData.message || 'Lead from consultation form'
+          })
+          
+          if (newCustomer.success && newCustomer.data) {
+            customerId = newCustomer.data.id
+            console.log('Created new customer:', customerId)
+          } else {
+            console.error('Failed to create customer:', newCustomer.error)
+            // Continue anyway, consultation will have embedded customer info
+          }
+        }
+      }
+      
       const { data, error } = await supabase
         .from(TABLES.CONSULTATIONS)
         .insert([{
-          customer_id: consultationData.customerId,
+          customer_id: customerId,
           property_id: consultationData.propertyId,
           agent_id: consultationData.agentId,
           case_number: consultationData.caseNumber,
