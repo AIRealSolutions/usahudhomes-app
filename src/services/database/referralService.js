@@ -46,7 +46,7 @@ class ReferralService {
       const { data, error } = await supabase
         .from(TABLES.CONSULTATIONS)
         .update({
-          assigned_broker_id: agentId,
+          agent_id: agentId,
           assigned_at: now,
           referral_expires_at: expiresAt,
           status: 'referred'
@@ -107,7 +107,7 @@ class ReferralService {
           status: 'accepted'
         })
         .eq('id', consultationId)
-        .eq('assigned_broker_id', agentId)
+        .eq('agent_id', agentId)
         .select()
         .single()
 
@@ -144,7 +144,7 @@ class ReferralService {
           status: 'declined'
         })
         .eq('id', consultationId)
-        .eq('assigned_broker_id', agentId)
+        .eq('agent_id', agentId)
         .select()
         .single()
 
@@ -174,7 +174,7 @@ class ReferralService {
       const { data, error } = await supabase
         .from(TABLES.CONSULTATIONS)
         .update({
-          assigned_broker_id: null,
+          agent_id: null,
           assigned_at: null,
           referral_expires_at: null,
           status: 'pending'
@@ -227,7 +227,7 @@ class ReferralService {
           .eq('id', consultation.id)
 
         // Log activity
-        await this.logReferralActivity(consultation.id, consultation.assigned_broker_id, 'expired')
+        await this.logReferralActivity(consultation.id, consultation.agent_id, 'expired')
 
         // Try to reassign
         const result = await this.reassignConsultation(consultation.id)
@@ -258,7 +258,7 @@ class ReferralService {
       let query = supabase
         .from(TABLES.CONSULTATIONS)
         .select('*, customers(*), properties(*)')
-        .eq('assigned_broker_id', agentId)
+        .eq('agent_id', agentId)
         .order('assigned_at', { ascending: false })
 
       if (status) {
@@ -358,7 +358,7 @@ class ReferralService {
       const { data, error } = await supabase
         .from(TABLES.CONSULTATIONS)
         .select('status, outcome')
-        .eq('assigned_broker_id', agentId)
+        .eq('agent_id', agentId)
 
       if (error) throw error
 

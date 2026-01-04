@@ -171,7 +171,7 @@ function ConsultationAdmin() {
       // Update consultation status
       await consultationService.updateConsultation(consultationId, { 
         status: 'scheduled',
-        assigned_agent_id: agentId 
+        agentId: agentId 
       })
       
       alert(`Lead successfully referred to ${agent.first_name} ${agent.last_name}!`)
