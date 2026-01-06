@@ -148,15 +148,15 @@ const ReferralAgreementStep = ({ formData, updateFormData, errors }) => {
           Electronic Signature *
         </Label>
         <p className="text-sm text-gray-600">
-          By typing your full name below, you are providing your electronic signature and 
-          agreeing to the terms of this agreement. This has the same legal effect as a 
-          handwritten signature.
+          Type your name exactly as it appears on your real estate license. By signing, you are 
+          providing your electronic signature and agreeing to the terms of this agreement. 
+          This has the same legal effect as a handwritten signature.
         </p>
 
         <Input
           id="signature"
           type="text"
-          placeholder="Type your full legal name (e.g., John Michael Smith Jr.)"
+          placeholder="Name as it appears on your real estate license"
           value={formData.signature}
           onChange={(e) => updateFormData('signature', e.target.value)}
           className={`text-lg font-serif ${errors.signature ? 'border-red-500' : ''}`}
