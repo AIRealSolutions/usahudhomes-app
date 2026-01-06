@@ -19,6 +19,7 @@ export const agentApplicationService = {
       const application = {
         first_name: applicationData.firstName,
         last_name: applicationData.lastName,
+        legal_name: applicationData.legalName,
         email: applicationData.email.toLowerCase(),
         phone: applicationData.phone,
         company: applicationData.company || null,
@@ -30,6 +31,8 @@ export const agentApplicationService = {
         specialties: applicationData.specialties,
         referral_fee_percentage: applicationData.referralFeePercentage || 25.00,
         agreed_to_terms: applicationData.agreedToTerms,
+        signature: applicationData.signature,
+        signature_date: new Date().toISOString(),
         terms_agreed_at: new Date().toISOString(),
         terms_version: 'v1.0',
         email_verification_token: verificationToken,

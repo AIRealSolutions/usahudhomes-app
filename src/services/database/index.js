@@ -9,6 +9,7 @@ export { agentService } from './agentService'
 export { consultationService } from './consultationService'
 export { referralService } from './referralService'
 export { eventService } from './eventService'
+export { agentApplicationService } from '../agentApplicationService'
 
 // Re-export Supabase client and utilities
 export { supabase, TABLES, isSupabaseConfigured } from '../../config/supabase'
