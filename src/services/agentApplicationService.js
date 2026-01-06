@@ -3,7 +3,7 @@
  * Handles agent registration, verification, and approval workflow
  */
 
-import { supabase } from '../lib/supabase'
+import { supabase } from '../config/supabase'
 import emailService from './emailService'
 
 export const agentApplicationService = {
