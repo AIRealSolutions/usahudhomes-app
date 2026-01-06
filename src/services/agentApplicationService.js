@@ -4,8 +4,7 @@
  */
 
 import { supabase } from '../lib/supabase'
-import { sendEmail } from './emailService'
-import crypto from 'crypto'
+import emailService from './emailService'
 
 export const agentApplicationService = {
   /**
@@ -14,7 +13,7 @@ export const agentApplicationService = {
   async submitApplication(applicationData) {
     try {
       // Generate email verification token
-      const verificationToken = crypto.randomBytes(32).toString('hex')
+      const verificationToken = Math.random().toString(36).substring(2) + Date.now().toString(36)
 
       // Prepare application data
       const application = {
@@ -75,38 +74,22 @@ export const agentApplicationService = {
    */
   async sendVerificationEmail(applicationId, email, token, firstName) {
     try {
-      const verificationLink = `${window.location.origin}/agent/verify-email?token=${token}`
+      // Get full application data
+      const { data: application } = await supabase
+        .from('agent_applications')
+        .select('*')
+        .eq('id', applicationId)
+        .single()
 
-      const emailContent = `
-        <h2>Verify Your Email Address</h2>
-        <p>Hi ${firstName},</p>
-        <p>Thank you for applying to become a HUD Home Lead Partner!</p>
-        <p>Please verify your email address by clicking the link below:</p>
-        <p><a href="${verificationLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Verify Email Address</a></p>
-        <p>Or copy and paste this link into your browser:</p>
-        <p>${verificationLink}</p>
-        <p>This link will expire in 24 hours.</p>
-        <p><strong>What's Next?</strong></p>
-        <ul>
-          <li>Verify your email address</li>
-          <li>We'll verify your real estate license</li>
-          <li>An administrator will review your application</li>
-          <li>You'll receive login credentials once approved</li>
-        </ul>
-        <p>Questions? Reply to this email or contact us at support@usahudhomes.com</p>
-        <p>Best regards,<br>USA HUD Homes Team</p>
-      `
+      if (!application) throw new Error('Application not found')
 
-      await sendEmail({
-        to: email,
-        subject: 'Verify Your Email - HUD Home Lead Partner Application',
-        html: emailContent
-      })
+      // Use the new email service
+      const result = await emailService.sendAgentVerificationEmail(application, token)
 
       // Log email sent
       await this.logVerificationAction(applicationId, null, 'verification_email_sent', `Verification email sent to ${email}`)
 
-      return { success: true }
+      return result
     } catch (error) {
       console.error('Error sending verification email:', error)
       return { success: false, error: error.message }
@@ -203,7 +186,7 @@ export const agentApplicationService = {
       }
 
       // Generate new token
-      const newToken = crypto.randomBytes(32).toString('hex')
+      const newToken = Math.random().toString(36).substring(2) + Date.now().toString(36)
 
       // Update token
       await supabase
@@ -436,51 +419,22 @@ export const agentApplicationService = {
    * Send approval email
    */
   async sendApprovalEmail(application, agentId) {
-    const emailContent = `
-      <h2>Congratulations! Your Application Has Been Approved</h2>
-      <p>Hi ${application.first_name},</p>
-      <p>Great news! Your application to become a HUD Home Lead Partner has been approved.</p>
-      <p><strong>You can now start receiving qualified HUD home buyer leads!</strong></p>
-      <h3>Next Steps:</h3>
-      <ol>
-        <li>Log in to your broker dashboard at: <a href="${window.location.origin}/broker-dashboard">${window.location.origin}/broker-dashboard</a></li>
-        <li>Complete your profile setup</li>
-        <li>Review your lead preferences</li>
-        <li>Start receiving leads!</li>
-      </ol>
-      <p><strong>Your Login Credentials:</strong></p>
-      <p>Email: ${application.email}<br>
-      Password: (Use the same password you set during registration, or reset it if needed)</p>
-      <p>Questions? Contact us at support@usahudhomes.com or call (910) 363-6147</p>
-      <p>Welcome to the team!<br>USA HUD Homes</p>
-    `
+    // Generate temporary password (in production, use proper auth system)
+    const temporaryPassword = Math.random().toString(36).slice(-8)
+    
+    const credentials = {
+      email: application.email,
+      temporaryPassword: temporaryPassword
+    }
 
-    await sendEmail({
-      to: application.email,
-      subject: 'Welcome to HUD Home Lead Partners - Application Approved!',
-      html: emailContent
-    })
+    return await emailService.sendAgentApprovalEmail(application, credentials)
   },
 
   /**
    * Send rejection email
    */
   async sendRejectionEmail(application, reason) {
-    const emailContent = `
-      <h2>Application Status Update</h2>
-      <p>Hi ${application.first_name},</p>
-      <p>Thank you for your interest in becoming a HUD Home Lead Partner.</p>
-      <p>After careful review, we are unable to approve your application at this time.</p>
-      ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
-      <p>If you believe this decision was made in error or if your circumstances have changed, please contact us at support@usahudhomes.com</p>
-      <p>Best regards,<br>USA HUD Homes Team</p>
-    `
-
-    await sendEmail({
-      to: application.email,
-      subject: 'Application Status Update - HUD Home Lead Partners',
-      html: emailContent
-    })
+    return await emailService.sendAgentRejectionEmail(application, reason)
   }
 }
 

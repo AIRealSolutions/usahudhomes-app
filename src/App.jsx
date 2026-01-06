@@ -26,6 +26,7 @@ import { getImageUrl } from './utils/imageUtils'
 import AgentRegistration from './components/agent/AgentRegistration.jsx'
 import ApplicationSubmitted from './components/agent/ApplicationSubmitted.jsx'
 import VerifyEmail from './components/agent/VerifyEmail.jsx'
+import ResendVerification from './components/agent/ResendVerification.jsx'
 import AgentApplicationsAdmin from './components/admin/AgentApplicationsAdmin.jsx'
 import './App.css'
 
@@ -776,6 +777,7 @@ function App() {
             <Route path="/agent/register" element={<AgentRegistration />} />
             <Route path="/agent/application-submitted" element={<ApplicationSubmitted />} />
             <Route path="/agent/verify-email" element={<VerifyEmail />} />
+            <Route path="/agent/resend-verification" element={<ResendVerification />} />
             <Route path="/admin/agent-applications" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AgentApplicationsAdmin />
