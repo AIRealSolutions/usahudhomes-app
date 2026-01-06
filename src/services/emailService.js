@@ -342,26 +342,37 @@ Marc Spencer: (910) 363-6147
     `;
   }
 
-  // Send email (simulated - in production, integrate with email service like SendGrid, Mailgun, etc.)
+  // Send email via Resend API (Vercel serverless function)
   async sendEmail(emailData) {
     try {
-      // Simulate email sending
-      console.log('📧 Email sent:', emailData);
+      console.log('📧 Sending email:', { to: emailData.to, subject: emailData.subject });
       
       // Log email for tracking
       this.logEmail(emailData);
       
-      // In production, replace with actual email service:
-      // const response = await fetch(this.emailEndpoint, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(emailData)
-      // });
-      // return response.json();
+      // Send via Resend API endpoint
+      const response = await fetch('/api/send-agent-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: emailData.type || 'notification',
+          to: emailData.to,
+          subject: emailData.subject,
+          html: emailData.html,
+          text: emailData.text
+        })
+      });
       
-      return { success: true, messageId: 'sim_' + Date.now() };
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send email');
+      }
+      
+      console.log('✅ Email sent successfully:', result.messageId);
+      return { success: true, messageId: result.messageId };
     } catch (error) {
-      console.error('Email sending failed:', error);
+      console.error('❌ Email sending failed:', error);
       return { success: false, error: error.message };
     }
   }
@@ -392,6 +403,7 @@ Marc Spencer: (910) 363-6147
     const verificationUrl = `${window.location.origin}/agent/verify-email?token=${verificationToken}`;
     
     const emailData = {
+      type: 'verification',
       to: applicationData.email,
       subject: '✅ Verify Your Email - USA HUD Homes Agent Application',
       html: this.generateAgentVerificationEmailHTML(applicationData, verificationUrl),
@@ -409,6 +421,7 @@ Marc Spencer: (910) 363-6147
   // Send approval notification to agent
   async sendAgentApprovalEmail(applicationData, credentials) {
     const emailData = {
+      type: 'approval',
       to: applicationData.email,
       subject: '🎉 Congratulations! Your Agent Application Has Been Approved',
       html: this.generateAgentApprovalEmailHTML(applicationData, credentials),
@@ -421,6 +434,7 @@ Marc Spencer: (910) 363-6147
   // Send rejection notification to agent
   async sendAgentRejectionEmail(applicationData, reason) {
     const emailData = {
+      type: 'rejection',
       to: applicationData.email,
       subject: 'Update on Your Agent Application - USA HUD Homes',
       html: this.generateAgentRejectionEmailHTML(applicationData, reason),
