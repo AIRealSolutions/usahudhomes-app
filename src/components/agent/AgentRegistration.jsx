@@ -99,8 +99,19 @@ const AgentRegistration = () => {
         }
         if (!formData.signature.trim()) {
           newErrors.signature = 'Please type your full name to sign the agreement'
-        } else if (formData.signature.toLowerCase() !== `${formData.firstName} ${formData.lastName}`.toLowerCase()) {
-          newErrors.signature = 'Signature must match your full name'
+        } else {
+          // More flexible validation: check if signature contains both first and last name
+          const signatureLower = formData.signature.toLowerCase().trim()
+          const firstNameLower = formData.firstName.toLowerCase().trim()
+          const lastNameLower = formData.lastName.toLowerCase().trim()
+          
+          // Check if signature contains both first and last name (allows middle names, suffixes, etc.)
+          const containsFirstName = signatureLower.includes(firstNameLower)
+          const containsLastName = signatureLower.includes(lastNameLower)
+          
+          if (!containsFirstName || !containsLastName) {
+            newErrors.signature = `Signature must include your first name (${formData.firstName}) and last name (${formData.lastName})`
+          }
         }
         break
 

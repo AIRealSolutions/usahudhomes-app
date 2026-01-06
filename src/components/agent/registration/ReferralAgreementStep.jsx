@@ -156,7 +156,7 @@ const ReferralAgreementStep = ({ formData, updateFormData, errors }) => {
         <Input
           id="signature"
           type="text"
-          placeholder="Type your full name exactly as it appears above"
+          placeholder="Type your full legal name (e.g., John Michael Smith Jr.)"
           value={formData.signature}
           onChange={(e) => updateFormData('signature', e.target.value)}
           className={`text-lg font-serif ${errors.signature ? 'border-red-500' : ''}`}
@@ -169,7 +169,9 @@ const ReferralAgreementStep = ({ formData, updateFormData, errors }) => {
           </div>
         )}
 
-        {formData.signature && formData.signature.toLowerCase() === `${formData.firstName} ${formData.lastName}`.toLowerCase() && (
+        {formData.signature && 
+         formData.signature.toLowerCase().includes(formData.firstName.toLowerCase()) && 
+         formData.signature.toLowerCase().includes(formData.lastName.toLowerCase()) && (
           <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
             <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
             <p className="text-sm text-green-700">
