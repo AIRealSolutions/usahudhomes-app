@@ -30,6 +30,7 @@ const AgentRegistration = () => {
     
     // Business Info
     company: '',
+    legalName: '',
     licenseNumber: '',
     licenseState: '',
     yearsExperience: 0,
@@ -79,6 +80,7 @@ const AgentRegistration = () => {
         break
 
       case 2: // Business Info
+        if (!formData.legalName.trim()) newErrors.legalName = 'Legal name is required'
         if (!formData.licenseNumber.trim()) newErrors.licenseNumber = 'License number is required'
         if (!formData.licenseState) newErrors.licenseState = 'License state is required'
         if (formData.yearsExperience < 0) newErrors.yearsExperience = 'Years of experience cannot be negative'
@@ -98,20 +100,9 @@ const AgentRegistration = () => {
           newErrors.agreedToTerms = 'You must agree to the referral agreement to continue'
         }
         if (!formData.signature.trim()) {
-          newErrors.signature = 'Please type your full name to sign the agreement'
-        } else {
-          // More flexible validation: check if signature contains both first and last name
-          const signatureLower = formData.signature.toLowerCase().trim()
-          const firstNameLower = formData.firstName.toLowerCase().trim()
-          const lastNameLower = formData.lastName.toLowerCase().trim()
-          
-          // Check if signature contains both first and last name (allows middle names, suffixes, etc.)
-          const containsFirstName = signatureLower.includes(firstNameLower)
-          const containsLastName = signatureLower.includes(lastNameLower)
-          
-          if (!containsFirstName || !containsLastName) {
-            newErrors.signature = `Signature must include your first name (${formData.firstName}) and last name (${formData.lastName})`
-          }
+          newErrors.signature = 'Please confirm your signature'
+        } else if (formData.signature.trim().toLowerCase() !== formData.legalName.trim().toLowerCase()) {
+          newErrors.signature = `Signature must match your legal name: ${formData.legalName}`
         }
         break
 

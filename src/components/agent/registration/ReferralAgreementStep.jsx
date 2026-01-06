@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -11,6 +11,13 @@ const ReferralAgreementStep = ({ formData, updateFormData, errors }) => {
   const [showFullAgreement, setShowFullAgreement] = useState(false)
   const agreementText = getReferralAgreementText(formData)
   const summary = getAgreementSummary(formData.referralFeePercentage)
+
+  // Auto-populate signature with legal name when component mounts or legal name changes
+  useEffect(() => {
+    if (formData.legalName && !formData.signature) {
+      updateFormData('signature', formData.legalName)
+    }
+  }, [formData.legalName])
 
   const downloadAgreement = () => {
     const blob = new Blob([agreementText], { type: 'text/plain' })
@@ -148,9 +155,9 @@ const ReferralAgreementStep = ({ formData, updateFormData, errors }) => {
           Electronic Signature *
         </Label>
         <p className="text-sm text-gray-600">
-          Type your name exactly as it appears on your real estate license. By signing, you are 
-          providing your electronic signature and agreeing to the terms of this agreement. 
-          This has the same legal effect as a handwritten signature.
+          Your legal name has been pre-filled below from your license information. Please verify 
+          it is correct. By confirming this signature, you are agreeing to the terms of this 
+          agreement. This has the same legal effect as a handwritten signature.
         </p>
 
         <Input
@@ -170,12 +177,11 @@ const ReferralAgreementStep = ({ formData, updateFormData, errors }) => {
         )}
 
         {formData.signature && 
-         formData.signature.toLowerCase().includes(formData.firstName.toLowerCase()) && 
-         formData.signature.toLowerCase().includes(formData.lastName.toLowerCase()) && (
+         formData.signature.trim().toLowerCase() === formData.legalName.trim().toLowerCase() && (
           <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
             <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
             <p className="text-sm text-green-700">
-              Signature verified: {formData.signature}
+              ✓ Signature verified: {formData.signature}
             </p>
           </div>
         )}

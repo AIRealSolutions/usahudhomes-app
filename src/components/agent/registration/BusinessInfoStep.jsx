@@ -40,6 +40,28 @@ const BusinessInfoStep = ({ formData, updateFormData, errors }) => {
         </p>
       </div>
 
+      {/* Legal Name */}
+      <div className="space-y-2">
+        <Label htmlFor="legalName" className="flex items-center gap-2">
+          <Award className="w-4 h-4" />
+          Legal Name (as it appears on your real estate license) *
+        </Label>
+        <Input
+          id="legalName"
+          type="text"
+          placeholder="e.g., John Michael Smith Jr."
+          value={formData.legalName}
+          onChange={(e) => updateFormData('legalName', e.target.value)}
+          className={errors.legalName ? 'border-red-500' : ''}
+        />
+        {errors.legalName && (
+          <p className="text-sm text-red-600">{errors.legalName}</p>
+        )}
+        <p className="text-sm text-gray-500">
+          Enter your full name exactly as it appears on your real estate license
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* License Number */}
         <div className="space-y-2">
