@@ -23,6 +23,10 @@ import CustomerDetailsPage from './components/admin/CustomerDetailsPage.jsx'
 import PropertyDetailsAdmin from './components/admin/PropertyDetailsAdmin.jsx'
 import { propertyService } from './services/database'
 import { getImageUrl } from './utils/imageUtils'
+import AgentRegistration from './components/agent/AgentRegistration.jsx'
+import ApplicationSubmitted from './components/agent/ApplicationSubmitted.jsx'
+import VerifyEmail from './components/agent/VerifyEmail.jsx'
+import AgentApplicationsAdmin from './components/admin/AgentApplicationsAdmin.jsx'
 import './App.css'
 
 // Header Component
@@ -77,6 +81,14 @@ function Header({ isAuthenticated, onLogout }) {
               }`}
             >
               Learn About HUD
+            </Link>
+            <Link 
+              to="/agent/register" 
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                isActive('/agent/register') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
+              }`}
+            >
+              Become a Partner
             </Link>
             {isAuthenticated ? (
               <Link 
@@ -159,6 +171,15 @@ function Header({ isAuthenticated, onLogout }) {
                 onClick={() => setIsMenuOpen(false)}
               >
                 Learn About HUD
+              </Link>
+              <Link 
+                to="/agent/register" 
+                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                  isActive('/agent/register') ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
+                }`}
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Become a Partner
               </Link>
               <Link 
                 to="/broker-dashboard" 
@@ -750,6 +771,16 @@ function App() {
               </ProtectedRoute>
             } />
             <Route path="/unauthorized" element={<Unauthorized />} />
+            
+            {/* Agent Onboarding Routes */}
+            <Route path="/agent/register" element={<AgentRegistration />} />
+            <Route path="/agent/application-submitted" element={<ApplicationSubmitted />} />
+            <Route path="/agent/verify-email" element={<VerifyEmail />} />
+            <Route path="/admin/agent-applications" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AgentApplicationsAdmin />
+              </ProtectedRoute>
+            } />
             <Route path="/customer/:customerId" element={
               isAuthenticated ? (
                 <CustomerDetail />

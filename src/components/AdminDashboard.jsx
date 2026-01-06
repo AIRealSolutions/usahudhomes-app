@@ -5,6 +5,7 @@ import {
   Users, 
   MessageSquare, 
   UserCog,
+  FileText,
   LogOut,
   RefreshCw,
   ArrowLeft
@@ -13,6 +14,7 @@ import PropertyAdmin from './admin/PropertyAdmin'
 import CustomerAdmin from './admin/CustomerAdmin'
 import ConsultationAdmin from './admin/ConsultationAdmin'
 import AgentAdmin from './admin/AgentAdmin'
+import AgentApplicationsAdmin from './admin/AgentApplicationsAdmin'
 
 const AdminDashboard = () => {
   const { user, profile, logout } = useAuth()
@@ -22,7 +24,8 @@ const AdminDashboard = () => {
     { id: 'properties', label: 'Properties', icon: Home, component: PropertyAdmin },
     { id: 'customers', label: 'Customers', icon: Users, component: CustomerAdmin },
     { id: 'consultations', label: 'Consultations', icon: MessageSquare, component: ConsultationAdmin },
-    { id: 'agents', label: 'Agents', icon: UserCog, component: AgentAdmin }
+    { id: 'agents', label: 'Agents', icon: UserCog, component: AgentAdmin },
+    { id: 'applications', label: 'Agent Applications', icon: FileText, component: AgentApplicationsAdmin }
   ]
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component
