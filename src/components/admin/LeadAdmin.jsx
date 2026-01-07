@@ -96,13 +96,22 @@ function LeadAdmin() {
     // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(c =>
-        c.customer_name?.toLowerCase().includes(query) ||
-        c.customer_email?.toLowerCase().includes(query) ||
-        c.customer_phone?.toLowerCase().includes(query) ||
-        c.case_number?.toLowerCase().includes(query) ||
-        c.message?.toLowerCase().includes(query)
-      )
+      filtered = filtered.filter(c => {
+        const fullName = `${c.first_name || ''} ${c.last_name || ''}`.toLowerCase()
+        return (
+          fullName.includes(query) ||
+          c.first_name?.toLowerCase().includes(query) ||
+          c.last_name?.toLowerCase().includes(query) ||
+          c.email?.toLowerCase().includes(query) ||
+          c.phone?.toLowerCase().includes(query) ||
+          c.customer_name?.toLowerCase().includes(query) ||
+          c.customer_email?.toLowerCase().includes(query) ||
+          c.customer_phone?.toLowerCase().includes(query) ||
+          c.case_number?.toLowerCase().includes(query) ||
+          c.message?.toLowerCase().includes(query) ||
+          c.preferred_location?.toLowerCase().includes(query)
+        )
+      })
     }
 
     // Filter by status
@@ -537,29 +546,52 @@ function LeadAdmin() {
                           <User className="h-5 w-5 text-blue-600" />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-lg">{lead.customer_name}</h3>
+                          <h3 className="font-semibold text-lg">
+                            {lead.first_name && lead.last_name ? `${lead.first_name} ${lead.last_name}` : lead.customer_name || 'Unnamed Lead'}
+                          </h3>
                           <p className="text-sm text-gray-500">{formatDate(lead.created_at)}</p>
                         </div>
                       </div>
                       <div className="flex gap-2">
                         {getStatusBadge(lead.status)}
+                        {lead.priority && (
+                          <Badge className={lead.priority === 'high' ? 'bg-red-100 text-red-800' : lead.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>
+                            {lead.priority}
+                          </Badge>
+                        )}
                         {getTypeBadge(lead.lead_type)}
                       </div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <Mail className="h-4 w-4" />
-                        <a href={`mailto:${lead.customer_email}`} className="hover:text-blue-600">
-                          {lead.customer_email}
-                        </a>
-                      </div>
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <Phone className="h-4 w-4" />
-                        <a href={`tel:${lead.customer_phone}`} className="hover:text-blue-600">
-                          {lead.customer_phone}
-                        </a>
-                      </div>
+                      {(lead.email || lead.customer_email) && (
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <Mail className="h-4 w-4" />
+                          <a href={`mailto:${lead.email || lead.customer_email}`} className="hover:text-blue-600">
+                            {lead.email || lead.customer_email}
+                          </a>
+                        </div>
+                      )}
+                      {(lead.phone || lead.customer_phone) && (
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <Phone className="h-4 w-4" />
+                          <a href={`tel:${lead.phone || lead.customer_phone}`} className="hover:text-blue-600">
+                            {lead.phone || lead.customer_phone}
+                          </a>
+                        </div>
+                      )}
+                      {lead.preferred_location && (
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <Home className="h-4 w-4" />
+                          <span>{lead.preferred_location}{lead.state ? `, ${lead.state}` : ''}</span>
+                        </div>
+                      )}
+                      {lead.timeline && (
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <Clock className="h-4 w-4" />
+                          <span>Timeline: {lead.timeline}</span>
+                        </div>
+                      )}
                       {lead.case_number && (
                         <div className="flex items-center gap-2 text-gray-600">
                           <Home className="h-4 w-4" />
