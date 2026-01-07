@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase'
+import { eventService, EVENT_TYPES, EVENT_CATEGORIES, EVENT_SOURCES } from './database/eventService'
 
 /**
  * Facebook Leads Import Service
@@ -445,6 +446,47 @@ class FacebookLeadsImportService {
             error: consultationError.message
           })
           continue
+        }
+
+        // Log Facebook lead import event with all original data
+        try {
+          await eventService.logEvent({
+            customerId: customer.id,
+            consultationId: consultation.id,
+            agentId: assignToAgent || null,
+            eventType: EVENT_TYPES.FACEBOOK_LEAD_IMPORTED,
+            eventCategory: EVENT_CATEGORIES.ONBOARDING,
+            eventTitle: 'Facebook Lead Imported',
+            eventDescription: `Lead imported from Facebook ${lead.source_details.platform === 'ig' ? 'Instagram' : 'Lead'} Ad`,
+            eventData: {
+              facebook_id: lead.source_details.facebook_id,
+              platform: lead.source_details.platform,
+              campaign_name: lead.source_details.campaign_name,
+              ad_name: lead.source_details.ad_name,
+              form_name: lead.source_details.form_name,
+              created_time: lead.source_details.created_time,
+              original_data: {
+                full_name: `${lead.first_name} ${lead.last_name}`,
+                email: lead.email,
+                phone: lead.phone,
+                raw_budget: lead.source_details.raw_budget,
+                raw_location: lead.source_details.raw_location,
+                raw_timeline: lead.source_details.raw_timeline
+              },
+              parsed_data: {
+                budget_min: lead.budget_min,
+                budget_max: lead.budget_max,
+                preferred_location: lead.preferred_location,
+                state: lead.state,
+                timeline: lead.timeline,
+                priority: lead.priority
+              }
+            },
+            source: EVENT_SOURCES.SYSTEM
+          })
+        } catch (eventError) {
+          console.error('Failed to log Facebook import event:', eventError)
+          // Don't fail the import if event logging fails
         }
 
         results.success++

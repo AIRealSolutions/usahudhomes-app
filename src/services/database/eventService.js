@@ -11,6 +11,7 @@ export const EVENT_TYPES = {
   CUSTOMER_CREATED: 'customer_created',
   CUSTOMER_UPDATED: 'customer_updated',
   CUSTOMER_DELETED: 'customer_deleted',
+  FACEBOOK_LEAD_IMPORTED: 'facebook_lead_imported',
   
   // Consultations
   CONSULTATION_CREATED: 'consultation_created',
