@@ -428,7 +428,7 @@ class FacebookLeadsImportService {
         // Log Facebook lead import event with all original data
         try {
           await eventService.logEvent({
-            customerId: customer.id,
+            customerId: null, // No customer yet - will be created when assigned to broker
             consultationId: consultation.id,
             agentId: assignToAgent || null,
             eventType: EVENT_TYPES.FACEBOOK_LEAD_IMPORTED,
