@@ -391,7 +391,7 @@ class FacebookLeadsImportService {
             last_name: lead.last_name,
             email: lead.email,
             phone: lead.phone,
-            source: 'facebook_lead_ad',
+            lead_source: 'facebook_lead_ad',
             created_at: lead.created_at
           })
           .select()
