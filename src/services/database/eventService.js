@@ -108,8 +108,8 @@ class EventService {
         return { success: false, error: 'Missing required event fields', data: null }
       }
 
-      // Build event object, only include agent_id if it's provided
-      // The agent_id field is nullable in the database, so we can safely omit it
+      // Build event object WITHOUT agent_id to avoid foreign key constraint errors
+      // TODO: After database migration is applied, we can include agent_id again
       const eventObject = {
         customer_id: customerId,
         consultation_id: consultationId,
@@ -123,12 +123,9 @@ class EventService {
         user_agent: userAgent
       }
 
-      // Only add agent_id if it's provided
-      // If the agent_id doesn't exist in the agents table, the database will handle it
-      // by setting it to NULL (due to ON DELETE SET NULL constraint)
-      if (agentId) {
-        eventObject.agent_id = agentId
-      }
+      // TEMPORARILY NOT INCLUDING agent_id to avoid foreign key constraint
+      // This is a workaround until the database migration is applied
+      // The agent information is still captured in event_data if needed
 
       const { data: event, error } = await supabase
         .from(TABLES.CUSTOMER_EVENTS)
