@@ -23,6 +23,7 @@ function LeadDetail() {
   const navigate = useNavigate()
   const [lead, setLead] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
   const [editMode, setEditMode] = useState(false)
   const [editedLead, setEditedLead] = useState({})
@@ -47,10 +48,16 @@ function LeadDetail() {
 
   const loadLeadData = () => {
     setLoading(true)
+    setError(null)
     try {
+      console.log('Loading lead with ID:', leadId)
+      console.log('Available consultations:', customerDatabase.consultations?.length || 0)
+      
       // Get lead from consultations (since consultations are leads)
       const consultation = customerDatabase.consultations?.find(c => c.id === leadId)
+      
       if (consultation) {
+        console.log('Found consultation:', consultation)
         setLead(consultation)
         setEditedLead(consultation)
         
@@ -58,10 +65,13 @@ function LeadDetail() {
         setInteractions(customerDatabase.getLeadInteractions?.(leadId) || [])
         setTasks(customerDatabase.getLeadTasks?.(leadId) || [])
       } else {
-        console.error('Lead not found:', leadId)
+        const errorMsg = `Lead not found with ID: ${leadId}. Available: ${customerDatabase.consultations?.length || 0} consultations`
+        console.error(errorMsg)
+        setError(errorMsg)
       }
     } catch (error) {
       console.error('Error loading lead:', error)
+      setError(`Failed to load lead: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -332,14 +342,20 @@ Lightkeeper Realty
     )
   }
 
-  if (!lead) {
+  if (!lead || error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center max-w-md p-8">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Lead Not Found</h2>
-          <p className="text-gray-600 mb-4">The requested lead could not be found.</p>
-          <Button onClick={() => navigate('/broker-dashboard')}>
+          <p className="text-gray-600 mb-2">The requested lead could not be found.</p>
+          {error && (
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-800 font-mono">{error}</p>
+              <p className="text-xs text-red-600 mt-2">Lead ID: {leadId}</p>
+            </div>
+          )}
+          <Button onClick={() => navigate('/broker-dashboard')} className="mt-6">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
