@@ -19,7 +19,10 @@ import {
   Eye,
   UserPlus,
   Edit,
-  Save
+  Save,
+  Plus,
+  Trash2,
+  X as XIcon
 } from 'lucide-react'
 import { consultationService, customerService, propertyService, agentService, referralService } from '../../services/database'
 
@@ -33,6 +36,8 @@ function LeadAdmin() {
   const [loading, setLoading] = useState(true)
   const [editingLead, setEditingLead] = useState(null)
   const [editForm, setEditForm] = useState({})
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createForm, setCreateForm] = useState({})
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -167,6 +172,120 @@ function LeadAdmin() {
     }
   }
 
+  function openCreateModal() {
+    setCreateForm({
+      first_name: '',
+      last_name: '',
+      email: '',
+      phone: '',
+      budget_min: '',
+      budget_max: '',
+      preferred_location: '',
+      state: '',
+      timeline: '',
+      priority: 'medium',
+      status: 'new',
+      source: 'manual',
+      notes: '',
+      agent_id: ''
+    })
+    setShowCreateModal(true)
+  }
+
+  function closeCreateModal() {
+    setShowCreateModal(false)
+    setCreateForm({})
+  }
+
+  async function createLead() {
+    try {
+      // Validate required fields
+      if (!createForm.first_name || !createForm.last_name) {
+        alert('First name and last name are required')
+        return
+      }
+      if (!createForm.email && !createForm.phone) {
+        alert('Either email or phone is required')
+        return
+      }
+
+      // Create customer first
+      const customerData = {
+        first_name: createForm.first_name,
+        last_name: createForm.last_name,
+        email: createForm.email || null,
+        phone: createForm.phone || null,
+        lead_source: createForm.source || 'manual'
+      }
+
+      const customerResult = await customerService.addCustomer(customerData)
+      if (!customerResult.success) {
+        alert('Failed to create customer: ' + customerResult.error)
+        return
+      }
+
+      // Create consultation/lead
+      const leadData = {
+        customer_id: customerResult.data.id,
+        first_name: createForm.first_name,
+        last_name: createForm.last_name,
+        email: createForm.email || null,
+        phone: createForm.phone || null,
+        budget_min: createForm.budget_min ? parseFloat(createForm.budget_min) : null,
+        budget_max: createForm.budget_max ? parseFloat(createForm.budget_max) : null,
+        preferred_location: createForm.preferred_location || null,
+        state: createForm.state || null,
+        timeline: createForm.timeline || null,
+        priority: createForm.priority || 'medium',
+        status: createForm.status || 'new',
+        source: createForm.source || 'manual',
+        notes: createForm.notes || null,
+        assigned_agent_id: createForm.agent_id || null
+      }
+
+      const leadResult = await consultationService.addLead(leadData)
+      if (!leadResult.success) {
+        alert('Failed to create lead: ' + leadResult.error)
+        return
+      }
+
+      // Close modal and reload
+      closeCreateModal()
+      await loadLeads()
+      alert('Lead created successfully!')
+    } catch (error) {
+      console.error('Error creating lead:', error)
+      alert('Failed to create lead: ' + error.message)
+    }
+  }
+
+  async function deleteLead(lead) {
+    const leadName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || lead.customer_email || lead.email || 'this lead'
+    
+    const confirmed = confirm(
+      `⚠️ WARNING: DELETE LEAD\n\n` +
+      `Are you sure you want to delete:\n` +
+      `Lead: ${leadName}\n` +
+      `Email: ${lead.email || lead.customer_email || 'N/A'}\n\n` +
+      `This action cannot be undone.`
+    )
+
+    if (!confirmed) return
+
+    try {
+      const result = await consultationService.deleteLead(lead.id)
+      if (result.success) {
+        await loadLeads()
+        alert('Lead deleted successfully')
+      } else {
+        alert('Failed to delete lead: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error deleting lead:', error)
+      alert('Failed to delete lead: ' + error.message)
+    }
+  }
+
   async function updateLeadStatus(leadId, newStatus) {
     const result = await consultationService.updateLead(leadId, { status: newStatus })
     if (result.success) {
@@ -236,9 +355,15 @@ function LeadAdmin() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold">Leads</h2>
-        <p className="text-gray-600">Manage all leads from Facebook, website, and other sources</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold">Leads</h2>
+          <p className="text-gray-600">Manage all leads from Facebook, website, and other sources</p>
+        </div>
+        <Button onClick={openCreateModal}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Lead
+        </Button>
       </div>
 
       {/* Stats */}
@@ -439,6 +564,15 @@ function LeadAdmin() {
                         Cancel
                       </Button>
                     )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => deleteLead(lead)}
+                      className="text-red-600 hover:bg-red-50 border-red-200"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -553,9 +687,177 @@ function LeadAdmin() {
             </div>
           </div>
         </div>
+       )}
+
+      {/* Create Lead Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b">
+              <h3 className="text-xl font-bold">Create New Lead</h3>
+              <p className="text-sm text-gray-600">Add a new lead manually</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">First Name *</label>
+                  <Input
+                    value={createForm.first_name}
+                    onChange={(e) => setCreateForm({...createForm, first_name: e.target.value})}
+                    placeholder="John"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Last Name *</label>
+                  <Input
+                    value={createForm.last_name}
+                    onChange={(e) => setCreateForm({...createForm, last_name: e.target.value})}
+                    placeholder="Doe"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email</label>
+                  <Input
+                    type="email"
+                    value={createForm.email}
+                    onChange={(e) => setCreateForm({...createForm, email: e.target.value})}
+                    placeholder="john@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Phone</label>
+                  <Input
+                    type="tel"
+                    value={createForm.phone}
+                    onChange={(e) => setCreateForm({...createForm, phone: e.target.value})}
+                    placeholder="+1234567890"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Budget Min</label>
+                  <Input
+                    type="number"
+                    value={createForm.budget_min}
+                    onChange={(e) => setCreateForm({...createForm, budget_min: e.target.value})}
+                    placeholder="50000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Budget Max</label>
+                  <Input
+                    type="number"
+                    value={createForm.budget_max}
+                    onChange={(e) => setCreateForm({...createForm, budget_max: e.target.value})}
+                    placeholder="150000"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Preferred Location</label>
+                  <Input
+                    value={createForm.preferred_location}
+                    onChange={(e) => setCreateForm({...createForm, preferred_location: e.target.value})}
+                    placeholder="Charlotte"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">State</label>
+                  <Input
+                    value={createForm.state}
+                    onChange={(e) => setCreateForm({...createForm, state: e.target.value})}
+                    placeholder="NC"
+                    maxLength="2"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Timeline</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={createForm.timeline}
+                    onChange={(e) => setCreateForm({...createForm, timeline: e.target.value})}
+                  >
+                    <option value="">Select timeline</option>
+                    <option value="ASAP">ASAP</option>
+                    <option value="1-3 months">1-3 months</option>
+                    <option value="3-6 months">3-6 months</option>
+                    <option value="6+ months">6+ months</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Priority</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={createForm.priority}
+                    onChange={(e) => setCreateForm({...createForm, priority: e.target.value})}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Status</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={createForm.status}
+                    onChange={(e) => setCreateForm({...createForm, status: e.target.value})}
+                  >
+                    <option value="new">New</option>
+                    <option value="pending">Pending</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Assign to Broker</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={createForm.agent_id}
+                    onChange={(e) => setCreateForm({...createForm, agent_id: e.target.value})}
+                  >
+                    <option value="">Unassigned</option>
+                    {agents.map(agent => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.first_name} {agent.last_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Notes</label>
+                <textarea
+                  className="w-full border rounded px-3 py-2"
+                  rows="3"
+                  value={createForm.notes}
+                  onChange={(e) => setCreateForm({...createForm, notes: e.target.value})}
+                  placeholder="Additional notes about this lead..."
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t flex gap-3 justify-end">
+              <Button variant="outline" onClick={closeCreateModal}>
+                <XIcon className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+              <Button onClick={createLead} className="bg-green-600 hover:bg-green-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Lead
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
 }
-
 export default LeadAdmin
