@@ -16,6 +16,7 @@ import {
 import customerDatabase from '../services/customerDatabase.js'
 import { brokerNetwork } from '../services/brokerNetwork.js'
 import emailService from '../services/emailService.js'
+import AIAgentAssistant from './broker/AIAgentAssistant'
 
 function LeadDetail() {
   const { leadId } = useParams()
@@ -511,12 +512,26 @@ Lightkeeper Realty
 
             {/* CRM Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="ai-agent">🤖 AI Agent</TabsTrigger>
                 <TabsTrigger value="interactions">Interactions</TabsTrigger>
                 <TabsTrigger value="tasks">Tasks</TabsTrigger>
                 <TabsTrigger value="email">Email</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="ai-agent" className="space-y-6">
+                <AIAgentAssistant 
+                  lead={lead} 
+                  onAction={async (action, data) => {
+                    // Handle AI Agent actions
+                    console.log('AI Agent action:', action, data)
+                    if (action === 'send_message') {
+                      addInteraction(`AI Agent sent ${data.channel}: ${data.subject || 'message'}`, data.channel)
+                    }
+                  }}
+                />
+              </TabsContent>
 
               <TabsContent value="overview" className="space-y-6">
                 <Card>
