@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, Sparkles } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, Sparkles, Brain } from 'lucide-react'
 import { consultationService } from '../services/database'
 import AIAgentAssistant from './broker/AIAgentAssistant'
+import AIPropertiesTab from './broker/AIPropertiesTab'
 
 function LeadDetailWithAI() {
   const { leadId } = useParams()
@@ -160,6 +161,17 @@ function LeadDetailWithAI() {
                 Overview
               </button>
               <button
+                onClick={() => setActiveTab('ai-properties')}
+                className={`px-6 py-4 text-sm font-medium border-b-2 flex items-center gap-2 ${
+                  activeTab === 'ai-properties'
+                    ? 'border-purple-600 text-purple-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                }`}
+              >
+                <Brain className="w-4 h-4" />
+                AI Properties
+              </button>
+              <button
                 onClick={() => setActiveTab('ai-agent')}
                 className={`px-6 py-4 text-sm font-medium border-b-2 flex items-center gap-2 ${
                   activeTab === 'ai-agent'
@@ -264,6 +276,12 @@ function LeadDetailWithAI() {
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'ai-properties' && (
+              <div>
+                <AIPropertiesTab lead={lead} />
               </div>
             )}
 
