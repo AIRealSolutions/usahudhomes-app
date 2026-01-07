@@ -245,6 +245,51 @@ function LeadAdmin() {
     }
   }
 
+  async function assignBroker(leadId, agentId) {
+    if (!agentId) return
+    
+    try {
+      const lead = leads.find(l => l.id === leadId)
+      if (!lead) return
+      
+      const isFirstAssignment = !lead.customer_id
+      
+      // If first assignment, create customer
+      let customerId = lead.customer_id
+      if (isFirstAssignment) {
+        const customerResult = await customerService.addCustomer({
+          first_name: lead.first_name,
+          last_name: lead.last_name,
+          email: lead.email,
+          phone: lead.phone,
+          lead_source: lead.source || 'manual'
+        })
+        
+        if (customerResult.success) {
+          customerId = customerResult.data.id
+        } else {
+          alert('Failed to create customer: ' + customerResult.error)
+          return
+        }
+      }
+      
+      // Update lead with agent assignment
+      const updateResult = await consultationService.updateLead(leadId, {
+        agent_id: agentId,
+        customer_id: customerId
+      })
+      
+      if (updateResult.success) {
+        await loadLeads() // Reload to show changes
+      } else {
+        alert('Failed to assign broker: ' + updateResult.error)
+      }
+    } catch (error) {
+      console.error('Error assigning broker:', error)
+      alert('Failed to assign broker: ' + error.message)
+    }
+  }
+
   function openCreateModal() {
     setCreateForm({
       first_name: '',
@@ -662,14 +707,26 @@ function LeadAdmin() {
                           <span>Case #{lead.case_number}</span>
                         </div>
                       )}
-                      {lead.agent && (
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <UserPlus className="h-4 w-4" />
-                          <span className="font-medium text-blue-600">
-                            Assigned to: {lead.agent.first_name} {lead.agent.last_name}
+                      <div className="flex items-center gap-2">
+                        <UserPlus className="h-4 w-4 text-gray-600" />
+                        <select
+                          value={lead.assigned_agent_id || lead.agent_id || ''}
+                          onChange={(e) => assignBroker(lead.id, e.target.value)}
+                          className="text-sm border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Assign Broker...</option>
+                          {agents.map(agent => (
+                            <option key={agent.id} value={agent.id}>
+                              {agent.first_name} {agent.last_name}
+                            </option>
+                          ))}
+                        </select>
+                        {(lead.assigned_agent || lead.agent) && (
+                          <span className="text-xs text-green-600 font-medium">
+                            ✓ Assigned
                           </span>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                     
                     {lead.message && (
