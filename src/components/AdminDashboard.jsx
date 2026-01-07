@@ -8,13 +8,15 @@ import {
   FileText,
   LogOut,
   RefreshCw,
-  ArrowLeft
+  ArrowLeft,
+  Upload
 } from 'lucide-react'
 import PropertyAdmin from './admin/PropertyAdmin'
 import CustomerAdmin from './admin/CustomerAdmin'
 import ConsultationAdmin from './admin/ConsultationAdmin'
 import AgentAdmin from './admin/AgentAdmin'
 import AgentApplicationsAdmin from './admin/AgentApplicationsAdmin'
+import FacebookLeadsImport from './admin/FacebookLeadsImport'
 
 const AdminDashboard = () => {
   const { user, profile, logout } = useAuth()
@@ -25,7 +27,8 @@ const AdminDashboard = () => {
     { id: 'customers', label: 'Customers', icon: Users, component: CustomerAdmin },
     { id: 'consultations', label: 'Consultations', icon: MessageSquare, component: ConsultationAdmin },
     { id: 'agents', label: 'Agents', icon: UserCog, component: AgentAdmin },
-    { id: 'applications', label: 'Agent Applications', icon: FileText, component: AgentApplicationsAdmin }
+    { id: 'applications', label: 'Agent Applications', icon: FileText, component: AgentApplicationsAdmin },
+    { id: 'facebook-import', label: 'Import Facebook Leads', icon: Upload, component: FacebookLeadsImport }
   ]
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component
