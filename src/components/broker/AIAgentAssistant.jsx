@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react'
+import PropertySelector from './PropertySelector'
+import PropertyShareModal from './PropertyShareModal'
+import PropertyShareAnalytics from './PropertyShareAnalytics'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -47,6 +50,16 @@ const AIAgentAssistant = ({ lead, onAction }) => {
   })
   const [clientInsights, setClientInsights] = useState(null)
   const [recommendedProperties, setRecommendedProperties] = useState([])
+  const [showPropertySelector, setShowPropertySelector] = useState(false)
+  const [selectedProperties, setSelectedProperties] = useState([])
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [agent, setAgent] = useState(null)
+
+  // Load agent info
+  useEffect(() => {
+    const agentData = JSON.parse(localStorage.getItem('agent') || '{}')
+    setAgent(agentData)
+  }, [])
 
   useEffect(() => {
     // Generate AI insights when component loads
@@ -309,7 +322,7 @@ const AIAgentAssistant = ({ lead, onAction }) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => startWorkflow('PROPERTY_MATCH')}
+              onClick={() => setShowPropertySelector(true)}
               className="justify-start"
             >
               <Home className="w-4 h-4 mr-2" />
@@ -530,6 +543,81 @@ const AIAgentAssistant = ({ lead, onAction }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Property Selector Modal */}
+      <Dialog open={showPropertySelector} onOpenChange={setShowPropertySelector}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Home className="w-5 h-5" />
+              Select Properties to Share
+            </DialogTitle>
+            <DialogDescription>
+              Choose HUD properties to share with {lead?.firstName || 'this lead'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <PropertySelector
+              onSelectProperties={setSelectedProperties}
+              selectedProperties={selectedProperties}
+              maxSelection={10}
+            />
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPropertySelector(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedProperties.length === 0) {
+                  alert('Please select at least one property')
+                  return
+                }
+                setShowPropertySelector(false)
+                setShowShareModal(true)
+              }}
+              disabled={selectedProperties.length === 0}
+            >
+              <Share2 className="w-4 h-4 mr-2" />
+              Continue to Share ({selectedProperties.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Property Share Modal */}
+      {showShareModal && agent && (
+        <PropertyShareModal
+          isOpen={showShareModal}
+          onClose={() => {
+            setShowShareModal(false)
+            setSelectedProperties([])
+          }}
+          properties={selectedProperties}
+          lead={lead}
+          agent={agent}
+          onShareComplete={(results) => {
+            console.log('Properties shared:', results)
+            // Refresh analytics
+            setSelectedProperties([])
+          }}
+        />
+      )}
+
+      {/* Property Sharing Analytics */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Property Sharing History</CardTitle>
+          <CardDescription>
+            Track engagement and responses for shared properties
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PropertyShareAnalytics leadId={lead?.id} agentId={agent?.id} />
+        </CardContent>
+      </Card>
     </div>
   )
 }
