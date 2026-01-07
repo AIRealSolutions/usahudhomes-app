@@ -750,7 +750,12 @@ function App() {
             <Route path="/consult/:caseNumber" element={<PropertyConsultation />} />
             <Route path="/customer/:customerId" element={<CustomerDetail />} />
             <Route path="/leads" element={<LeadsManagement />} />
-            <Route path="/lead/:leadId" element={<LeadDetail />} />            <Route path="/login" element={<Login onLogin={handleLogin} />} />
+            <Route path="/lead/:leadId" element={
+              <ProtectedRoute allowedRoles={['broker', 'admin']}>
+                <LeadDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/login" element={<Login onLogin={handleLogin} />} />
             <Route path="/broker-dashboard" element={
               <ProtectedRoute allowedRoles={['broker', 'admin']}>
                 <BrokerDashboard />
