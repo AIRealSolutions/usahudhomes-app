@@ -50,12 +50,6 @@ function LeadAdmin() {
     completed: 0,
     cancelled: 0
   })
-  const [debugInfo, setDebugInfo] = useState({
-    serviceResponse: null,
-    leadsCount: 0,
-    filteredCount: 0,
-    lastUpdate: null
-  })
 
   useEffect(() => {
     loadLeads()
@@ -67,33 +61,12 @@ function LeadAdmin() {
   }, [leads, searchQuery, statusFilter, typeFilter])
 
   async function loadLeads() {
-    console.log('🔍 LeadAdmin: Starting loadLeads...')
     setLoading(true)
     const result = await consultationService.getAllLeads()
-    console.log('🔍 LeadAdmin: getAllLeads result:', result)
-    console.log('🔍 LeadAdmin: result.success:', result.success)
-    console.log('🔍 LeadAdmin: result.data:', result.data)
-    console.log('🔍 LeadAdmin: result.data length:', result.data?.length)
     if (result.success) {
       const leadsData = result.data || []
-      console.log('🔍 LeadAdmin: Setting leads with', leadsData.length, 'items')
-      console.log('🔍 LeadAdmin: First lead:', leadsData[0])
       setLeads(leadsData)
       calculateStats(leadsData)
-      setDebugInfo(prev => ({
-        ...prev,
-        serviceResponse: 'success',
-        leadsCount: leadsData.length,
-        lastUpdate: new Date().toLocaleTimeString()
-      }))
-    } else {
-      console.error('❌ LeadAdmin: Failed to load leads:', result.error)
-      setDebugInfo(prev => ({
-        ...prev,
-        serviceResponse: result.error || 'failed',
-        leadsCount: 0,
-        lastUpdate: new Date().toLocaleTimeString()
-      }))
     }
     setLoading(false)
   }
@@ -118,7 +91,6 @@ function LeadAdmin() {
   }
 
   function filterLeads() {
-    console.log('🔍 LeadAdmin: filterLeads called with', leads.length, 'leads')
     let filtered = [...leads]
 
     // Filter by search query
@@ -152,13 +124,7 @@ function LeadAdmin() {
       filtered = filtered.filter(c => c.lead_type === typeFilter)
     }
 
-    console.log('🔍 LeadAdmin: Setting filteredLeads with', filtered.length, 'items')
-    console.log('🔍 LeadAdmin: Filtered leads:', filtered)
     setFilteredLeads(filtered)
-    setDebugInfo(prev => ({
-      ...prev,
-      filteredCount: filtered.length
-    }))
   }
 
   function openEditModal(lead) {
@@ -254,22 +220,31 @@ function LeadAdmin() {
       
       const isFirstAssignment = !lead.customer_id
       
-      // If first assignment, create customer
+      // If first assignment, find or create customer
       let customerId = lead.customer_id
       if (isFirstAssignment) {
-        const customerResult = await customerService.addCustomer({
-          first_name: lead.first_name,
-          last_name: lead.last_name,
-          email: lead.email,
-          phone: lead.phone,
-          lead_source: lead.source || 'manual'
-        })
+        // First, try to find existing customer by email or phone
+        const existingCustomerResult = await customerService.getCustomerByEmail(lead.email)
         
-        if (customerResult.success) {
-          customerId = customerResult.data.id
+        if (existingCustomerResult.success && existingCustomerResult.data) {
+          // Customer exists, use their ID
+          customerId = existingCustomerResult.data.id
         } else {
-          alert('Failed to create customer: ' + customerResult.error)
-          return
+          // Customer doesn't exist, create new one
+          const customerResult = await customerService.addCustomer({
+            first_name: lead.first_name,
+            last_name: lead.last_name,
+            email: lead.email,
+            phone: lead.phone,
+            lead_source: lead.source || 'manual'
+          })
+          
+          if (customerResult.success) {
+            customerId = customerResult.data.id
+          } else {
+            alert('Failed to create customer: ' + customerResult.error)
+            return
+          }
         }
       }
       
@@ -557,36 +532,6 @@ function LeadAdmin() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Debug Info Panel */}
-      <Card className="bg-blue-50 border-blue-200">
-        <CardContent className="p-4">
-          <div className="text-sm font-semibold text-blue-900 mb-2">🔍 Debug Info (for troubleshooting)</div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <div className="text-blue-600 font-medium">Service Response</div>
-              <div className={debugInfo.serviceResponse === 'success' ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
-                {debugInfo.serviceResponse || 'Not loaded yet'}
-              </div>
-            </div>
-            <div>
-              <div className="text-blue-600 font-medium">Leads from DB</div>
-              <div className="text-blue-900 font-bold text-xl">{debugInfo.leadsCount}</div>
-            </div>
-            <div>
-              <div className="text-blue-600 font-medium">After Filters</div>
-              <div className="text-blue-900 font-bold text-xl">{debugInfo.filteredCount}</div>
-            </div>
-            <div>
-              <div className="text-blue-600 font-medium">Last Update</div>
-              <div className="text-blue-900">{debugInfo.lastUpdate || 'Never'}</div>
-            </div>
-          </div>
-          <div className="mt-2 text-xs text-blue-700">
-            If "Leads from DB" shows a number but "After Filters" is 0, check your filter settings below.
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4">

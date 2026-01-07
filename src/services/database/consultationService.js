@@ -400,9 +400,6 @@ class ConsultationService {
    * @returns {Promise<Array>} List of leads
    */
   async getAllLeads(filters = {}) {
-    console.log('🔍 consultationService.getAllLeads: Starting...')
-    console.log('🔍 consultationService.getAllLeads: Filters:', filters)
-    console.log('🔍 consultationService.getAllLeads: Querying table:', TABLES.CONSULTATIONS)
     try {
       let query = supabase
         .from(TABLES.CONSULTATIONS)
@@ -426,15 +423,9 @@ class ConsultationService {
       }
 
       const { data, error } = await query
-      console.log('🔍 consultationService.getAllLeads: Raw data:', data)
-      console.log('🔍 consultationService.getAllLeads: Raw error:', error)
-      console.log('🔍 consultationService.getAllLeads: Data count:', data?.length)
-
-      const response = formatSupabaseResponse(data, error)
-      console.log('🔍 consultationService.getAllLeads: Formatted response:', response)
-      return response
+      return formatSupabaseResponse(data, error)
     } catch (error) {
-      console.error('❌ consultationService.getAllLeads: Exception:', error)
+      console.error('Error fetching leads:', error)
       return { success: false, error: error.message, data: [] }
     }
   }
