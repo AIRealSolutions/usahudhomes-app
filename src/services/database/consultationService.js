@@ -402,7 +402,7 @@ class ConsultationService {
   async getAllLeads(filters = {}) {
     try {
       let query = supabase
-        .from(TABLES.LEADS)
+        .from(TABLES.CONSULTATIONS)
         .select(`
           *,
           customer:customers(*),
