@@ -141,8 +141,33 @@ function LeadAdmin() {
       console.log('Saving lead:', editingLead.id, editForm)
       
       const agentChanged = editForm.agent_id && editForm.agent_id !== editingLead.agent_id
+      const isFirstAssignment = editForm.agent_id && !editingLead.agent_id && !editingLead.customer_id
       
-      // Update lead first
+      // If this is the first broker assignment and no customer exists, create customer
+      let customerId = editingLead.customer_id
+      if (isFirstAssignment) {
+        console.log('First broker assignment - creating customer record...')
+        const customerResult = await customerService.addCustomer({
+          first_name: editingLead.first_name,
+          last_name: editingLead.last_name,
+          email: editingLead.email,
+          phone: editingLead.phone,
+          lead_source: editingLead.source || 'manual'
+        })
+        
+        if (customerResult.success) {
+          customerId = customerResult.data.id
+          console.log('Customer created:', customerId)
+          // Update the form to include customer_id
+          editForm.customer_id = customerId
+        } else {
+          console.error('Failed to create customer:', customerResult.error)
+          alert('Failed to create customer record: ' + customerResult.error)
+          return
+        }
+      }
+      
+      // Update lead
       const updateResult = await consultationService.updateLead(editingLead.id, editForm)
       
       if (!updateResult.success) {
@@ -150,8 +175,8 @@ function LeadAdmin() {
         return
       }
       
-      // If agent changed, create referral to notify the new broker
-      if (agentChanged) {
+      // If agent changed (not first assignment), create referral to notify the new broker
+      if (agentChanged && !isFirstAssignment) {
         console.log('Agent changed, creating referral...')
         const referralResult = await referralService.createReferral({
           lead_id: editingLead.id,
@@ -214,24 +239,28 @@ function LeadAdmin() {
         return
       }
 
-      // Create customer first
-      const customerData = {
-        first_name: createForm.first_name,
-        last_name: createForm.last_name,
-        email: createForm.email || null,
-        phone: createForm.phone || null,
-        lead_source: createForm.source || 'manual'
-      }
+      // Create customer only if broker is assigned
+      let customerId = null
+      if (createForm.agent_id) {
+        const customerData = {
+          first_name: createForm.first_name,
+          last_name: createForm.last_name,
+          email: createForm.email || null,
+          phone: createForm.phone || null,
+          lead_source: createForm.source || 'manual'
+        }
 
-      const customerResult = await customerService.addCustomer(customerData)
-      if (!customerResult.success) {
-        alert('Failed to create customer: ' + customerResult.error)
-        return
+        const customerResult = await customerService.addCustomer(customerData)
+        if (!customerResult.success) {
+          alert('Failed to create customer: ' + customerResult.error)
+          return
+        }
+        customerId = customerResult.data.id
       }
 
       // Create consultation/lead
       const leadData = {
-        customer_id: customerResult.data.id,
+        customer_id: customerId, // null if no broker assigned yet
         first_name: createForm.first_name,
         last_name: createForm.last_name,
         email: createForm.email || null,

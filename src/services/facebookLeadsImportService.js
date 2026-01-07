@@ -384,32 +384,9 @@ class FacebookLeadsImportService {
           }
         }
 
-        // Create customer first
-        const { data: customer, error: customerError } = await supabase
-          .from('customers')
-          .insert({
-            first_name: lead.first_name,
-            last_name: lead.last_name,
-            email: lead.email,
-            phone: lead.phone,
-            lead_source: 'facebook_lead_ad',
-            created_at: lead.created_at
-          })
-          .select()
-          .single()
-
-        if (customerError) {
-          results.failed++
-          results.errors.push({
-            lead: `${lead.first_name} ${lead.last_name}`,
-            error: customerError.message
-          })
-          continue
-        }
-
-        // Create consultation
+        // Create consultation (lead) - customer will be created when assigned to broker
         const consultationData = {
-          customer_id: customer.id,
+          customer_id: null, // Will be set when assigned to broker
           first_name: lead.first_name,
           last_name: lead.last_name,
           email: lead.email,
