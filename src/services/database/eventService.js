@@ -108,21 +108,31 @@ class EventService {
         return { success: false, error: 'Missing required event fields', data: null }
       }
 
+      // Build event object, only include agent_id if it's provided
+      // The agent_id field is nullable in the database, so we can safely omit it
+      const eventObject = {
+        customer_id: customerId,
+        consultation_id: consultationId,
+        event_type: eventType,
+        event_category: eventCategory,
+        event_title: eventTitle,
+        event_description: eventDescription,
+        event_data: data,
+        source: source,
+        ip_address: ipAddress,
+        user_agent: userAgent
+      }
+
+      // Only add agent_id if it's provided
+      // If the agent_id doesn't exist in the agents table, the database will handle it
+      // by setting it to NULL (due to ON DELETE SET NULL constraint)
+      if (agentId) {
+        eventObject.agent_id = agentId
+      }
+
       const { data: event, error } = await supabase
         .from(TABLES.CUSTOMER_EVENTS)
-        .insert([{
-          customer_id: customerId,
-          consultation_id: consultationId,
-          agent_id: agentId,
-          event_type: eventType,
-          event_category: eventCategory,
-          event_title: eventTitle,
-          event_description: eventDescription,
-          event_data: data,
-          source: source,
-          ip_address: ipAddress,
-          user_agent: userAgent
-        }])
+        .insert([eventObject])
         .select()
 
       if (error) {
