@@ -16,7 +16,7 @@ import {
 import customerDatabase from '../services/customerDatabase.js'
 import { brokerNetwork } from '../services/brokerNetwork.js'
 import emailService from '../services/emailService.js'
-import AIAgentAssistant from './broker/AIAgentAssistant'
+// import AIAgentAssistant from './broker/AIAgentAssistant'
 
 function LeadDetail() {
   const { leadId } = useParams()
@@ -537,7 +537,11 @@ Lightkeeper Realty
               </TabsList>
 
               <TabsContent value="ai-agent" className="space-y-6">
-                <AIAgentAssistant 
+                <div className="p-8 text-center">
+                  <p className="text-gray-600">AI Agent Assistant is temporarily disabled for debugging.</p>
+                  <p className="text-sm text-gray-500 mt-2">This will be re-enabled shortly.</p>
+                </div>
+                {/* <AIAgentAssistant 
                   lead={lead} 
                   onAction={async (action, data) => {
                     // Handle AI Agent actions
@@ -546,7 +550,7 @@ Lightkeeper Realty
                       addInteraction(`AI Agent sent ${data.channel}: ${data.subject || 'message'}`, data.channel)
                     }
                   }}
-                />
+                /> */}
               </TabsContent>
 
               <TabsContent value="overview" className="space-y-6">
