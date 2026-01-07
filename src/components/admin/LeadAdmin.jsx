@@ -61,12 +61,21 @@ function LeadAdmin() {
   }, [leads, searchQuery, statusFilter, typeFilter])
 
   async function loadLeads() {
+    console.log('🔍 LeadAdmin: Starting loadLeads...')
     setLoading(true)
     const result = await consultationService.getAllLeads()
+    console.log('🔍 LeadAdmin: getAllLeads result:', result)
+    console.log('🔍 LeadAdmin: result.success:', result.success)
+    console.log('🔍 LeadAdmin: result.data:', result.data)
+    console.log('🔍 LeadAdmin: result.data length:', result.data?.length)
     if (result.success) {
       const leadsData = result.data || []
+      console.log('🔍 LeadAdmin: Setting leads with', leadsData.length, 'items')
+      console.log('🔍 LeadAdmin: First lead:', leadsData[0])
       setLeads(leadsData)
       calculateStats(leadsData)
+    } else {
+      console.error('❌ LeadAdmin: Failed to load leads:', result.error)
     }
     setLoading(false)
   }
@@ -91,6 +100,7 @@ function LeadAdmin() {
   }
 
   function filterLeads() {
+    console.log('🔍 LeadAdmin: filterLeads called with', leads.length, 'leads')
     let filtered = [...leads]
 
     // Filter by search query
@@ -124,6 +134,8 @@ function LeadAdmin() {
       filtered = filtered.filter(c => c.lead_type === typeFilter)
     }
 
+    console.log('🔍 LeadAdmin: Setting filteredLeads with', filtered.length, 'items')
+    console.log('🔍 LeadAdmin: Filtered leads:', filtered)
     setFilteredLeads(filtered)
   }
 
