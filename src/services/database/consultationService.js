@@ -410,7 +410,8 @@ class ConsultationService {
           *,
           customer:customers(*),
           property:properties(*),
-          agent:agents(*)
+          agent:agents!agent_id(*),
+          assigned_agent:agents!assigned_agent_id(*)
         `)
         .order('created_at', { ascending: false })
 
