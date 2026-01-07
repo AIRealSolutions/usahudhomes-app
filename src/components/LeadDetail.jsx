@@ -51,10 +51,16 @@ function LeadDetail() {
     setError(null)
     try {
       console.log('Loading lead with ID:', leadId)
-      console.log('Available consultations:', customerDatabase.consultations?.length || 0)
+      console.log('customerDatabase:', customerDatabase)
+      console.log('Available consultations:', customerDatabase?.consultations?.length || 0)
+      
+      // Safety check
+      if (!customerDatabase || !customerDatabase.consultations) {
+        throw new Error('Customer database not initialized')
+      }
       
       // Get lead from consultations (since consultations are leads)
-      const consultation = customerDatabase.consultations?.find(c => c.id === leadId)
+      const consultation = customerDatabase.consultations.find(c => c.id === leadId)
       
       if (consultation) {
         console.log('Found consultation:', consultation)
