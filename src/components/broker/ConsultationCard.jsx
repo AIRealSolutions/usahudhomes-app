@@ -233,7 +233,7 @@ const ConsultationCard = ({ consultation, onUpdate }) => {
           {consultation.customer_id && (
             <div className="mb-3">
               <button
-                onClick={() => navigate(`/lead/${consultation.customer_id}`)}
+                onClick={() => navigate(`/lead/${consultation.id}`)}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg transition-all shadow-sm hover:shadow-md"
               >
                 <Sparkles className="w-5 h-5" />
