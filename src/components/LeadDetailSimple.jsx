@@ -20,18 +20,39 @@ function LeadDetailSimple() {
     
     try {
       console.log('=== LEAD DETAIL DEBUG ===')
-      console.log('Lead ID:', leadId)
+      console.log('Looking for Lead ID:', leadId)
       
-      // Fetch consultation from Supabase
+      // First, let's see ALL consultations to debug
+      const allConsultations = await consultationService.getAllConsultations()
+      console.log('All consultations result:', allConsultations)
+      
+      if (allConsultations.success && allConsultations.data) {
+        console.log('Total consultations:', allConsultations.data.length)
+        console.log('All consultation IDs:', allConsultations.data.map(c => c.id))
+        
+        // Try to find it manually
+        const found = allConsultations.data.find(c => c.id === leadId)
+        if (found) {
+          console.log('Found consultation in list:', found)
+          setLead(found)
+          return
+        }
+      }
+      
+      // If not found in list, try direct fetch
       const result = await consultationService.getConsultationById(leadId)
-      
-      console.log('Consultation fetch result:', result)
+      console.log('Direct fetch result:', result)
       
       if (result.success && result.data) {
-        console.log('Found consultation:', result.data)
+        console.log('Found consultation via direct fetch:', result.data)
         setLead(result.data)
       } else {
-        setError(result.error || `Lead not found. Looking for ID: ${leadId}`)
+        let errorMsg = `Lead not found. Looking for ID: ${leadId}\n\n`
+        if (allConsultations.success) {
+          errorMsg += `Found ${allConsultations.data.length} consultations in database.\n`
+          errorMsg += `IDs: ${allConsultations.data.map(c => c.id).join(', ')}`
+        }
+        setError(errorMsg)
       }
     } catch (err) {
       console.error('Error loading lead:', err)
