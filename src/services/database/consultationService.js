@@ -437,19 +437,34 @@ class ConsultationService {
    */
   async addLead(leadData) {
     try {
+      // Insert into consultations table (which stores leads)
+      const insertData = {
+        customer_id: leadData.customer_id,
+        first_name: leadData.first_name,
+        last_name: leadData.last_name,
+        email: leadData.email,
+        phone: leadData.phone,
+        budget_min: leadData.budget_min,
+        budget_max: leadData.budget_max,
+        preferred_location: leadData.preferred_location,
+        state: leadData.state,
+        timeline: leadData.timeline,
+        priority: leadData.priority || 'medium',
+        status: leadData.status || 'new',
+        source: leadData.source || 'manual',
+        notes: leadData.notes,
+        assigned_agent_id: leadData.assigned_agent_id,
+        consultation_date: new Date().toISOString()
+      }
+
       const { data, error } = await supabase
-        .from(TABLES.LEADS)
-        .insert([{
-          customer_id: leadData.customerId,
-          property_id: leadData.propertyId,
-          agent_id: leadData.agentId,
-          status: leadData.status || 'new',
-          priority: leadData.priority || 'medium',
-          source: leadData.source,
-          notes: leadData.notes,
-          follow_up_date: leadData.followUpDate
-        }])
-        .select()
+        .from(TABLES.CONSULTATIONS)
+        .insert([insertData])
+        .select(`
+          *,
+          customer:customers(*),
+          agent:agents(*)
+        `)
         .single()
 
       return formatSupabaseResponse(data, error)

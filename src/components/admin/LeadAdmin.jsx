@@ -22,7 +22,9 @@ import {
   Save,
   Plus,
   Trash2,
-  X as XIcon
+  X as XIcon,
+  Sparkles,
+  Brain
 } from 'lucide-react'
 import { consultationService, customerService, propertyService, agentService, referralService } from '../../services/database'
 
@@ -38,6 +40,9 @@ function LeadAdmin() {
   const [editForm, setEditForm] = useState({})
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [createForm, setCreateForm] = useState({})
+  const [analyzingLead, setAnalyzingLead] = useState(null)
+  const [leadAnalysis, setLeadAnalysis] = useState({})
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false)
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -286,6 +291,42 @@ function LeadAdmin() {
     }
   }
 
+  async function analyzeLead(lead) {
+    try {
+      setAnalyzingLead(lead.id)
+      
+      // Import AI service dynamically
+      const { leadAgentService } = await import('../../services/ai/leadAgentService')
+      
+      // Analyze the lead
+      const result = await leadAgentService.analyzeLead(lead)
+      
+      if (result.success) {
+        // Store analysis
+        setLeadAnalysis(prev => ({
+          ...prev,
+          [lead.id]: result.data
+        }))
+        
+        // Show analysis modal
+        setShowAnalysisModal(true)
+        setEditingLead(lead)
+      } else {
+        alert('Failed to analyze lead: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error analyzing lead:', error)
+      alert('Failed to analyze lead: ' + error.message)
+    } finally {
+      setAnalyzingLead(null)
+    }
+  }
+
+  function closeAnalysisModal() {
+    setShowAnalysisModal(false)
+    setEditingLead(null)
+  }
+
   async function updateLeadStatus(leadId, newStatus) {
     const result = await consultationService.updateLead(leadId, { status: newStatus })
     if (result.success) {
@@ -515,6 +556,19 @@ function LeadAdmin() {
                   
                   {/* Right: Actions */}
                   <div className="flex md:flex-col gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => analyzeLead(lead)}
+                      disabled={analyzingLead === lead.id}
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                    >
+                      {analyzingLead === lead.id ? (
+                        <Clock className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4 mr-1" />
+                      )}
+                      {analyzingLead === lead.id ? 'Analyzing...' : 'AI Analyze'}
+                    </Button>
                     <Button
                       size="sm"
                       onClick={() => openEditModal(lead)}
@@ -852,6 +906,164 @@ function LeadAdmin() {
               <Button onClick={createLead} className="bg-green-600 hover:bg-green-700">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Lead
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Analysis Modal */}
+      {showAnalysisModal && editingLead && leadAnalysis[editingLead.id] && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b bg-gradient-to-r from-purple-600 to-pink-600 text-white">
+              <div className="flex items-center gap-3">
+                <Brain className="h-8 w-8" />
+                <div>
+                  <h3 className="text-xl font-bold">AI Lead Analysis</h3>
+                  <p className="text-sm opacity-90">{editingLead.first_name} {editingLead.last_name}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Lead Summary */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold mb-2">Lead Information</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="font-medium">Name:</span> {editingLead.first_name} {editingLead.last_name}</div>
+                  <div><span className="font-medium">Email:</span> {editingLead.email || 'N/A'}</div>
+                  <div><span className="font-medium">Phone:</span> {editingLead.phone || 'N/A'}</div>
+                  <div><span className="font-medium">Source:</span> {editingLead.source || 'N/A'}</div>
+                  {editingLead.budget_min && (
+                    <div><span className="font-medium">Budget:</span> ${editingLead.budget_min?.toLocaleString()} - ${editingLead.budget_max?.toLocaleString()}</div>
+                  )}
+                  {editingLead.preferred_location && (
+                    <div><span className="font-medium">Location:</span> {editingLead.preferred_location}, {editingLead.state}</div>
+                  )}
+                  {editingLead.timeline && (
+                    <div><span className="font-medium">Timeline:</span> {editingLead.timeline}</div>
+                  )}
+                  <div><span className="font-medium">Priority:</span> <Badge className={editingLead.priority === 'high' ? 'bg-red-100 text-red-800' : editingLead.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>{editingLead.priority}</Badge></div>
+                </div>
+              </div>
+
+              {/* Key Facts */}
+              {leadAnalysis[editingLead.id].key_facts && leadAnalysis[editingLead.id].key_facts.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2 flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    Key Facts
+                  </h4>
+                  <ul className="list-disc list-inside space-y-1 text-sm">
+                    {leadAnalysis[editingLead.id].key_facts.map((fact, idx) => (
+                      <li key={idx}>{fact}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Needs & Requirements */}
+              {leadAnalysis[editingLead.id].needs && leadAnalysis[editingLead.id].needs.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2 flex items-center gap-2">
+                    <Home className="h-5 w-5 text-blue-600" />
+                    Needs & Requirements
+                  </h4>
+                  <ul className="list-disc list-inside space-y-1 text-sm">
+                    {leadAnalysis[editingLead.id].needs.map((need, idx) => (
+                      <li key={idx}>{need}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Urgency */}
+              <div>
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-orange-600" />
+                  Urgency Level
+                </h4>
+                <Badge className={leadAnalysis[editingLead.id].urgency === 'high' ? 'bg-red-100 text-red-800' : leadAnalysis[editingLead.id].urgency === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>
+                  {leadAnalysis[editingLead.id].urgency.toUpperCase()}
+                </Badge>
+              </div>
+
+              {/* Budget Assessment */}
+              {leadAnalysis[editingLead.id].budget_assessment && (
+                <div>
+                  <h4 className="font-semibold mb-2">Budget Assessment</h4>
+                  <p className="text-sm">{leadAnalysis[editingLead.id].budget_assessment}</p>
+                </div>
+              )}
+
+              {/* Location Preferences */}
+              {leadAnalysis[editingLead.id].location_preferences && (
+                <div>
+                  <h4 className="font-semibold mb-2">Location Preferences</h4>
+                  <p className="text-sm">{leadAnalysis[editingLead.id].location_preferences}</p>
+                </div>
+              )}
+
+              {/* Red Flags */}
+              {leadAnalysis[editingLead.id].red_flags && leadAnalysis[editingLead.id].red_flags.length > 0 && (
+                <div className="bg-red-50 p-4 rounded-lg">
+                  <h4 className="font-semibold mb-2 flex items-center gap-2 text-red-800">
+                    <XCircle className="h-5 w-5" />
+                    Red Flags / Concerns
+                  </h4>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-red-700">
+                    {leadAnalysis[editingLead.id].red_flags.map((flag, idx) => (
+                      <li key={idx}>{flag}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Recommended Actions */}
+              {leadAnalysis[editingLead.id].recommended_actions && leadAnalysis[editingLead.id].recommended_actions.length > 0 && (
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-semibold mb-2 flex items-center gap-2 text-blue-800">
+                    <Sparkles className="h-5 w-5" />
+                    Recommended Actions
+                  </h4>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-blue-700">
+                    {leadAnalysis[editingLead.id].recommended_actions.map((action, idx) => (
+                      <li key={idx}>{action}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Broker Match Criteria */}
+              {leadAnalysis[editingLead.id].broker_criteria && leadAnalysis[editingLead.id].broker_criteria.length > 0 && (
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <h4 className="font-semibold mb-2 flex items-center gap-2 text-purple-800">
+                    <UserPlus className="h-5 w-5" />
+                    Ideal Broker Profile
+                  </h4>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-purple-700">
+                    {leadAnalysis[editingLead.id].broker_criteria.map((criteria, idx) => (
+                      <li key={idx}>{criteria}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Raw Analysis */}
+              <details className="text-sm">
+                <summary className="cursor-pointer font-medium text-gray-600 hover:text-gray-800">View Full AI Analysis</summary>
+                <div className="mt-2 p-4 bg-gray-50 rounded whitespace-pre-wrap">
+                  {leadAnalysis[editingLead.id].raw_analysis}
+                </div>
+              </details>
+            </div>
+            <div className="p-6 border-t flex gap-3 justify-end bg-gray-50">
+              <Button variant="outline" onClick={closeAnalysisModal}>
+                Close
+              </Button>
+              <Button onClick={() => { closeAnalysisModal(); openEditModal(editingLead); }} className="bg-purple-600 hover:bg-purple-700">
+                <Edit className="h-4 w-4 mr-2" />
+                Assign Broker
               </Button>
             </div>
           </div>
