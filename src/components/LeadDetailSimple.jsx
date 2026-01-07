@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Mail, Phone, MapPin, Calendar } from 'lucide-react'
-import customerDatabase from '../services/customerDatabase.js'
+import { consultationService } from '../services/database'
 
 function LeadDetailSimple() {
   const { leadId } = useParams()
@@ -14,38 +14,24 @@ function LeadDetailSimple() {
     loadLeadData()
   }, [leadId])
 
-  const loadLeadData = () => {
+  const loadLeadData = async () => {
     setLoading(true)
     setError(null)
     
     try {
       console.log('=== LEAD DETAIL DEBUG ===')
       console.log('Lead ID:', leadId)
-      console.log('customerDatabase exists:', !!customerDatabase)
-      console.log('consultations exists:', !!customerDatabase?.consultations)
-      console.log('consultations length:', customerDatabase?.consultations?.length || 0)
       
-      if (!customerDatabase) {
-        setError('Customer database not available')
-        setLoading(false)
-        return
-      }
-
-      if (!customerDatabase.consultations) {
-        setError('Consultations data not available')
-        setLoading(false)
-        return
-      }
-
-      console.log('All consultation IDs:', customerDatabase.consultations.map(c => c.id))
+      // Fetch consultation from Supabase
+      const result = await consultationService.getConsultationById(leadId)
       
-      const consultation = customerDatabase.consultations.find(c => c.id === leadId)
+      console.log('Consultation fetch result:', result)
       
-      if (consultation) {
-        console.log('Found consultation:', consultation)
-        setLead(consultation)
+      if (result.success && result.data) {
+        console.log('Found consultation:', result.data)
+        setLead(result.data)
       } else {
-        setError(`Lead not found. Looking for ID: ${leadId}`)
+        setError(result.error || `Lead not found. Looking for ID: ${leadId}`)
       }
     } catch (err) {
       console.error('Error loading lead:', err)
