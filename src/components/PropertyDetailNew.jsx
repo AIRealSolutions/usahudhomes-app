@@ -79,7 +79,7 @@ function PropertyDetailNew() {
 
   const propertyUrl = `https://usahudhomes.com/property/${property.case_number}`
   const propertyTitle = `${property.address}, ${property.city}, ${property.state} - HUD Home for Sale`
-  const propertyDescription = `${property.bedrooms} bed, ${property.bathrooms} bath HUD home in ${property.city}, ${property.state}. Case #${property.case_number}. Price: $${property.price?.toLocaleString()}. ${property.status}.`
+  const propertyDescription = `${property.beds} bed, ${property.baths} bath HUD home in ${property.city}, ${property.state}. Case #${property.case_number}. Price: $${property.price?.toLocaleString()}. ${property.status}.`
 
   return (
     <>
@@ -151,7 +151,7 @@ function PropertyDetailNew() {
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">{property.address}</h1>
                     <div className="flex items-center text-gray-600 mb-2">
                       <MapPin className="h-5 w-5 mr-2" />
-                      <span>{property.city}, {property.state} {property.zipCode}</span>
+                      <span>{property.city}, {property.state} {property.zip_code}</span>
                     </div>
                     <div className="flex items-center text-gray-600">
                       <span className="text-sm">Case #{property.case_number}</span>
@@ -178,28 +178,28 @@ function PropertyDetailNew() {
                     <div className="flex items-center justify-center mb-2">
                       <Bed className="h-6 w-6 text-gray-400" />
                     </div>
-                    <div className="text-2xl font-bold text-gray-900">{property.bedrooms || 'N/A'}</div>
+                    <div className="text-2xl font-bold text-gray-900">{property.beds || 'N/A'}</div>
                     <div className="text-sm text-gray-600">Bedrooms</div>
                   </div>
                   <div className="text-center">
                     <div className="flex items-center justify-center mb-2">
                       <Bath className="h-6 w-6 text-gray-400" />
                     </div>
-                    <div className="text-2xl font-bold text-gray-900">{property.bathrooms || 'N/A'}</div>
+                    <div className="text-2xl font-bold text-gray-900">{property.baths || 'N/A'}</div>
                     <div className="text-sm text-gray-600">Bathrooms</div>
                   </div>
                   <div className="text-center">
                     <div className="flex items-center justify-center mb-2">
                       <Square className="h-6 w-6 text-gray-400" />
                     </div>
-                    <div className="text-2xl font-bold text-gray-900">{property.sqft?.toLocaleString() || 'N/A'}</div>
+                    <div className="text-2xl font-bold text-gray-900">{property.sq_ft?.toLocaleString() || 'N/A'}</div>
                     <div className="text-sm text-gray-600">Sq Ft</div>
                   </div>
                   <div className="text-center">
                     <div className="flex items-center justify-center mb-2">
                       <Calendar className="h-6 w-6 text-gray-400" />
                     </div>
-                    <div className="text-2xl font-bold text-gray-900">{property.yearBuilt || 'N/A'}</div>
+                    <div className="text-2xl font-bold text-gray-900">{property.year_built || 'N/A'}</div>
                     <div className="text-sm text-gray-600">Year Built</div>
                   </div>
                 </div>
@@ -218,11 +218,11 @@ function PropertyDetailNew() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex justify-between py-2 border-b border-gray-200">
                       <span className="text-gray-600">Property Type</span>
-                      <span className="font-medium text-gray-900">{property.propertyType || 'Single Family'}</span>
+                      <span className="font-medium text-gray-900">{property.property_type || 'Single Family'}</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-gray-200">
                       <span className="text-gray-600">Lot Size</span>
-                      <span className="font-medium text-gray-900">{property.lotSize || 'N/A'}</span>
+                      <span className="font-medium text-gray-900">{property.lot_size || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-gray-200">
                       <span className="text-gray-600">County</span>
@@ -230,7 +230,7 @@ function PropertyDetailNew() {
                     </div>
                     <div className="flex justify-between py-2 border-b border-gray-200">
                       <span className="text-gray-600">FHA Insurable</span>
-                      <span className="font-medium text-gray-900">{property.fhaInsurable ? 'Yes' : 'No'}</span>
+                      <span className="font-medium text-gray-900">{property.fha_insurable ? 'Yes' : 'No'}</span>
                     </div>
                   </div>
                 </div>
@@ -247,7 +247,7 @@ function PropertyDetailNew() {
                   to={`/consult/${property.case_number}`}
                   className="w-full inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors mb-4"
                 >
-                  Schedule Consultation
+                  Request a Showing
                 </Link>
 
                 <div className="space-y-3 pt-4 border-t border-gray-200">
