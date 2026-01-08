@@ -489,7 +489,10 @@ class ConsultationService {
       if (updates.notes) updateData.notes = updates.notes
       if (updates.followUpDate) updateData.follow_up_date = updates.followUpDate
       if (updates.agentId) updateData.agent_id = updates.agentId
-      if (updates.agent_id) updateData.assigned_agent_id = updates.agent_id
+      if (updates.agent_id) {
+        updateData.agent_id = updates.agent_id
+        updateData.assigned_agent_id = updates.agent_id
+      }
       if (updates.customer_id !== undefined) updateData.customer_id = updates.customer_id
       if (updates.case_number) updateData.case_number = updates.case_number
       if (updates.message) updateData.message = updates.message

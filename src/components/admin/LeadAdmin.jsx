@@ -251,7 +251,8 @@ function LeadAdmin() {
       // Update lead with agent assignment
       const updateResult = await consultationService.updateLead(leadId, {
         agent_id: agentId,
-        customer_id: customerId
+        customer_id: customerId,
+        status: 'referred'
       })
       
       if (updateResult.success) {
