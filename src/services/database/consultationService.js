@@ -412,6 +412,10 @@ class ConsultationService {
         `)
         .order('created_at', { ascending: false })
 
+      // Only show leads that are unassigned or rejected
+      // This keeps the Leads tab clean - assigned leads move to broker dashboards
+      query = query.or('agent_id.is.null,status.eq.rejected')
+
       if (filters.status) {
         query = query.eq('status', filters.status)
       }
