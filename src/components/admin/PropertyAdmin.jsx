@@ -24,6 +24,7 @@ import { useNavigate } from 'react-router-dom'
 import { propertyService } from '../../services/database'
 import { supabase } from '../../config/supabase'
 import PropertyImportAgent from './PropertyImportAgent'
+import HUDSyncAdmin from './HUDSyncAdmin'
 
 function PropertyAdmin() {
   const navigate = useNavigate()
@@ -31,6 +32,7 @@ function PropertyAdmin() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [showImportAgent, setShowImportAgent] = useState(false)
+  const [showHUDSync, setShowHUDSync] = useState(false)
   const [editingProperty, setEditingProperty] = useState(null)
   const [formData, setFormData] = useState(getEmptyFormData())
   const [stats, setStats] = useState({ total: 0, averagePrice: 0, bidsOpen: 0, priceReduced: 0 })
@@ -354,6 +356,31 @@ function PropertyAdmin() {
           </div>
         </div>
       )}
+
+      {/* HUD Sync Modal */}
+      {showHUDSync && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+              <h2 className="text-xl font-bold">HUD Property Sync</h2>
+              <button
+                onClick={() => setShowHUDSync(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <HUDSyncAdmin
+                onImportComplete={() => {
+                  loadProperties();
+                  loadStats();
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -375,6 +402,10 @@ function PropertyAdmin() {
           <Button onClick={() => setShowImportAgent(true)} className="mr-2">
             <Upload className="h-4 w-4 mr-2" />
             AI Import
+          </Button>
+          <Button onClick={() => setShowHUDSync(true)} className="mr-2" variant="default">
+            <Download className="h-4 w-4 mr-2" />
+            HUD Sync
           </Button>
           <Button onClick={handleAdd}>
             <Plus className="h-4 w-4 mr-2" />
