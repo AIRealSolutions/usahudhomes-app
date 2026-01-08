@@ -16,9 +16,11 @@ import {
   X,
   Download,
   Upload,
-  Building
+  Building,
+  Send
 } from 'lucide-react'
 import { agentService } from '../../services/database'
+import { agentInvitationService } from '../../services/agentInvitationService'
 
 function AgentAdmin() {
   const [agents, setAgents] = useState([])
@@ -118,6 +120,23 @@ function AgentAdmin() {
     }
   }
 
+  async function handleResendInvitation(agent) {
+    if (confirm(`Send invitation email to ${agent.email}?`)) {
+      setLoading(true)
+      try {
+        const result = await agentInvitationService.resendInvitation(agent.email)
+        if (result.success) {
+          alert(result.message || 'Invitation email sent successfully!')
+        } else {
+          alert('Error: ' + result.error)
+        }
+      } catch (error) {
+        alert('Error: ' + error.message)
+      }
+      setLoading(false)
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
 
@@ -140,7 +159,13 @@ function AgentAdmin() {
       } else {
         result = await agentService.addAgent(formData)
         if (result.success) {
-          alert('Agent added successfully!')
+          if (result.invitationSent) {
+            alert('Agent added successfully! Invitation email sent to ' + formData.email)
+          } else if (result.invitationError) {
+            alert('Agent added successfully, but invitation email failed: ' + result.invitationError + '\n\nYou can resend the invitation using the Send button.')
+          } else {
+            alert('Agent added successfully!')
+          }
         } else {
           alert('Error: ' + result.error)
         }
@@ -540,6 +565,14 @@ function AgentAdmin() {
                   </div>
                 </div>
                 <div className="flex gap-2 ml-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleResendInvitation(agent)}
+                    title="Send invitation email"
+                  >
+                    <Send className="h-4 w-4 text-blue-600" />
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => handleEdit(agent)}>
                     <Edit className="h-4 w-4" />
                   </Button>

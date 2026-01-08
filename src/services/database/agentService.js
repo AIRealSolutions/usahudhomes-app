@@ -4,6 +4,7 @@
  */
 
 import { supabase, TABLES, formatSupabaseResponse } from '../../config/supabase'
+import { agentInvitationService } from '../agentInvitationService'
 
 class AgentService {
   /**
@@ -124,7 +125,27 @@ class AgentService {
         .select()
         .single()
 
-      return formatSupabaseResponse(data, error)
+      const response = formatSupabaseResponse(data, error)
+      
+      // If agent was created successfully, send invitation email
+      if (response.success && data) {
+        const inviteResult = await agentInvitationService.sendInvitation({
+          email: agentData.email,
+          firstName: agentData.firstName,
+          lastName: agentData.lastName
+        })
+        
+        if (!inviteResult.success) {
+          console.warn('Agent created but invitation email failed:', inviteResult.error)
+          // Still return success for agent creation, but note the email issue
+          response.invitationSent = false
+          response.invitationError = inviteResult.error
+        } else {
+          response.invitationSent = true
+        }
+      }
+      
+      return response
     } catch (error) {
       console.error('Error adding agent:', error)
       return { success: false, error: error.message, data: null }
