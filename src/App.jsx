@@ -214,9 +214,9 @@ function HomePage({ stateStats, onStateSelect }) {
   const [featuredProperties, setFeaturedProperties] = useState([])
 
   useEffect(() => {
-    // Load properties from Supabase
+    // Load random properties from Supabase
     const loadProperties = async () => {
-      const result = await propertyService.getFeaturedProperties(6)
+      const result = await propertyService.getRandomProperties(5)
       if (result.success) {
         setFeaturedProperties(result.data)
       }
@@ -699,20 +699,14 @@ function App() {
   }, [])
 
   const loadStateStats = async () => {
-    // Mock state statistics - in real app, this would come from API
-    const mockStats = {
-      'CA': { total_properties: 8, avg_price: 485000, min_price: 350000, max_price: 750000, cities: ['Los Angeles', 'San Francisco', 'San Diego'] },
-      'NY': { total_properties: 6, avg_price: 625000, min_price: 450000, max_price: 900000, cities: ['New York City', 'Buffalo', 'Albany'] },
-      'FL': { total_properties: 7, avg_price: 395000, min_price: 280000, max_price: 650000, cities: ['Miami', 'Orlando', 'Tampa'] },
-      'TX': { total_properties: 9, avg_price: 320000, min_price: 180000, max_price: 550000, cities: ['Houston', 'Dallas', 'Austin'] },
-      'NC': { total_properties: 5, avg_price: 285000, min_price: 165000, max_price: 450000, cities: ['Charlotte', 'Raleigh', 'Asheville'] },
-      'GA': { total_properties: 4, avg_price: 245000, min_price: 145000, max_price: 380000, cities: ['Atlanta', 'Savannah', 'Augusta'] },
-      'AZ': { total_properties: 3, avg_price: 365000, min_price: 220000, max_price: 520000, cities: ['Phoenix', 'Tucson', 'Scottsdale'] },
-      'NV': { total_properties: 2, avg_price: 425000, min_price: 285000, max_price: 565000, cities: ['Las Vegas', 'Reno'] },
-      'CO': { total_properties: 3, avg_price: 445000, min_price: 320000, max_price: 620000, cities: ['Denver', 'Boulder', 'Colorado Springs'] },
-      'WA': { total_properties: 4, avg_price: 565000, min_price: 385000, max_price: 785000, cities: ['Seattle', 'Spokane', 'Tacoma'] }
+    // Load actual state statistics from database
+    const result = await propertyService.getStateStatistics()
+    if (result.success) {
+      setStateStats(result.data)
+    } else {
+      console.error('Failed to load state statistics:', result.error)
+      setStateStats({})
     }
-    setStateStats(mockStats)
   }
 
   const handleLogin = (email, role) => {

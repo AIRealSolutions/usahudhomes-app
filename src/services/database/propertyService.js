@@ -330,6 +330,106 @@ class PropertyService {
       return { success: false, error: error.message, data: [] }
     }
   }
+
+  /**
+   * Get random properties
+   * @param {number} limit - Number of properties to return
+   * @returns {Promise<Array>} Random properties
+   */
+  async getRandomProperties(limit = 5) {
+    try {
+      // First, get all active properties
+      const { data: allProperties, error: fetchError } = await supabase
+        .from(TABLES.PROPERTIES)
+        .select('*')
+        .eq('is_active', true)
+
+      if (fetchError) {
+        console.error('Error fetching properties:', fetchError)
+        return { success: false, error: fetchError.message, data: [] }
+      }
+
+      // If we have properties, shuffle and return the requested number
+      if (allProperties && allProperties.length > 0) {
+        // Shuffle array using Fisher-Yates algorithm
+        const shuffled = [...allProperties]
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+        }
+        
+        // Return the first 'limit' items
+        const randomProperties = shuffled.slice(0, Math.min(limit, shuffled.length))
+        return { success: true, data: randomProperties }
+      }
+
+      return { success: true, data: [] }
+    } catch (error) {
+      console.error('Error fetching random properties:', error)
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  /**
+   * Get state statistics from actual database
+   * @returns {Promise<Object>} State statistics
+   */
+  async getStateStatistics() {
+    try {
+      const { data, error } = await supabase
+        .from(TABLES.PROPERTIES)
+        .select('state, city, price')
+        .eq('is_active', true)
+
+      if (error) {
+        console.error('Error fetching state statistics:', error)
+        return { success: false, error: error.message, data: {} }
+      }
+
+      // Group properties by state and calculate statistics
+      const stateStats = {}
+      
+      if (data && data.length > 0) {
+        data.forEach(property => {
+          const state = property.state
+          if (!state) return
+
+          if (!stateStats[state]) {
+            stateStats[state] = {
+              total_properties: 0,
+              prices: [],
+              cities: new Set()
+            }
+          }
+
+          stateStats[state].total_properties++
+          stateStats[state].prices.push(parseFloat(property.price) || 0)
+          if (property.city) {
+            stateStats[state].cities.add(property.city)
+          }
+        })
+
+        // Calculate averages and format output
+        Object.keys(stateStats).forEach(state => {
+          const stats = stateStats[state]
+          const prices = stats.prices.sort((a, b) => a - b)
+          
+          stateStats[state] = {
+            total_properties: stats.total_properties,
+            avg_price: Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length),
+            min_price: prices[0],
+            max_price: prices[prices.length - 1],
+            cities: Array.from(stats.cities)
+          }
+        })
+      }
+
+      return { success: true, data: stateStats }
+    } catch (error) {
+      console.error('Error calculating state statistics:', error)
+      return { success: false, error: error.message, data: {} }
+    }
+  }
 }
 
 // Export singleton instance
