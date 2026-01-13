@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import SEOHead from './SEOHead.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { Button } from '@/components/ui/button.jsx'
@@ -27,6 +28,7 @@ import { getImageUrl } from '../utils/imageUtils'
 
 const PropertySearch = () => {
   const [searchQuery, setSearchQuery] = useState('')
+  const [totalProperties, setTotalProperties] = useState(0)
   const [filters, setFilters] = useState({
     state: '',
     minPrice: 0,
@@ -117,7 +119,14 @@ const PropertySearch = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <>
+      <SEOHead
+        title="Search HUD Homes for Sale | Find Foreclosure Properties Nationwide"
+        description="Search HUD foreclosure properties across all 50 states. Filter by location, price, bedrooms, and more. Find below-market homes with owner-occupant incentives."
+        url="/search"
+        keywords="search HUD homes, find foreclosure properties, HUD property search, government foreclosure listings, search homes by state"
+      />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Search Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-4">Search HUD Properties</h1>
@@ -426,9 +435,9 @@ const PropertySearch = () => {
             Clear All Filters
           </Button>
         </div>
-      )}
+       )}
     </div>
+    </>
   )
 }
-
 export default PropertySearch

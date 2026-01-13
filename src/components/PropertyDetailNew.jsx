@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
+import SEOHead from './SEOHead.jsx'
 import { propertyService } from '../services/database'
+import { getImageUrl } from '../utils/imageUtils'
 import { 
   ArrowLeft, 
   MapPin, 
@@ -37,15 +38,26 @@ function PropertyDetailNew() {
     loadProperty()
   }, [caseNumber])
 
-  const handleShare = () => {
+  const handleShare = async () => {
+    const shareData = {
+      title: propertyTitle,
+      text: `${property.beds} bed, ${property.baths} bath HUD home in ${property.city}, ${property.state} for $${property.price?.toLocaleString()}. Owner-occupant incentives available!`,
+      url: `https://usahudhomes.com/property/${property.case_number}`
+    }
+    
     if (navigator.share) {
-      navigator.share({
-        title: `${property.address} - HUD Home`,
-        text: `Check out this HUD home: ${property.address}, ${property.city}, ${property.state}`,
-        url: window.location.href
-      })
+      try {
+        await navigator.share(shareData)
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          // Fallback to clipboard
+          navigator.clipboard.writeText(shareData.url)
+          alert('Link copied to clipboard!')
+        }
+      }
     } else {
-      navigator.clipboard.writeText(window.location.href)
+      // Fallback to clipboard
+      navigator.clipboard.writeText(shareData.url)
       alert('Link copied to clipboard!')
     }
   }
@@ -77,26 +89,47 @@ function PropertyDetailNew() {
     )
   }
 
-  const propertyUrl = `https://usahudhomes.com/property/${property.case_number}`
-  const propertyTitle = `${property.address}, ${property.city}, ${property.state} - HUD Home for Sale`
-  const propertyDescription = `${property.beds} bed, ${property.baths} bath HUD home in ${property.city}, ${property.state}. Case #${property.case_number}. Price: $${property.price?.toLocaleString()}. ${property.status}.`
+  // SEO and Social Media metadata
+  const propertyUrl = `/property/${property.case_number}`
+  const propertyTitle = `${property.address}, ${property.city}, ${property.state} - HUD Home for Sale | Case #${property.case_number}`
+  
+  // Create comprehensive description for social sharing
+  const propertyDescription = `${property.beds} bed, ${property.baths} bath HUD foreclosure home in ${property.city}, ${property.state}. ${property.sq_ft ? `${property.sq_ft.toLocaleString()} sq ft.` : ''} Listed at $${property.price?.toLocaleString()}. ${property.status}. Owner-occupant incentives: $100 down FHA loans, 3% closing costs paid, repair escrows up to $35,000 with 203k loan. Contact Lightkeeper Realty at 910-363-6147.`
+  
+  // Get property image for social sharing
+  const propertyImage = property.main_image ? getImageUrl(property.main_image) : (property.images && property.images[0] ? getImageUrl(property.images[0]) : null)
+  
+  // Generate keywords for SEO
+  const propertyKeywords = `HUD home ${property.city} ${property.state}, ${property.city} foreclosure, HUD foreclosure ${property.state}, ${property.beds} bedroom home ${property.city}, HUD case ${property.case_number}, government foreclosure ${property.county} county, below market home ${property.state}, FHA loan property`
+  
+  // Tags for article metadata
+  const propertyTags = [
+    property.city,
+    property.state,
+    property.county,
+    'HUD Home',
+    'Foreclosure',
+    `${property.beds} Bedroom`,
+    property.property_type || 'Single Family'
+  ]
 
   return (
     <>
-      <Helmet>
-        <title>{propertyTitle}</title>
-        <meta name="description" content={propertyDescription} />
-        <meta property="og:title" content={propertyTitle} />
-        <meta property="og:description" content={propertyDescription} />
-        <meta property="og:url" content={propertyUrl} />
-        <meta property="og:type" content="website" />
-        {property.images && property.images[0] && (
-          <meta property="og:image" content={property.images[0]} />
-        )}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={propertyTitle} />
-        <meta name="twitter:description" content={propertyDescription} />
-      </Helmet>
+      <SEOHead
+        title={propertyTitle}
+        description={propertyDescription}
+        url={propertyUrl}
+        image={propertyImage}
+        type="article"
+        keywords={propertyKeywords}
+        price={property.price}
+        currency="USD"
+        availability="instock"
+        publishedTime={property.created_at}
+        modifiedTime={property.updated_at}
+        section="Real Estate"
+        tags={propertyTags}
+      />
 
       <div className="min-h-screen bg-gray-50">
         {/* Header */}

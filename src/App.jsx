@@ -28,6 +28,7 @@ import ApplicationSubmitted from './components/agent/ApplicationSubmitted.jsx'
 import VerifyEmail from './components/agent/VerifyEmail.jsx'
 import ResendVerification from './components/agent/ResendVerification.jsx'
 import AgentApplicationsAdmin from './components/admin/AgentApplicationsAdmin.jsx'
+import SEOHead from './components/SEOHead.jsx'
 import './App.css'
 
 // Header Component
@@ -225,7 +226,15 @@ function HomePage({ stateStats, onStateSelect }) {
   }, [])
 
   return (
-    <div className="min-h-screen bg-white">
+    <>
+      <SEOHead
+        title="HUD Homes for Sale Nationwide | USAHUDhomes.com"
+        description="Find HUD foreclosure properties at below-market prices across all 50 states, DC, and Puerto Rico. Browse government-owned homes with HUD registered brokers."
+        url="/"
+        image="/images/og-home.jpg"
+        keywords="HUD homes, foreclosure properties, government homes, HUD foreclosures, below market homes, HUD registered brokers"
+      />
+      <div className="min-h-screen bg-white">
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -294,6 +303,7 @@ function HomePage({ stateStats, onStateSelect }) {
       {/* Educational Section */}
       <EducationalSection />
     </div>
+    </>
   )
 }
 
