@@ -227,13 +227,13 @@ function HomePage({ stateStats, onStateSelect }) {
 
   return (
     <>
-      <SEOHead
+      {/* <SEOHead
         title="HUD Homes for Sale Nationwide | USAHUDhomes.com"
         description="Find HUD foreclosure properties at below-market prices across all 50 states, DC, and Puerto Rico. Browse government-owned homes with HUD registered brokers."
         url="/"
         image="/images/og-home.jpg"
         keywords="HUD homes, foreclosure properties, government homes, HUD foreclosures, below market homes, HUD registered brokers"
-      />
+      /> */}
       <div className="min-h-screen bg-white">
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-20">
@@ -693,29 +693,38 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [userRole, setUserRole] = useState(null)
   const [stateStats, setStateStats] = useState({})
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    // Check for existing authentication
-    const authStatus = localStorage.getItem('isAuthenticated')
-    const role = localStorage.getItem('userRole')
-    
-    if (authStatus === 'true') {
-      setIsAuthenticated(true)
-      setUserRole(role)
-    }
+    try {
+      // Check for existing authentication
+      const authStatus = localStorage.getItem('isAuthenticated')
+      const role = localStorage.getItem('userRole')
+      
+      if (authStatus === 'true') {
+        setIsAuthenticated(true)
+        setUserRole(role)
+      }
 
-    // Load mock state statistics
-    loadStateStats()
+      // Load actual state statistics from database
+      loadStateStats()
+    } catch (err) {
+      console.error('Initialization error:', err)
+      setError(err.message)
+    }
   }, [])
 
   const loadStateStats = async () => {
-    // Load actual state statistics from database
-    const result = await propertyService.getStateStatistics()
-    if (result.success) {
-      setStateStats(result.data)
-    } else {
-      console.error('Failed to load state statistics:', result.error)
-      setStateStats({})
+    try {
+      const result = await propertyService.getStateStatistics()
+      if (result.success) {
+        setStateStats(result.data)
+      } else {
+        console.error('Failed to load state statistics:', result.error)
+        setStateStats({})
+      }
+    } catch (err) {
+      console.error('Error in loadStateStats:', err)
     }
   }
 
@@ -738,6 +747,20 @@ function App() {
   const handleStateSelect = (state) => {
     // Navigate to search page with state filter
     window.location.href = `/search?state=${state.code}`
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6 text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h1>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <Button onClick={() => window.location.reload()} className="bg-blue-600 hover:bg-blue-700">
+            Reload Page
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
