@@ -28,6 +28,7 @@ import ApplicationSubmitted from './components/agent/ApplicationSubmitted.jsx'
 import VerifyEmail from './components/agent/VerifyEmail.jsx'
 import ResendVerification from './components/agent/ResendVerification.jsx'
 import AgentApplicationsAdmin from './components/admin/AgentApplicationsAdmin.jsx'
+import EnvDiagnostic from './components/EnvDiagnostic.jsx'
 // import SEOHead from './components/SEOHead.jsx' // TEMPORARILY DISABLED
 import './App.css'
 
@@ -807,7 +808,8 @@ function App() {
             
             {/* Agent Onboarding Routes */}
             <Route path="/agent/register" element={<AgentRegistration />} />
-            <Route path="/agent/application-submitted" element={<ApplicationSubmitted />} />
+               <Route path="/env-check" element={<EnvDiagnostic />} />
+              <Route path="/agent-applications-admin" element={<ApplicationSubmitted />} />
             <Route path="/agent/verify-email" element={<VerifyEmail />} />
             <Route path="/agent/resend-verification" element={<ResendVerification />} />
             <Route path="/admin/agent-applications" element={
