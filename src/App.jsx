@@ -13,7 +13,7 @@ import BrokerDashboard from './components/broker/BrokerDashboard.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Unauthorized from './components/Unauthorized.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
-import { HelmetProvider } from 'react-helmet-async'
+// import { HelmetProvider } from 'react-helmet-async' // DISABLED for React 19 compatibility
 import PropertyDetail from './components/PropertyDetailNew.jsx'
 import PropertyConsultation from './components/PropertyConsultation.jsx'
 import CustomerDetail from './components/CustomerDetail.jsx'
@@ -28,7 +28,7 @@ import ApplicationSubmitted from './components/agent/ApplicationSubmitted.jsx'
 import VerifyEmail from './components/agent/VerifyEmail.jsx'
 import ResendVerification from './components/agent/ResendVerification.jsx'
 import AgentApplicationsAdmin from './components/admin/AgentApplicationsAdmin.jsx'
-import SEOHead from './components/SEOHead.jsx'
+// import SEOHead from './components/SEOHead.jsx' // DISABLED for React 19 compatibility
 import './App.css'
 
 // Header Component
