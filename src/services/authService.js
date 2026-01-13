@@ -13,6 +13,10 @@ class AuthService {
    */
   async signUp({ email, password, firstName, lastName, role = 'end_user', phone, state }) {
     try {
+      // Safety check
+      if (!supabase || !supabase.auth) {
+        return { success: false, error: 'Database not configured', data: null }
+      }
       // Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -78,6 +82,10 @@ class AuthService {
    */
   async signIn(email, password) {
     try {
+      // Safety check
+      if (!supabase || !supabase.auth) {
+        return { success: false, error: 'Database not configured', data: null }
+      }
       // Authenticate user
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
@@ -165,6 +173,11 @@ class AuthService {
    */
   async getSession() {
     try {
+      // Safety check
+      if (!supabase || !supabase.auth) {
+        console.error('Supabase not initialized')
+        return { success: false, error: 'Database not configured', data: null }
+      }
       const { data: { session }, error } = await supabase.auth.getSession()
 
       if (error) {
@@ -367,6 +380,12 @@ class AuthService {
    * @returns {Object} Subscription
    */
   onAuthStateChange(callback) {
+    // Safety check: ensure supabase is initialized
+    if (!supabase || !supabase.auth) {
+      console.error('Supabase not initialized - check environment variables')
+      return { data: { subscription: { unsubscribe: () => {} } } }
+    }
+    
     return supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         // Get profile
