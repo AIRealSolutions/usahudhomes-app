@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { US_STATES } from '../utils/states';
 import { 
   ArrowLeft, Edit2, Save, X, Mail, Phone, MessageSquare, 
   Calendar, DollarSign, MapPin, Clock, User, FileText,
@@ -21,6 +22,7 @@ export default function LeadDetail() {
   const [eventNotes, setEventNotes] = useState('');
   const [loadingProperties, setLoadingProperties] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState([]);
+  const [availableCities, setAvailableCities] = useState([]);
 
   // Form state for editing
   const [formData, setFormData] = useState({});
@@ -35,6 +37,12 @@ export default function LeadDetail() {
       fetchProperties();
     }
   }, [lead, activeTab]);
+
+  useEffect(() => {
+    if (formData.state) {
+      fetchCitiesForState(formData.state);
+    }
+  }, [formData.state]);
 
   const fetchLeadDetails = async () => {
     try {
@@ -108,6 +116,34 @@ export default function LeadDetail() {
       console.error('Error fetching properties:', error);
     } finally {
       setLoadingProperties(false);
+    }
+  };
+
+  const fetchCitiesForState = async (state) => {
+    try {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('city')
+        .eq('state', state);
+
+      if (error) throw error;
+
+      // Count properties per city
+      const cityCounts = {};
+      data.forEach(p => {
+        if (p.city) {
+          cityCounts[p.city] = (cityCounts[p.city] || 0) + 1;
+        }
+      });
+
+      // Sort cities by property count and get top 3
+      const sortedCities = Object.entries(cityCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([city]) => city);
+
+      setAvailableCities(sortedCities);
+    } catch (error) {
+      console.error('Error fetching cities:', error);
     }
   };
 
@@ -399,17 +435,73 @@ export default function LeadDetail() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Preferred Location
+                        State
                       </label>
                       {isEditing ? (
-                        <input
-                          type="text"
-                          value={formData.preferred_location || ''}
-                          onChange={(e) => setFormData({ ...formData, preferred_location: e.target.value })}
+                        <select
+                          value={formData.state || ''}
+                          onChange={(e) => {
+                            setFormData({ ...formData, state: e.target.value, city: '' });
+                            setAvailableCities([]);
+                          }}
                           className="w-full px-3 py-2 border rounded-lg"
-                        />
+                        >
+                          <option value="">Select State</option>
+                          {US_STATES.map((state) => (
+                            <option key={state.code} value={state.code}>
+                              {state.name}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
-                        <p className="text-gray-900">{lead.preferred_location || 'N/A'}</p>
+                        <p className="text-gray-900">{lead.state || 'N/A'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        City (Top 3 by availability)
+                      </label>
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <select
+                            value={formData.city && availableCities.slice(0, 3).includes(formData.city) ? formData.city : (formData.city ? 'other' : '')}
+                            onChange={(e) => {
+                              if (e.target.value === 'other') {
+                                // Keep current city or clear it
+                                return;
+                              }
+                              setFormData({ ...formData, city: e.target.value });
+                            }}
+                            disabled={!formData.state || availableCities.length === 0}
+                            className="w-full px-3 py-2 border rounded-lg disabled:bg-gray-100"
+                          >
+                            <option value="">{formData.state ? 'Select City' : 'Select State First'}</option>
+                            {availableCities.slice(0, 3).map((city) => (
+                              <option key={city} value={city}>
+                                {city}
+                              </option>
+                            ))}
+                            {availableCities.length > 3 && (
+                              <option value="other">Other City...</option>
+                            )}
+                          </select>
+                          {formData.city && !availableCities.slice(0, 3).includes(formData.city) && availableCities.length > 3 && (
+                            <select
+                              value={formData.city || ''}
+                              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                              className="w-full px-3 py-2 border rounded-lg"
+                            >
+                              <option value="">Select from all cities</option>
+                              {availableCities.slice(3).map((city) => (
+                                <option key={city} value={city}>
+                                  {city}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-gray-900">{lead.city || 'N/A'}</p>
                       )}
                     </div>
                     <div>
