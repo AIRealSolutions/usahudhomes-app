@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate } fro
 import { supabase } from './config/supabase'
 import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User, Menu } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import Login from './pages/Login'
+import Dashboard from './pages/Dashboard'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -989,7 +991,8 @@ export default function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/how-it-works" element={<HowItWorksPage />} />
-              <Route path="/login" element={<LoginPage />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />
             </Routes>
           </main>
