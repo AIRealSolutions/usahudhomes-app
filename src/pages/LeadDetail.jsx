@@ -19,6 +19,8 @@ export default function LeadDetail() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [eventType, setEventType] = useState('');
   const [eventNotes, setEventNotes] = useState('');
+  const [loadingProperties, setLoadingProperties] = useState(false);
+  const [selectedProperties, setSelectedProperties] = useState([]);
 
   // Form state for editing
   const [formData, setFormData] = useState({});
@@ -27,6 +29,12 @@ export default function LeadDetail() {
     fetchLeadDetails();
     fetchEvents();
   }, [id]);
+
+  useEffect(() => {
+    if (lead && activeTab === 'properties') {
+      fetchProperties();
+    }
+  }, [lead, activeTab]);
 
   const fetchLeadDetails = async () => {
     try {
@@ -58,6 +66,48 @@ export default function LeadDetail() {
       setEvents(data || []);
     } catch (error) {
       console.error('Error fetching events:', error);
+    }
+  };
+
+  const fetchProperties = async () => {
+    if (!lead) return;
+    
+    setLoadingProperties(true);
+    try {
+      // Build query based on lead preferences
+      let query = supabase
+        .from('properties')
+        .select('*')
+        .eq('status', 'Available');
+
+      // Filter by state if preferred location is specified
+      if (lead.state) {
+        query = query.eq('state', lead.state);
+      } else if (lead.preferred_location) {
+        // Try to match city
+        query = query.ilike('city', `%${lead.preferred_location}%`);
+      }
+
+      // Filter by budget if specified
+      if (lead.budget_min && lead.budget_max) {
+        query = query
+          .gte('list_price', lead.budget_min)
+          .lte('list_price', lead.budget_max);
+      } else if (lead.budget_max) {
+        query = query.lte('list_price', lead.budget_max);
+      }
+
+      // Limit to 20 results
+      query = query.limit(20);
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setProperties(data || []);
+    } catch (error) {
+      console.error('Error fetching properties:', error);
+    } finally {
+      setLoadingProperties(false);
     }
   };
 
@@ -399,8 +449,116 @@ export default function LeadDetail() {
 
             {activeTab === 'properties' && (
               <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-xl font-semibold mb-4">AI Property Recommendations</h2>
-                <p className="text-gray-600">Property sharing feature coming soon...</p>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-semibold">AI Property Recommendations</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Based on: {lead.preferred_location || 'Any location'} • 
+                      Budget: ${lead.budget_min?.toLocaleString() || '0'} - ${lead.budget_max?.toLocaleString() || 'Any'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={fetchProperties}
+                    disabled={loadingProperties}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                  >
+                    {loadingProperties ? 'Searching...' : 'Refresh'}
+                  </button>
+                </div>
+
+                {loadingProperties ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-600">Searching for properties...</p>
+                  </div>
+                ) : properties.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-600">No properties found matching criteria</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-4 flex items-center justify-between">
+                      <p className="text-sm text-gray-600">{properties.length} properties found</p>
+                      {selectedProperties.length > 0 && (
+                        <button
+                          onClick={() => {
+                            // TODO: Implement share selected properties
+                            alert(`Share ${selectedProperties.length} properties with ${lead.first_name}`);
+                          }}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                        >
+                          Share Selected ({selectedProperties.length})
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-3">
+                      {properties.map((property) => (
+                        <div
+                          key={property.id}
+                          className="flex items-start gap-4 p-4 border rounded-lg hover:bg-gray-50"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedProperties.includes(property.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedProperties([...selectedProperties, property.id]);
+                              } else {
+                                setSelectedProperties(selectedProperties.filter(id => id !== property.id));
+                              }
+                            }}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h3 className="font-semibold text-lg">
+                                  {property.address}
+                                </h3>
+                                <p className="text-gray-600">
+                                  {property.city}, {property.state} {property.zip}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xl font-bold text-blue-600">
+                                  ${property.list_price?.toLocaleString()}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  Case: {property.case_number}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+                              <span>{property.bedrooms} bed</span>
+                              <span>•</span>
+                              <span>{property.bathrooms} bath</span>
+                              <span>•</span>
+                              <span>{property.square_feet?.toLocaleString()} sqft</span>
+                            </div>
+                            <div className="flex gap-2 mt-3">
+                              <a
+                                href={`/property/${property.case_number}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
+                              >
+                                View Details
+                              </a>
+                              <button
+                                onClick={() => {
+                                  // TODO: Implement share single property
+                                  alert(`Share property at ${property.address} with ${lead.first_name}`);
+                                }}
+                                className="px-3 py-1 text-sm bg-green-50 text-green-700 rounded hover:bg-green-100"
+                              >
+                                Share
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
