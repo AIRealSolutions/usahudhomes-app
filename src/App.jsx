@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate } from 'react-router-dom'
 import { supabase } from './config/supabase'
 import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User } from 'lucide-react'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
-import ProtectedRoute from './components/ProtectedRoute'
+// Auth imports will be added gradually
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -29,14 +28,11 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// H// Header Component
+// Header Component
 function Header() {
-  const { user, signOut, role, getDashboardRoute } = useAuth()
-
-  const handleSignOut = async () => {
-    await signOut()
-    window.location.href = '/'
-  }
+  // Auth will be added gradually
+  const user = null
+  const role = null
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
@@ -47,38 +43,15 @@ function Header() {
             <span className="text-2xl font-bold text-gray-900">USAHUDhomes.com</span>
           </Link>
           
-          <nav className="hidden md:flex space-x-8 items-center">
+              <nav className="hidden md:flex space-x-8 items-center">
             <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Home</Link>
-            <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Homes</Link>
-            
-            {user ? (
-              <>
-                <Link to={getDashboardRoute()} className="text-gray-700 hover:text-blue-600 font-medium flex items-center">
-                  <User className="h-4 w-4 mr-1" />
-                  Dashboard
-                </Link>
-                <button
-                  onClick={handleSignOut}
-                  className="text-gray-700 hover:text-blue-600 font-medium flex items-center"
-                >
-                  <LogOut className="h-4 w-4 mr-1" />
-                  Logout
-                </button>
-              </>
-            ) : (
-              <Link to="/login" className="text-gray-700 hover:text-blue-600 font-medium">Login</Link>
-            )}
+            <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Properties</Link>
+            <Link to="/login" className="text-gray-700 hover:text-blue-600 font-medium">Login</Link>
           </nav>
           
           <a href="tel:9103636147" className="flex items-center text-blue-600 hover:text-blue-700 font-semibold">
             <Phone className="h-5 w-5 mr-2" />
             <span className="hidden sm:inline">910-363-6147</span>
-          </a>
-        </div>
-      </div>
-    </header>
-  )
-}-6147
           </a>
         </div>
       </div>
