@@ -211,15 +211,20 @@ function HomePage() {
   useEffect(() => {
     async function loadProperties() {
       try {
-        const { data, error } = await supabase
+        // Get all available properties first
+        const { data: allProps, error } = await supabase
           .from('properties')
           .select('*')
-          .eq('status', 'available')
-          .order('created_at', { ascending: false })
-          .limit(12)
+          .or('status.eq.AVAILABLE,status.eq.BIDS OPEN')
+          .limit(100)
         
         if (error) throw error
-        setProperties(data || [])
+        
+        // Shuffle and take 6 random properties
+        const shuffled = (allProps || []).sort(() => Math.random() - 0.5)
+        const randomSix = shuffled.slice(0, 6)
+        
+        setProperties(randomSix)
       } catch (err) {
         console.error('Error loading properties:', err)
       } finally {
@@ -246,7 +251,7 @@ function HomePage() {
             <p className="text-gray-600">No properties available at this time.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {properties.map(property => (
               <PropertyCard key={property.id} property={property} />
             ))}
