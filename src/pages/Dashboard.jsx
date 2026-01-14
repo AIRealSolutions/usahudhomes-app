@@ -30,7 +30,7 @@ export default function Dashboard() {
       const { data: userData, error } = await supabase
         .from('users')
         .select('role')
-        .eq('id', session.user.id)
+        .eq('email', session.user.email)
         .single()
 
       if (error) throw error
