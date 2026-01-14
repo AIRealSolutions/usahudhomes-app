@@ -137,7 +137,7 @@ export default function BrokerDashboard({ user, showAdminAccess }) {
             {consultations.map((c) => (
               <div key={c.id} className="px-6 py-4">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold">{c.customer_name}</h3>
+                  <h3 className="font-semibold">{c.first_name} {c.last_name}</h3>
                   <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800">
                     {c.status}
                   </span>
@@ -145,14 +145,14 @@ export default function BrokerDashboard({ user, showAdminAccess }) {
                 <div className="space-y-1 text-sm text-gray-600">
                   <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4" />
-                    <a href={`mailto:${c.customer_email}`} className="text-blue-600">
-                      {c.customer_email}
+                    <a href={`mailto:${c.email}`} className="text-blue-600">
+                      {c.email}
                     </a>
                   </div>
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4" />
-                    <a href={`tel:${c.customer_phone}`} className="text-blue-600">
-                      {c.customer_phone}
+                    <a href={`tel:${c.phone}`} className="text-blue-600">
+                      {c.phone}
                     </a>
                   </div>
                   {c.properties && (
