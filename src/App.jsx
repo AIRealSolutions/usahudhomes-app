@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate } from 'react-router-dom'
 import { supabase } from './config/supabase'
 import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User } from 'lucide-react'
-// Auth imports will be added gradually
+import { AuthProvider } from './contexts/AuthContext'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -896,7 +896,8 @@ function PropertyDetailPage() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <Router>
+      <AuthProvider>
+        <Router>
         <div className="min-h-screen flex flex-col">
           <Header />
           <main className="flex-1">
@@ -910,7 +911,8 @@ export default function App() {
           </main>
           <Footer />
         </div>
-      </Router>
+        </Router>
+      </AuthProvider>
     </ErrorBoundary>
   )
 }
