@@ -22,7 +22,6 @@ export default function LeadDetail() {
   const [eventNotes, setEventNotes] = useState('');
   const [loadingProperties, setLoadingProperties] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState([]);
-  const [availableCities, setAvailableCities] = useState([]);
 
   // Form state for editing
   const [formData, setFormData] = useState({});
@@ -37,12 +36,6 @@ export default function LeadDetail() {
       fetchProperties();
     }
   }, [lead, activeTab]);
-
-  useEffect(() => {
-    if (formData.state) {
-      fetchCitiesForState(formData.state);
-    }
-  }, [formData.state]);
 
   const fetchLeadDetails = async () => {
     try {
@@ -116,24 +109,6 @@ export default function LeadDetail() {
       console.error('Error fetching properties:', error);
     } finally {
       setLoadingProperties(false);
-    }
-  };
-
-  const fetchCitiesForState = async (state) => {
-    try {
-      const { data, error } = await supabase
-        .from('properties')
-        .select('city')
-        .eq('state', state)
-        .order('city');
-
-      if (error) throw error;
-
-      // Get unique cities in alphabetical order
-      const uniqueCities = [...new Set(data.map(p => p.city))].filter(Boolean).sort();
-      setAvailableCities(uniqueCities);
-    } catch (error) {
-      console.error('Error fetching cities:', error);
     }
   };
 
@@ -449,24 +424,50 @@ export default function LeadDetail() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        City
+                        Location 1 (City, Neighborhood, Zip, etc.)
                       </label>
                       {isEditing ? (
-                        <select
-                          value={formData.city || ''}
-                          onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                          disabled={!formData.state || availableCities.length === 0}
-                          className="w-full px-3 py-2 border rounded-lg disabled:bg-gray-100"
-                        >
-                          <option value="">{formData.state ? 'Select City' : 'Select State First'}</option>
-                          {availableCities.map((city) => (
-                            <option key={city} value={city}>
-                              {city}
-                            </option>
-                          ))}
-                        </select>
+                        <input
+                          type="text"
+                          value={formData.location_1 || ''}
+                          onChange={(e) => setFormData({ ...formData, location_1: e.target.value })}
+                          placeholder="e.g., Raleigh, Downtown, 27601"
+                          className="w-full px-3 py-2 border rounded-lg"
+                        />
                       ) : (
-                        <p className="text-gray-900">{lead.city || 'N/A'}</p>
+                        <p className="text-gray-900">{lead.location_1 || 'N/A'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Location 2 (Optional)
+                      </label>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={formData.location_2 || ''}
+                          onChange={(e) => setFormData({ ...formData, location_2: e.target.value })}
+                          placeholder="e.g., Durham, Chapel Hill"
+                          className="w-full px-3 py-2 border rounded-lg"
+                        />
+                      ) : (
+                        <p className="text-gray-900">{lead.location_2 || 'N/A'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Location 3 (Optional)
+                      </label>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={formData.location_3 || ''}
+                          onChange={(e) => setFormData({ ...formData, location_3: e.target.value })}
+                          placeholder="e.g., Cary, Wake Forest"
+                          className="w-full px-3 py-2 border rounded-lg"
+                        />
+                      ) : (
+                        <p className="text-gray-900">{lead.location_3 || 'N/A'}</p>
                       )}
                     </div>
                     <div>
