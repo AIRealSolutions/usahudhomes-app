@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Home as HomeIcon, Users, UserCheck, TrendingUp, DollarSign, MapPin } from 'lucide-react'
 
-export default function AdminDashboard({ user }) {
+export default function AdminDashboard({ user, showBrokerLink }) {
   const [stats, setStats] = useState({
     properties: 0,
     customers: 0,
@@ -75,9 +75,22 @@ export default function AdminDashboard({ user }) {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="mt-2 text-gray-600">Manage properties, customers, and agents</p>
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="mt-2 text-gray-600">Manage properties, customers, and agents</p>
+        </div>
+        {showBrokerLink && (
+          <Link
+            to="/dashboard"
+            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <svg className="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Broker Dashboard
+          </Link>
+        )}
       </div>
 
       {/* Stats Cards */}

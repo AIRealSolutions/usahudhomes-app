@@ -993,6 +993,7 @@ export default function App() {
               <Route path="/how-it-works" element={<HowItWorksPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/admin" element={<Dashboard />} />
               <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />
             </Routes>
           </main>

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { Navigate, Link } from 'react-router-dom'
+import { Navigate, Link, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import UserDashboard from './UserDashboard'
 import BrokerDashboard from './BrokerDashboard'
 import AdminDashboard from './AdminDashboard'
 
 export default function Dashboard() {
+  const location = useLocation()
   const [user, setUser] = useState(null)
   const [userRole, setUserRole] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -58,13 +59,22 @@ export default function Dashboard() {
     return <Navigate to="/login" replace />
   }
 
+  // Check if user has admin access (Marc Spencer)
+  const hasAdminAccess = user?.email === 'marcspencer28461@gmail.com'
+  const isAdminRoute = location.pathname === '/admin'
+
+  // If accessing /admin route and has admin access, show admin dashboard
+  if (isAdminRoute && hasAdminAccess) {
+    return <AdminDashboard user={user} showBrokerLink={true} />
+  }
+
   // Route to appropriate dashboard based on role
   if (userRole === 'end_user') {
     return <UserDashboard user={user} />
   }
 
   if (userRole === 'broker') {
-    return <BrokerDashboard user={user} />
+    return <BrokerDashboard user={user} showAdminAccess={hasAdminAccess} />
   }
 
   if (userRole === 'admin') {
