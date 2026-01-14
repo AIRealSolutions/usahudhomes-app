@@ -138,8 +138,14 @@ export default function LeadDetail() {
       // Log update event
       await logEvent('update', 'Lead information updated');
 
-      setLead({...lead, ...updateData});
+      const updatedLead = {...lead, ...updateData};
+      setLead(updatedLead);
       setIsEditing(false);
+
+      // Refresh properties if state or budget changed
+      if (activeTab === 'properties') {
+        await fetchProperties();
+      }
     } catch (error) {
       console.error('Error updating lead:', error);
       alert('Failed to update lead: ' + error.message);
