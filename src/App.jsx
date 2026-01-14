@@ -5,6 +5,7 @@ import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCi
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import LeadDetail from './pages/LeadDetail'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -994,6 +995,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/admin" element={<Dashboard />} />
+              <Route path="/lead/:id" element={<LeadDetail />} />
               <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />
             </Routes>
           </main>

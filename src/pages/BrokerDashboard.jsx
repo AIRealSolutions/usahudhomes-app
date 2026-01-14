@@ -135,7 +135,7 @@ export default function BrokerDashboard({ user, showAdminAccess }) {
         ) : (
           <div className="divide-y">
             {consultations.map((c) => (
-              <div key={c.id} className="px-6 py-4">
+              <Link key={c.id} to={`/lead/${c.id}`} className="block px-6 py-4 hover:bg-gray-50 transition-colors">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-semibold">{c.first_name} {c.last_name}</h3>
                   <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800">
@@ -167,7 +167,7 @@ export default function BrokerDashboard({ user, showAdminAccess }) {
                     <strong>Message:</strong> {c.message}
                   </div>
                 )}
-              </div>
+              </Link>
             ))}
           </div>
         )}
