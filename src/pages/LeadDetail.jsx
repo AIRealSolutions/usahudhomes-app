@@ -422,54 +422,7 @@ export default function LeadDetail() {
                         <p className="text-gray-900">{lead.state || 'N/A'}</p>
                       )}
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Location 1 (City, Neighborhood, Zip, etc.)
-                      </label>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={formData.location_1 || ''}
-                          onChange={(e) => setFormData({ ...formData, location_1: e.target.value })}
-                          placeholder="e.g., Raleigh, Downtown, 27601"
-                          className="w-full px-3 py-2 border rounded-lg"
-                        />
-                      ) : (
-                        <p className="text-gray-900">{lead.location_1 || 'N/A'}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Location 2 (Optional)
-                      </label>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={formData.location_2 || ''}
-                          onChange={(e) => setFormData({ ...formData, location_2: e.target.value })}
-                          placeholder="e.g., Durham, Chapel Hill"
-                          className="w-full px-3 py-2 border rounded-lg"
-                        />
-                      ) : (
-                        <p className="text-gray-900">{lead.location_2 || 'N/A'}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Location 3 (Optional)
-                      </label>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={formData.location_3 || ''}
-                          onChange={(e) => setFormData({ ...formData, location_3: e.target.value })}
-                          placeholder="e.g., Cary, Wake Forest"
-                          className="w-full px-3 py-2 border rounded-lg"
-                        />
-                      ) : (
-                        <p className="text-gray-900">{lead.location_3 || 'N/A'}</p>
-                      )}
-                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Timeline
