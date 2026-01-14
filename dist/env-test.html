@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Environment Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        .box {
+            background: #000;
+            border: 1px solid #00ff00;
+            padding: 20px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Environment Variables Test</h1>
+    <div class="box">
+        <h2>Build Time Check</h2>
+        <p>If you see "VITE_SUPABASE_URL" below, env vars are NOT being injected:</p>
+        <p id="url">Loading...</p>
+        <p id="key">Loading...</p>
+    </div>
+    
+    <div class="box">
+        <h2>What This Means</h2>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // This will be replaced at build time by Vite
+        const url = "VITE_SUPABASE_URL_PLACEHOLDER";
+        const key = "VITE_SUPABASE_ANON_KEY_PLACEHOLDER";
+        
+        document.getElementById('url').textContent = 'URL: ' + url;
+        document.getElementById('key').textContent = 'Key: ' + key.substring(0, 50) + '...';
+        
+        const result = document.getElementById('result');
+        
+        if (url.includes('PLACEHOLDER') || url === 'VITE_SUPABASE_URL') {
+            result.innerHTML = `
+                <p style="color: #ff0000;">❌ FAILED: Environment variables are NOT being injected at build time</p>
+                <p>This means Vercel is not reading the environment variables during the build process.</p>
+                <p><strong>Solution:</strong> The environment variables must be set in Vercel BEFORE the build runs.</p>
+            `;
+        } else {
+            result.innerHTML = `
+                <p style="color: #00ff00;">✅ SUCCESS: Environment variables ARE being injected!</p>
+                <p>The variables are configured correctly in Vercel.</p>
+            `;
+        }
+    </script>
+    
+    <!-- Replace placeholders with actual env vars -->
+    <script>
+        // Try to access via import.meta.env (won't work in plain HTML, but let's see)
+        try {
+            if (typeof import.meta !== 'undefined' && import.meta.env) {
+                document.body.innerHTML += `
+                    <div class="box">
+                        <h2>Runtime Check</h2>
+                        <p>URL: ${import.meta.env.VITE_SUPABASE_URL || 'NOT FOUND'}</p>
+                        <p>Key: ${(import.meta.env.VITE_SUPABASE_ANON_KEY || 'NOT FOUND').substring(0, 50)}...</p>
+                    </div>
+                `;
+            }
+        } catch(e) {
+            console.log('import.meta not available in plain HTML');
+        }
+    </script>
+</body>
+</html>
