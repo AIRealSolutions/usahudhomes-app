@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { Navigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import UserDashboard from './UserDashboard'
+import BrokerDashboard from './BrokerDashboard'
+import AdminDashboard from './AdminDashboard'
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
@@ -55,74 +58,25 @@ export default function Dashboard() {
     return <Navigate to="/login" replace />
   }
 
-  // Simple dashboard based on role
+  // Route to appropriate dashboard based on role
+  if (userRole === 'end_user') {
+    return <UserDashboard user={user} />
+  }
+
+  if (userRole === 'broker') {
+    return <BrokerDashboard user={user} />
+  }
+
+  if (userRole === 'admin') {
+    return <AdminDashboard user={user} />
+  }
+
+  // Default fallback
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
       <div className="bg-white rounded-lg shadow-lg p-8">
-        <h1 className="text-3xl font-bold mb-4">Welcome to Your Dashboard!</h1>
-        <p className="text-gray-600 mb-6">
-          You're logged in as: <span className="font-semibold">{user.email}</span>
-        </p>
-        <p className="text-gray-600 mb-6">
-          Your role: <span className="font-semibold capitalize">{userRole?.replace('_', ' ')}</span>
-        </p>
-
-        {userRole === 'admin' && (
-          <div className="mt-8 p-6 bg-blue-50 rounded-lg">
-            <h2 className="text-xl font-bold mb-4">Admin Dashboard</h2>
-            <p className="text-gray-700 mb-4">
-              You have full access to manage properties, customers, and agents.
-            </p>
-            <div className="space-y-2">
-              <p className="text-sm text-gray-600">• Manage all HUD properties</p>
-              <p className="text-sm text-gray-600">• View and assign customer leads</p>
-              <p className="text-sm text-gray-600">• Manage broker agents</p>
-            </div>
-          </div>
-        )}
-
-        {userRole === 'broker' && (
-          <div className="mt-8 p-6 bg-green-50 rounded-lg">
-            <h2 className="text-xl font-bold mb-4">Broker Dashboard</h2>
-            <p className="text-gray-700 mb-4">
-              Manage your assigned leads and consultations.
-            </p>
-            <div className="space-y-2">
-              <p className="text-sm text-gray-600">• View assigned referrals</p>
-              <p className="text-sm text-gray-600">• Track active consultations</p>
-              <p className="text-sm text-gray-600">• Communicate with clients</p>
-            </div>
-          </div>
-        )}
-
-        {userRole === 'end_user' && (
-          <div className="mt-8 p-6 bg-purple-50 rounded-lg">
-            <h2 className="text-xl font-bold mb-4">My Inquiries</h2>
-            <p className="text-gray-700 mb-4">
-              Track your property inquiries and saved homes.
-            </p>
-            <div className="space-y-2">
-              <p className="text-sm text-gray-600">• View your property inquiries</p>
-              <p className="text-sm text-gray-600">• Track inquiry status</p>
-              <p className="text-sm text-gray-600">• Update your profile</p>
-            </div>
-          </div>
-        )}
-
-        <div className="mt-8 flex gap-4">
-          <Link
-            to="/search"
-            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700"
-          >
-            Search Properties
-          </Link>
-          <Link
-            to="/"
-            className="inline-block bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300"
-          >
-            Back to Home
-          </Link>
-        </div>
+        <h1 className="text-3xl font-bold mb-4">Dashboard</h1>
+        <p className="text-gray-600">Loading your dashboard...</p>
       </div>
     </div>
   )
