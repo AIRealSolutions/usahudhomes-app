@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate } from 'react-router-dom'
 import { supabase } from './config/supabase'
 import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User } from 'lucide-react'
-import { AuthProvider } from './contexts/AuthContext'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -30,9 +30,12 @@ class ErrorBoundary extends React.Component {
 
 // Header Component
 function Header() {
-  // Auth will be added gradually
-  const user = null
-  const role = null
+  const { user, signOut } = useAuth()
+
+  const handleSignOut = async () => {
+    await signOut()
+    window.location.href = '/'
+  }
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
@@ -43,10 +46,26 @@ function Header() {
             <span className="text-2xl font-bold text-gray-900">USAHUDhomes.com</span>
           </Link>
           
-              <nav className="hidden md:flex space-x-8 items-center">
+          <nav className="hidden md:flex space-x-8 items-center">
             <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Home</Link>
             <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Properties</Link>
-            <Link to="/login" className="text-gray-700 hover:text-blue-600 font-medium">Login</Link>
+            {user ? (
+              <>
+                <Link to="/dashboard" className="text-gray-700 hover:text-blue-600 font-medium flex items-center">
+                  <User className="h-4 w-4 mr-1" />
+                  Dashboard
+                </Link>
+                <button
+                  onClick={handleSignOut}
+                  className="text-gray-700 hover:text-blue-600 font-medium flex items-center"
+                >
+                  <LogOut className="h-4 w-4 mr-1" />
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link to="/login" className="text-gray-700 hover:text-blue-600 font-medium">Login</Link>
+            )}
           </nav>
           
           <a href="tel:9103636147" className="flex items-center text-blue-600 hover:text-blue-700 font-semibold">
