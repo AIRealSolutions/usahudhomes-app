@@ -114,9 +114,23 @@ export default function LeadDetail() {
 
   const handleSave = async () => {
     try {
+      // Only update fields that exist in consultations table
+      const updateData = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        phone: formData.phone,
+        state: formData.state,
+        budget_min: formData.budget_min,
+        budget_max: formData.budget_max,
+        timeline: formData.timeline,
+        notes: formData.notes,
+        status: formData.status
+      };
+
       const { error } = await supabase
         .from('consultations')
-        .update(formData)
+        .update(updateData)
         .eq('id', id);
 
       if (error) throw error;
@@ -124,11 +138,11 @@ export default function LeadDetail() {
       // Log update event
       await logEvent('update', 'Lead information updated');
 
-      setLead(formData);
+      setLead({...lead, ...updateData});
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating lead:', error);
-      alert('Failed to update lead');
+      alert('Failed to update lead: ' + error.message);
     }
   };
 
