@@ -33,18 +33,12 @@ export default function Login() {
 
         if (data.user) {
           // Create user record in database
-          // Split full name into first and last
-          const nameParts = fullName.trim().split(' ')
-          const firstName = nameParts[0] || ''
-          const lastName = nameParts.slice(1).join(' ') || ''
-
           const { error: dbError } = await supabase
             .from('users')
             .insert([
               {
                 email: data.user.email,
-                first_name: firstName,
-                last_name: lastName,
+                name: fullName,
                 role: 'end_user'
               }
             ])
