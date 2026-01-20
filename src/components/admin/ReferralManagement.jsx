@@ -523,9 +523,37 @@ const ReferralManagement = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Select Broker (Licensed in {selectedReferral.state})
               </label>
+              
+              {/* Debug info */}
+              <div className="mb-3 p-2 bg-gray-100 rounded text-xs">
+                <div><strong>Debug Info:</strong></div>
+                <div>Total brokers: {agents.length}</div>
+                <div>Looking for state: {selectedReferral.state}</div>
+                <div>Matching brokers: {agents.filter(agent => {
+                  const states = Array.isArray(agent.states_covered) ? agent.states_covered : [];
+                  return states.includes(selectedReferral.state);
+                }).length}</div>
+                {agents.length > 0 && (
+                  <div className="mt-1">
+                    <div>All brokers states:</div>
+                    {agents.map(a => (
+                      <div key={a.id} className="ml-2">
+                        {a.first_name} {a.last_name}: {JSON.stringify(a.states_covered)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {agents
-                  .filter(agent => agent.states_covered?.includes(selectedReferral.state))
+                  .filter(agent => {
+                    // Handle both array and JSONB formats
+                    const states = Array.isArray(agent.states_covered) 
+                      ? agent.states_covered 
+                      : [];
+                    return states.includes(selectedReferral.state);
+                  })
                   .map(agent => (
                     <div
                       key={agent.id}
@@ -561,7 +589,10 @@ const ReferralManagement = () => {
                     </div>
                   ))}
               </div>
-              {agents.filter(agent => agent.states_covered?.includes(selectedReferral.state)).length === 0 && (
+              {agents.filter(agent => {
+                const states = Array.isArray(agent.states_covered) ? agent.states_covered : [];
+                return states.includes(selectedReferral.state);
+              }).length === 0 && (
                 <div className="text-center text-gray-500 py-4">
                   No brokers available in {selectedReferral.state}
                 </div>

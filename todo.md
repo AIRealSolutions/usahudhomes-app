@@ -32,3 +32,9 @@
 - [ ] Add bulk actions (assign multiple leads)
 - [ ] Add export functionality
 - [ ] Test complete admin workflow with real data
+
+### Bug Fixes
+- [x] Fix broker assignment - not recognizing brokers available in lead's state
+- [x] Investigate states_covered field format (array vs string)
+- [x] Add debugging info to assignment modal
+- [ ] Test broker filtering with real broker data
