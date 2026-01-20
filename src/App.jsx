@@ -686,17 +686,26 @@ function InquiryFormModal({ property, onClose }) {
     setSubmitting(true)
 
     try {
-      // Save inquiry to database
+      // Split name into first and last name
+      const nameParts = formData.name.trim().split(' ')
+      const firstName = nameParts[0] || ''
+      const lastName = nameParts.slice(1).join(' ') || ''
+
+      // Save inquiry to referrals table with property information
       const { error } = await supabase
-        .from('customers')
+        .from('referrals')
         .insert([{
-          name: formData.name,
+          first_name: firstName,
+          last_name: lastName,
           email: formData.email,
           phone: formData.phone,
+          state: property.state,
           message: formData.message,
-          property_id: property.id,
-          source: 'website_inquiry',
-          status: 'new'
+          property_case_number: property.case_number,
+          property_address: `${property.address}, ${property.city}, ${property.state}`,
+          property_price: property.list_price,
+          source: 'property_inquiry',
+          status: 'unassigned'
         }])
 
       if (error) throw error
