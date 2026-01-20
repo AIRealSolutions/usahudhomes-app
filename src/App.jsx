@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import LeadDetail from './pages/LeadDetail'
 import ContactForm from './pages/ContactForm'
 import ContactThankYou from './pages/ContactThankYou'
+import AgentRegistration from './components/agent/AgentRegistration'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -56,6 +57,7 @@ function Header() {
           <nav className="hidden md:flex space-x-8 items-center">
             <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Home</Link>
             <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Properties</Link>
+            <Link to="/broker/register" className="text-gray-700 hover:text-blue-600 font-medium">Become a Partner</Link>
             <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>
             {user ? (
               <>
@@ -110,6 +112,13 @@ function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Search Properties
+              </Link>
+              <Link 
+                to="/broker/register" 
+                className="text-gray-700 hover:text-blue-600 font-medium"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Become a Partner
               </Link>
               <Link 
                 to="/contact" 
@@ -1009,6 +1018,7 @@ export default function App() {
               <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />
               <Route path="/contact" element={<ContactForm />} />
               <Route path="/contact/thank-you" element={<ContactThankYou />} />
+              <Route path="/broker/register" element={<AgentRegistration />} />
             </Routes>
           </main>
           <Footer />
