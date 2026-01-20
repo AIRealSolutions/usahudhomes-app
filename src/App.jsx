@@ -6,6 +6,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import LeadDetail from './pages/LeadDetail'
+import ContactForm from './pages/ContactForm'
+import ContactThankYou from './pages/ContactThankYou'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -997,6 +999,8 @@ export default function App() {
               <Route path="/admin" element={<Dashboard />} />
               <Route path="/lead/:id" element={<LeadDetail />} />
               <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />
+              <Route path="/contact" element={<ContactForm />} />
+              <Route path="/contact/thank-you" element={<ContactThankYou />} />
             </Routes>
           </main>
           <Footer />
