@@ -11,8 +11,10 @@ import {
   Search,
   Filter,
   RefreshCw,
-  Settings
+  Settings,
+  Inbox
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import PendingReferralCard from './PendingReferralCard'
 import ConsultationCard from './ConsultationCard'
 import StatsCards from './StatsCards'
@@ -142,11 +144,25 @@ const BrokerDashboard = () => {
             </div>
             
             <div className="flex items-center gap-4">
+              {/* Referral Inbox Link */}
+              <Link
+                to="/broker/referrals"
+                className="relative flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors"
+              >
+                <Inbox className="w-5 h-5" />
+                <span className="hidden sm:inline">Referral Inbox</span>
+                {pendingReferrals.length > 0 && (
+                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                    {pendingReferrals.length}
+                  </span>
+                )}
+              </Link>
+
               {/* Admin Dashboard Link (for admins only) */}
               {profile?.role === 'admin' && (
                 <a
                   href="/admin-dashboard"
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white hover:bg-gray-700 rounded-lg transition-colors"
                 >
                   <Settings className="w-5 h-5" />
                   <span className="hidden sm:inline">Admin Dashboard</span>

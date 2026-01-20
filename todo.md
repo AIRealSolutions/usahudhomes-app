@@ -13,3 +13,12 @@
 - [ ] Create referral detail view
 - [ ] Add manual referral creation form
 - [ ] Test admin workflow end-to-end
+
+### Broker Referral Inbox
+- [x] Create broker referral inbox component
+- [x] Add referral list view with filtering
+- [x] Build accept referral functionality (creates consultation)
+- [x] Build reject referral functionality (with reason)
+- [x] Add notification badge for pending referrals
+- [x] Integrate with broker dashboard
+- [ ] Test broker workflow end-to-end
