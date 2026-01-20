@@ -56,6 +56,7 @@ function Header() {
           <nav className="hidden md:flex space-x-8 items-center">
             <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Home</Link>
             <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Properties</Link>
+            <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>
             {user ? (
               <>
                 <Link to="/dashboard" className="text-gray-700 hover:text-blue-600 font-medium flex items-center">
@@ -109,6 +110,13 @@ function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Search Properties
+              </Link>
+              <Link 
+                to="/contact" 
+                className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold text-center transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Get Connected
               </Link>
               {user ? (
                 <>
