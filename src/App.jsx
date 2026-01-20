@@ -9,6 +9,7 @@ import LeadDetail from './pages/LeadDetail'
 import ContactForm from './pages/ContactForm'
 import ContactThankYou from './pages/ContactThankYou'
 import AgentRegistration from './components/agent/AgentRegistration'
+import ReferralManagement from './components/admin/ReferralManagement'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -1028,6 +1029,7 @@ export default function App() {
               <Route path="/contact" element={<ContactForm />} />
               <Route path="/contact/thank-you" element={<ContactThankYou />} />
               <Route path="/broker/register" element={<AgentRegistration />} />
+              <Route path="/admin/referrals" element={<ReferralManagement />} />
             </Routes>
           </main>
           <Footer />

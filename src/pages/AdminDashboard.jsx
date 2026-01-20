@@ -147,7 +147,14 @@ export default function AdminDashboard({ user, showBrokerLink }) {
       {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow p-6 mb-8">
         <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Link
+            to="/admin/referrals"
+            className="flex items-center justify-center px-4 py-3 border border-blue-300 bg-blue-50 rounded-md hover:bg-blue-100"
+          >
+            <TrendingUp className="h-5 w-5 mr-2 text-blue-600" />
+            <span className="font-medium text-blue-700">Manage Referrals</span>
+          </Link>
           <Link
             to="/search"
             className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50"
