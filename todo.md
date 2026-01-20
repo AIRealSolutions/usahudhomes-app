@@ -22,3 +22,13 @@
 - [x] Add notification badge for pending referrals
 - [x] Integrate with broker dashboard
 - [ ] Test broker workflow end-to-end
+
+### Admin Referral Management Enhancements
+- [x] Add expandable lead detail view with complete information
+- [x] Show all lead data fields (budget, timeline, message, etc.)
+- [x] Add timeline/events log for each lead
+- [x] Improve assign modal with broker details (active leads count, specialties)
+- [ ] Add manual lead creation form
+- [ ] Add bulk actions (assign multiple leads)
+- [ ] Add export functionality
+- [ ] Test complete admin workflow with real data
