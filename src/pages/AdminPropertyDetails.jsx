@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { 
   ArrowLeft, Edit2, Save, X, Share2, Copy, Check,
-  Facebook, Twitter, Linkedin, Instagram, ExternalLink
+  Facebook, Twitter, Linkedin, Instagram, ExternalLink, Upload
 } from 'lucide-react';
 
 export default function AdminPropertyDetails() {
@@ -15,6 +15,8 @@ export default function AdminPropertyDetails() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [copiedPlatform, setCopiedPlatform] = useState(null);
   const [editedProperty, setEditedProperty] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
 
   useEffect(() => {
     fetchProperty();
@@ -63,6 +65,57 @@ export default function AdminPropertyDetails() {
 
   const handleChange = (field, value) => {
     setEditedProperty({ ...editedProperty, [field]: value });
+  };
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+
+    try {
+      // Generate filename: case_number with underscores + .jpg
+      const fileName = `${property.case_number.replace(/-/g, '_')}.jpg`;
+      const filePath = fileName;
+
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('USAHUDhomes')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true // Overwrite if exists
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('USAHUDhomes')
+        .getPublicUrl(filePath);
+
+      // Update the main_image field
+      handleChange('main_image', publicUrl);
+      setImagePreview(URL.createObjectURL(file));
+
+      alert('Image uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert(`Failed to upload image: ${error.message}`);
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const publicUrl = `https://usahudhomes.com/property/${caseNumber}`;
@@ -317,15 +370,57 @@ ${publicUrl}`,
             {editMode && (
               <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Image URL
+                  Property Image
                 </label>
-                <input
-                  type="text"
-                  value={editedProperty.main_image || ''}
-                  onChange={(e) => handleChange('main_image', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  placeholder="https://..."
-                />
+                
+                {/* Image Preview */}
+                {(imagePreview || editedProperty.main_image) && (
+                  <div className="mb-3">
+                    <img 
+                      src={imagePreview || editedProperty.main_image} 
+                      alt="Property preview"
+                      className="w-full h-48 object-cover rounded-lg border border-gray-300"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Upload Button */}
+                <div className="flex gap-2 mb-2">
+                  <label className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      disabled={uploadingImage}
+                    />
+                    <div className="cursor-pointer flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300">
+                      <Upload className="h-4 w-4" />
+                      {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                    </div>
+                  </label>
+                </div>
+
+                {/* Manual URL Input */}
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Or enter image URL manually:
+                  </label>
+                  <input
+                    type="text"
+                    value={editedProperty.main_image || ''}
+                    onChange={(e) => handleChange('main_image', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder="https://..."
+                  />
+                </div>
+
+                <p className="text-xs text-gray-500 mt-2">
+                  Supported: JPG, PNG, WebP (max 5MB). Image will be saved as {property?.case_number?.replace(/-/g, '_')}.jpg
+                </p>
               </div>
             )}
           </div>

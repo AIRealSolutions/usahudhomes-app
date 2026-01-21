@@ -259,4 +259,15 @@
 - [x] Parse pasted JSON data
 - [x] Parse pasted CSV data
 - [x] Validate pasted data format
-- [ ] Deploy and test paste functionality
+- [x] Deploy and test paste functionality (deployed, ready for testing)
+
+
+### Add Image Upload to Admin Property Edit Mode
+- [x] Add image upload UI to admin property edit page
+- [x] Add image preview when file is selected
+- [x] Implement image upload to Supabase Storage
+- [x] Use correct naming format (case_number with underscores + .jpg)
+- [x] Update database main_image field with storage URL
+- [x] Handle upload errors and show feedback
+- [ ] Test image upload and verify display on public pages
+- [ ] Deploy and verify the feature
