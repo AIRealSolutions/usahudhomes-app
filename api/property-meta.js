@@ -73,7 +73,13 @@ export default async function handler(req, res) {
     const propertyUrl = `https://usahudhomes.com/property/${property.case_number}`;
     const propertyTitle = escapeHtml(`${property.address} - ${property.city}, ${property.state}`);
     const propertyDescription = escapeHtml(`$${property.list_price?.toLocaleString() || 'Price Available'} | ${property.bedrooms || 0} beds | ${property.bathrooms || 0} baths | HUD Home in ${property.city}, ${property.state}. Contact Lightkeeper Realty at 910-363-6147 for more information.`);
-    const propertyImage = escapeHtml(property.main_image || 'https://usahudhomes.com/default-property-image.jpg');
+    
+    // Fix image URL: convert .jog to .jpg
+    let imageUrl = property.main_image || 'https://usahudhomes.com/default-property-image.jpg';
+    if (imageUrl && imageUrl.endsWith('.jog')) {
+      imageUrl = imageUrl.replace(/\.jog$/, '.jpg');
+    }
+    const propertyImage = escapeHtml(imageUrl);
 
     // Read the index.html file
     const indexPath = path.join(__dirname, '..', 'dist', 'index.html');

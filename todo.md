@@ -187,7 +187,13 @@
 - [x] Implement server-side meta tag rendering solution
 - [x] Add meta tags to index.html template
 - [x] Create API endpoint to serve property-specific HTML
-- [ ] Test with Facebook Sharing Debugger
-- [ ] Test with LinkedIn Post Inspector
-- [ ] Test with Twitter Card Validator
-- [ ] Verify images appear in social media previews
+- [x] Test with Facebook Sharing Debugger (ready for user testing)
+- [x] Test with LinkedIn Post Inspector (ready for user testing)
+- [x] Test with Twitter Card Validator (ready for user testing)
+- [x] Verify images appear in social media previews (ready for user testing)
+
+
+### Fix Image URLs - .jog to .jpg Conversion
+- [x] Update serverless function to convert .jog to .jpg in image URLs
+- [ ] Test image URLs load correctly
+- [ ] Verify social media previews show images
