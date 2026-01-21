@@ -693,9 +693,9 @@ function InquiryFormModal({ property, onClose }) {
       const firstName = nameParts[0] || ''
       const lastName = nameParts.slice(1).join(' ') || ''
 
-      // Save inquiry to referrals table with property information
-      const { error } = await supabase
-        .from('referrals')
+      // Save inquiry to leads table with property information
+      const { data: leadData, error: leadError } = await supabase
+        .from('leads')
         .insert([{
           first_name: firstName,
           last_name: lastName,
@@ -707,10 +707,31 @@ function InquiryFormModal({ property, onClose }) {
           property_address: `${property.address}, ${property.city}, ${property.state}`,
           property_price: property.list_price,
           source: 'property_inquiry',
-          status: 'unassigned'
+          status: 'new_lead'
         }])
+        .select()
+        .single();
 
-      if (error) throw error
+      if (leadError) throw leadError;
+
+      // Create initial lead event
+      const { error: eventError } = await supabase
+        .from('lead_events')
+        .insert({
+          lead_id: leadData.id,
+          event_type: 'lead_received',
+          event_data: {
+            source: 'property_inquiry',
+            form_type: 'property_inquiry',
+            property_case_number: property.case_number,
+            property_address: `${property.address}, ${property.city}, ${property.state}`,
+            property_price: property.list_price
+          }
+        });
+
+      if (eventError) console.error('Error creating lead event:', eventError);
+
+      const error = null;
       setSubmitted(true)
       setTimeout(() => onClose(), 2000)
     } catch (err) {

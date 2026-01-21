@@ -90,8 +90,9 @@ export default function ContactForm() {
     try {
       setSubmitting(true);
 
-      const { data, error } = await supabase
-        .from('referrals')
+      // Create lead in leads table
+      const { data: leadData, error: leadError } = await supabase
+        .from('leads')
         .insert({
           first_name: formData.first_name,
           last_name: formData.last_name,
@@ -103,10 +104,30 @@ export default function ContactForm() {
           timeline: formData.timeline || null,
           message: formData.message || null,
           source: 'website',
-          status: 'unassigned'
+          status: 'new_lead'
         })
         .select()
         .single();
+
+      if (leadError) throw leadError;
+
+      // Create initial lead event
+      const { error: eventError } = await supabase
+        .from('lead_events')
+        .insert({
+          lead_id: leadData.id,
+          event_type: 'lead_received',
+          event_data: {
+            source: 'website',
+            form_type: 'general_contact',
+            message_preview: formData.message ? formData.message.substring(0, 100) : null
+          }
+        });
+
+      if (eventError) console.error('Error creating lead event:', eventError);
+
+      const data = leadData;
+      const error = null;
 
       if (error) throw error;
 
