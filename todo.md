@@ -251,3 +251,12 @@
 - [x] Update property details page to use correct image URL format
 - [x] Ensure images display on public property detail pages
 - [ ] Deploy and verify the fix
+
+
+### Add Paste Option to Property Import Wizard
+- [x] Add textarea for pasting JSON or CSV data
+- [x] Add tab/toggle to switch between file upload and paste
+- [x] Parse pasted JSON data
+- [x] Parse pasted CSV data
+- [x] Validate pasted data format
+- [ ] Deploy and test paste functionality

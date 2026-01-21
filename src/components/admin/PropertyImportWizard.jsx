@@ -17,6 +17,8 @@ export default function PropertyImportWizard() {
   const [importPreview, setImportPreview] = useState(null);
   const [importing, setImporting] = useState(false);
   const [importResults, setImportResults] = useState(null);
+  const [inputMode, setInputMode] = useState('file'); // 'file' or 'paste'
+  const [pastedData, setPastedData] = useState('');
 
   const states = ['NC', 'TN', 'SC', 'VA', 'GA', 'FL', 'AL', 'MS', 'LA', 'TX'];
 
@@ -54,6 +56,48 @@ export default function PropertyImportWizard() {
     }
 
     return data;
+  };
+
+  const handlePastedData = async () => {
+    if (!pastedData || !selectedState) {
+      alert('Please select a state and paste data');
+      return;
+    }
+
+    try {
+      let data;
+      const trimmedData = pastedData.trim();
+      
+      // Try to parse as JSON first
+      if (trimmedData.startsWith('[') || trimmedData.startsWith('{')) {
+        try {
+          data = JSON.parse(trimmedData);
+          if (!Array.isArray(data)) {
+            throw new Error('JSON must be an array of property objects');
+          }
+        } catch (jsonError) {
+          throw new Error(`Invalid JSON format: ${jsonError.message}`);
+        }
+      } else {
+        // Parse as CSV
+        try {
+          data = parseCSV(trimmedData);
+        } catch (csvError) {
+          throw new Error(`Invalid CSV format: ${csvError.message}`);
+        }
+      }
+
+      // Validate data
+      const errors = validateData(data);
+      setValidationErrors(errors);
+
+      if (errors.length === 0) {
+        setParsedData(data);
+        setStep(2);
+      }
+    } catch (error) {
+      alert(`Error parsing pasted data: ${error.message}`);
+    }
   };
 
   const handleFileUpload = async () => {
@@ -266,6 +310,8 @@ export default function PropertyImportWizard() {
     setValidationErrors([]);
     setImportPreview(null);
     setImportResults(null);
+    setInputMode('file');
+    setPastedData('');
   };
 
   return (
@@ -309,10 +355,10 @@ export default function PropertyImportWizard() {
         </div>
       </div>
 
-      {/* Step 1: Upload File */}
+      {/* Step 1: Upload File or Paste Data */}
       {step === 1 && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-6">Step 1: Upload File</h2>
+          <h2 className="text-xl font-semibold mb-6">Step 1: Upload or Paste Data</h2>
           
           {/* State Selection */}
           <div className="mb-6">
@@ -334,36 +380,86 @@ export default function PropertyImportWizard() {
             </p>
           </div>
 
-          {/* File Upload */}
+          {/* Input Mode Tabs */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select File (JSON or CSV) *
-            </label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-              <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <input
-                type="file"
-                accept=".json,.csv"
-                onChange={handleFileSelect}
-                className="hidden"
-                id="file-upload"
-              />
-              <label
-                htmlFor="file-upload"
-                className="cursor-pointer text-blue-600 hover:text-blue-700 font-medium"
+            <div className="flex border-b border-gray-200">
+              <button
+                onClick={() => setInputMode('file')}
+                className={`px-6 py-3 font-medium transition-colors ${
+                  inputMode === 'file'
+                    ? 'border-b-2 border-blue-600 text-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
               >
-                Choose a file
-              </label>
-              <p className="text-sm text-gray-500 mt-2">or drag and drop</p>
-              <p className="text-xs text-gray-400 mt-2">JSON or CSV files only</p>
+                <Upload className="h-4 w-4 inline mr-2" />
+                Upload File
+              </button>
+              <button
+                onClick={() => setInputMode('paste')}
+                className={`px-6 py-3 font-medium transition-colors ${
+                  inputMode === 'paste'
+                    ? 'border-b-2 border-blue-600 text-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <FileText className="h-4 w-4 inline mr-2" />
+                Paste Data
+              </button>
             </div>
-            {file && (
-              <div className="mt-4 flex items-center text-sm text-gray-600">
-                <FileText className="h-4 w-4 mr-2" />
-                {file.name} ({fileType.toUpperCase()})
-              </div>
-            )}
           </div>
+
+          {/* File Upload Mode */}
+          {inputMode === 'file' && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select File (JSON or CSV) *
+              </label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <input
+                  type="file"
+                  accept=".json,.csv"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  id="file-upload"
+                />
+                <label
+                  htmlFor="file-upload"
+                  className="cursor-pointer text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Choose a file
+                </label>
+                <p className="text-sm text-gray-500 mt-2">or drag and drop</p>
+                <p className="text-xs text-gray-400 mt-2">JSON or CSV files only</p>
+              </div>
+              {file && (
+                <div className="mt-4 flex items-center text-sm text-gray-600">
+                  <FileText className="h-4 w-4 mr-2" />
+                  {file.name} ({fileType.toUpperCase()})
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Paste Data Mode */}
+          {inputMode === 'paste' && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Paste JSON or CSV Data *
+              </label>
+              <textarea
+                value={pastedData}
+                onChange={(e) => setPastedData(e.target.value)}
+                placeholder="Paste your JSON array or CSV data here...\n\nJSON example:\n[{\"case_number\": \"381-850249\", \"address\": \"123 Main St\", ...}]\n\nCSV example:\ncase_number,address,city,state,list_price\n381-850249,123 Main St,Raleigh,NC,125000"
+                className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              />
+              {pastedData && (
+                <div className="mt-2 text-sm text-gray-600">
+                  {pastedData.length} characters pasted
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Validation Errors */}
           {validationErrors.length > 0 && (
@@ -443,8 +539,12 @@ export default function PropertyImportWizard() {
           {/* Next Button */}
           <div className="flex justify-end">
             <button
-              onClick={handleFileUpload}
-              disabled={!file || !selectedState}
+              onClick={inputMode === 'file' ? handleFileUpload : handlePastedData}
+              disabled={
+                !selectedState || 
+                (inputMode === 'file' && !file) || 
+                (inputMode === 'paste' && !pastedData)
+              }
               className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               Next: Preview Data
