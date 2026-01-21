@@ -450,7 +450,14 @@ export default function PropertyImportWizard() {
               <textarea
                 value={pastedData}
                 onChange={(e) => setPastedData(e.target.value)}
-                placeholder="Paste your JSON array or CSV data here...\n\nJSON example:\n[{\"case_number\": \"381-850249\", \"address\": \"123 Main St\", ...}]\n\nCSV example:\ncase_number,address,city,state,list_price\n381-850249,123 Main St,Raleigh,NC,125000"
+                placeholder={`Paste your JSON array or CSV data here...
+
+JSON example:
+[{"case_number": "381-850249", "address": "123 Main St", ...}]
+
+CSV example:
+case_number,address,city,state,list_price
+381-850249,123 Main St,Raleigh,NC,125000`}
                 className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
               />
               {pastedData && (
