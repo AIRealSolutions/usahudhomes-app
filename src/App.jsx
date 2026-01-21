@@ -952,11 +952,27 @@ function PropertyDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="lg:col-span-2">
-          {/* Image Gallery Placeholder */}
-          <div className="bg-gray-200 rounded-lg h-96 flex items-center justify-center mb-6">
-            <div className="text-center">
-              <HomeIcon className="h-24 w-24 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500">Property Image</p>
+          {/* Property Image */}
+          <div className="bg-gray-200 rounded-lg h-96 relative overflow-hidden mb-6">
+            {property.main_image ? (
+              <img 
+                src={property.main_image} 
+                alt={property.address}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none'
+                  e.target.nextSibling.style.display = 'flex'
+                }}
+              />
+            ) : null}
+            <div 
+              className="absolute inset-0 flex items-center justify-center bg-gray-200"
+              style={{display: property.main_image ? 'none' : 'flex'}}
+            >
+              <div className="text-center">
+                <HomeIcon className="h-24 w-24 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500">Property Image</p>
+              </div>
             </div>
           </div>
 

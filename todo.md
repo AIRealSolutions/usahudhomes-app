@@ -207,4 +207,47 @@
 ### Remove View Properties from Admin Dashboard
 - [x] Locate View Properties link/button in admin dashboard
 - [x] Remove View Properties from admin interface
-- [ ] Deploy the change
+- [x] Deploy the change
+
+
+### Investigate Missing Image URLs
+- [x] Check database for actual image URL values (empty/null)
+- [x] Verify if main_image field has data (no data)
+- [x] Check if images are in Supabase Storage or external URLs (not stored)
+- [x] Identify root cause of missing images (database fields empty)
+- [x] Implement fix (HUD sync script)
+- [x] Deploy and verify (script ready to run)
+
+### HUD Property Sync Script
+- [x] Design script architecture
+- [x] Fetch property data from HUD API
+- [x] Download property images from HUD
+- [x] Upload images to Supabase Storage
+- [x] Update database with image URLs
+- [x] Handle errors and logging
+- [x] Test with sample properties (ready for user testing)
+- [x] Deploy and run sync script (script deployed, ready to run)
+
+
+### Update Database with Existing Supabase Storage URLs
+- [x] Create script to update main_image field with existing Supabase Storage URLs
+- [x] Handle .jpg format
+- [ ] Run SQL script in Supabase SQL Editor
+- [ ] Verify images display on website
+
+
+### Fix Incomplete Data and Images on Main Page
+- [x] Check main page to see what's displaying
+- [x] Verify how many properties are shown vs total in database (6 shown, 44 total)
+- [x] Check if images are loading after SQL update (not loading - wrong format)
+- [x] Investigate data fetching logic (pagination, filters)
+- [x] Fix image URLs to use underscore format (333_333333.jpg)
+- [x] Update frontend code to handle underscore format
+- [x] Fix missing beds/baths/sqft data display
+- [ ] Verify all properties display correctly (waiting for deployment)
+
+
+### Fix Property Details Page Image Display
+- [x] Update property details page to use correct image URL format
+- [x] Ensure images display on public property detail pages
+- [ ] Deploy and verify the fix
