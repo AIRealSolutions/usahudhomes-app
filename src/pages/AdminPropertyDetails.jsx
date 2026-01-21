@@ -371,17 +371,17 @@ ${publicUrl}`,
             )}
             {editMode && (
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Property Image
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Upload Property Image
                 </label>
                 
                 {/* Image Preview */}
                 {(imagePreview || editedProperty.main_image) && (
-                  <div className="mb-3">
+                  <div className="mb-4">
                     <img 
                       src={imagePreview || editedProperty.main_image} 
                       alt="Property preview"
-                      className="w-full h-48 object-cover rounded-lg border border-gray-300"
+                      className="w-full h-64 object-cover rounded-lg border-2 border-gray-300 shadow-sm"
                       onError={(e) => {
                         e.target.style.display = 'none';
                       }}
@@ -389,9 +389,9 @@ ${publicUrl}`,
                   </div>
                 )}
 
-                {/* Upload Button */}
-                <div className="flex gap-2 mb-2">
-                  <label className="flex-1">
+                {/* Upload Button - Primary Action */}
+                <div className="mb-4">
+                  <label className="block w-full">
                     <input
                       type="file"
                       accept="image/*"
@@ -399,30 +399,46 @@ ${publicUrl}`,
                       className="hidden"
                       disabled={uploadingImage}
                     />
-                    <div className="cursor-pointer flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300">
-                      <Upload className="h-4 w-4" />
-                      {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                    <div className={`cursor-pointer flex items-center justify-center gap-3 px-6 py-4 rounded-lg font-semibold text-lg transition-colors ${
+                      uploadingImage 
+                        ? 'bg-gray-400 cursor-not-allowed' 
+                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg'
+                    }`}>
+                      <Upload className="h-6 w-6" />
+                      {uploadingImage ? 'Uploading Image...' : 'Choose Image File to Upload'}
                     </div>
                   </label>
+                  <p className="text-sm text-gray-600 mt-2 text-center">
+                    📁 Supported formats: JPG, PNG, WebP • Max size: 5MB
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1 text-center">
+                    Image will be saved as: <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">{property?.case_number?.replace(/-/g, '_')}.jpg</span>
+                  </p>
                 </div>
 
-                {/* Manual URL Input */}
+                {/* Divider */}
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-white text-gray-500">or</span>
+                  </div>
+                </div>
+
+                {/* Manual URL Input - Secondary Option */}
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">
-                    Or enter image URL manually:
+                  <label className="block text-sm text-gray-600 mb-2">
+                    Enter image URL manually (advanced):
                   </label>
                   <input
                     type="text"
                     value={editedProperty.main_image || ''}
                     onChange={(e) => handleChange('main_image', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    placeholder="https://..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="https://example.com/image.jpg"
                   />
                 </div>
-
-                <p className="text-xs text-gray-500 mt-2">
-                  Supported: JPG, PNG, WebP (max 5MB). Image will be saved as {property?.case_number?.replace(/-/g, '_')}.jpg
-                </p>
               </div>
             )}
           </div>
