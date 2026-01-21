@@ -17,8 +17,19 @@ export const fixImageExtension = (imageUrl) => {
 };
 
 /**
+ * Convert case number to storage filename format
+ * Case numbers use hyphens (333-333333) but storage files use underscores (333_333333.jpg)
+ * @param {string} caseNumber - The case number (e.g., "333-333333")
+ * @returns {string} - Storage filename (e.g., "333_333333.jpg")
+ */
+export const caseNumberToFilename = (caseNumber) => {
+  if (!caseNumber) return null;
+  return caseNumber.replace(/-/g, '_') + '.jpg';
+};
+
+/**
  * Get the public URL for an image stored in Supabase Storage
- * @param {string} imagePath - The path to the image (e.g., "properties/381_892971.jpg")
+ * @param {string} imagePath - The path to the image (e.g., "properties/381_892971.jpg") or case number
  * @returns {string|null} - The public URL or null if no path provided
  */
 export const getImageUrl = (imagePath) => {
@@ -38,6 +49,17 @@ export const getImageUrl = (imagePath) => {
     .getPublicUrl(imagePath);
   
   return data?.publicUrl || null;
+};
+
+/**
+ * Get image URL from case number
+ * @param {string} caseNumber - The property case number (e.g., "333-333333")
+ * @returns {string|null} - The full image URL
+ */
+export const getImageUrlFromCaseNumber = (caseNumber) => {
+  if (!caseNumber) return null;
+  const filename = caseNumberToFilename(caseNumber);
+  return `https://lpqjndfjbenolhneqzec.supabase.co/storage/v1/object/public/USAHUDhomes/${filename}`;
 };
 
 /**
