@@ -15,6 +15,7 @@ import LeadManagement from './components/admin/LeadManagement'
 import BrokerReferralInbox from './components/broker/BrokerReferralInbox'
 import PropertyManagement from './components/admin/PropertyManagement'
 import AdminPropertyDetails from './pages/AdminPropertyDetails'
+import PropertyImportWizard from './components/admin/PropertyImportWizard'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -1060,6 +1061,7 @@ export default function App() {
               <Route path="/admin/leads/:id" element={<LeadDetailsPage />} />
               <Route path="/broker/referrals" element={<BrokerReferralInbox />} />
               <Route path="/admin/properties" element={<PropertyManagement />} />
+              <Route path="/admin/properties/import" element={<PropertyImportWizard />} />
               <Route path="/admin/properties/:caseNumber" element={<AdminPropertyDetails />} />
             </Routes>
           </main>

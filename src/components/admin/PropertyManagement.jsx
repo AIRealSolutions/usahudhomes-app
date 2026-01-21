@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../config/supabase';
 import { 
   Search, Home, DollarSign, MapPin, Bed, Bath, 
-  Calendar, Filter, Edit, Share2, Eye
+  Calendar, Filter, Edit, Share2, Eye, Upload
 } from 'lucide-react';
 
 export default function PropertyManagement() {
@@ -118,9 +118,18 @@ export default function PropertyManagement() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Property Management</h1>
-        <p className="text-gray-600 mt-2">Manage HUD property listings and social media sharing</p>
+      <div className="mb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Property Management</h1>
+          <p className="text-gray-600 mt-2">Manage HUD property listings and social media sharing</p>
+        </div>
+        <Link
+          to="/admin/properties/import"
+          className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+        >
+          <Upload className="h-5 w-5" />
+          Import Properties
+        </Link>
       </div>
 
       {/* Stats */}
