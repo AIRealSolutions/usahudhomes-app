@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import LeadDetail from './pages/LeadDetail'
+import LeadDetailsPage from './pages/LeadDetailsPage'
 import ContactForm from './pages/ContactForm'
 import ContactThankYou from './pages/ContactThankYou'
 import AgentRegistration from './components/agent/AgentRegistration'
@@ -1054,6 +1055,7 @@ export default function App() {
               <Route path="/broker/register" element={<AgentRegistration />} />
               <Route path="/admin/referrals" element={<ReferralManagement />} />
               <Route path="/admin/leads" element={<LeadManagement />} />
+              <Route path="/admin/leads/:id" element={<LeadDetailsPage />} />
               <Route path="/broker/referrals" element={<BrokerReferralInbox />} />
             </Routes>
           </main>
