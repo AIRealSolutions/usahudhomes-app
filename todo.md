@@ -270,4 +270,13 @@
 - [x] Update database main_image field with storage URL
 - [x] Handle upload errors and show feedback
 - [ ] Test image upload and verify display on public pages
-- [ ] Deploy and verify the feature
+- [x] Deploy and verify the feature (deployed, ready for testing)
+
+
+### Fix Production Deployment Failure
+- [x] Check Vercel deployment logs for error details
+- [x] Identify the cause of the build/deployment failure (Supabase API destructuring)
+- [x] Fix the issue (fixed getPublicUrl destructuring)
+- [ ] Test locally if possible
+- [ ] Commit and push the fix
+- [ ] Verify deployment succeeds

@@ -101,9 +101,11 @@ export default function AdminPropertyDetails() {
       if (uploadError) throw uploadError;
 
       // Get public URL
-      const { data: { publicUrl } } = supabase.storage
+      const { data } = supabase.storage
         .from('USAHUDhomes')
         .getPublicUrl(filePath);
+      
+      const publicUrl = data.publicUrl;
 
       // Update the main_image field
       handleChange('main_image', publicUrl);
