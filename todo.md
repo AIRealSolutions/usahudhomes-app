@@ -197,3 +197,8 @@
 - [x] Update serverless function to convert .jog to .jpg in image URLs
 - [ ] Test image URLs load correctly
 - [ ] Verify social media previews show images
+- [x] Create utility function for image URL conversion
+- [x] Update all React components to use image URL fix (via getImageUrl)
+- [x] Fix images on main page/search results (via getImageUrl)
+- [x] Fix images on property detail pages (via getImageUrl)
+- [ ] Deploy and verify all images display correctly
