@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/property/:caseNumber",
+      "destination": "/api/property-meta?caseNumber=:caseNumber"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
