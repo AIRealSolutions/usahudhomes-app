@@ -1,16 +1,16 @@
-import React, { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Home as HomeIcon, Users, UserCheck, TrendingUp, DollarSign, MapPin } from 'lucide-react'
+import { Home as HomeIcon, Users, UserCheck, TrendingUp, DollarSign, MapPin, AlertCircle, CheckCircle } from 'lucide-react'
 
 export default function AdminDashboard({ user, showBrokerLink }) {
   const [stats, setStats] = useState({
     properties: 0,
-    customers: 0,
-    agents: 0,
-    leads: 0
+    brokers: 0,
+    pendingReferrals: 0,
+    activeConsultations: 0
   })
-  const [recentLeads, setRecentLeads] = useState([])
+  const [recentReferrals, setRecentReferrals] = useState([])
   const [recentProperties, setRecentProperties] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -23,31 +23,29 @@ export default function AdminDashboard({ user, showBrokerLink }) {
   const fetchDashboardData = async () => {
     try {
       // Fetch stats
-      const [propertiesRes, customersRes, agentsRes, leadsRes] = await Promise.all([
+      const [propertiesRes, brokersRes, referralsRes, consultationsRes] = await Promise.all([
         supabase.from('properties').select('id', { count: 'exact', head: true }),
-        supabase.from('customers').select('id', { count: 'exact', head: true }),
-        supabase.from('agents').select('id', { count: 'exact', head: true }),
-        supabase.from('consultations').select('id', { count: 'exact', head: true })
+        supabase.from('agents').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
+        supabase.from('referrals').select('id', { count: 'exact', head: true }).eq('status', 'unassigned'),
+        supabase.from('consultations').select('id', { count: 'exact', head: true }).eq('status', 'active')
       ])
 
       setStats({
         properties: propertiesRes.count || 0,
-        customers: customersRes.count || 0,
-        agents: agentsRes.count || 0,
-        leads: leadsRes.count || 0
+        brokers: brokersRes.count || 0,
+        pendingReferrals: referralsRes.count || 0,
+        activeConsultations: consultationsRes.count || 0
       })
 
-      // Fetch recent leads
-      const { data: leadsData } = await supabase
-        .from('consultations')
-        .select(`
-          *,
-          properties (case_number, address, city, state)
-        `)
+      // Fetch recent unassigned referrals (pending leads)
+      const { data: referralsData } = await supabase
+        .from('referrals')
+        .select('*')
+        .eq('status', 'unassigned')
         .order('created_at', { ascending: false })
         .limit(5)
 
-      setRecentLeads(leadsData || [])
+      setRecentReferrals(referralsData || [])
 
       // Fetch recent properties
       const { data: propsData } = await supabase
@@ -78,7 +76,7 @@ export default function AdminDashboard({ user, showBrokerLink }) {
       <div className="mb-8 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="mt-2 text-gray-600">Manage properties, customers, and agents</p>
+          <p className="mt-2 text-gray-600">Manage leads, properties, and brokers</p>
         </div>
         {showBrokerLink && (
           <Link
@@ -97,12 +95,13 @@ export default function AdminDashboard({ user, showBrokerLink }) {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
-            <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
-              <HomeIcon className="h-6 w-6 text-blue-600" />
+            <div className="flex-shrink-0 bg-orange-100 rounded-md p-3">
+              <AlertCircle className="h-6 w-6 text-orange-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Properties</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.properties}</p>
+              <p className="text-sm font-medium text-gray-600">Pending Leads</p>
+              <p className="text-2xl font-semibold text-gray-900">{stats.pendingReferrals}</p>
+              <p className="text-xs text-gray-500 mt-1">Awaiting assignment</p>
             </div>
           </div>
         </div>
@@ -110,11 +109,25 @@ export default function AdminDashboard({ user, showBrokerLink }) {
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
             <div className="flex-shrink-0 bg-green-100 rounded-md p-3">
-              <Users className="h-6 w-6 text-green-600" />
+              <CheckCircle className="h-6 w-6 text-green-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Customers</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.customers}</p>
+              <p className="text-sm font-medium text-gray-600">Active Leads</p>
+              <p className="text-2xl font-semibold text-gray-900">{stats.activeConsultations}</p>
+              <p className="text-xs text-gray-500 mt-1">Being worked by brokers</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
+              <HomeIcon className="h-6 w-6 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Properties</p>
+              <p className="text-2xl font-semibold text-gray-900">{stats.properties}</p>
+              <p className="text-xs text-gray-500 mt-1">Available listings</p>
             </div>
           </div>
         </div>
@@ -125,20 +138,9 @@ export default function AdminDashboard({ user, showBrokerLink }) {
               <UserCheck className="h-6 w-6 text-purple-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Agents</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.agents}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0 bg-yellow-100 rounded-md p-3">
-              <TrendingUp className="h-6 w-6 text-yellow-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Leads</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.leads}</p>
+              <p className="text-sm font-medium text-gray-600">Active Brokers</p>
+              <p className="text-2xl font-semibold text-gray-900">{stats.brokers}</p>
+              <p className="text-xs text-gray-500 mt-1">Approved agents</p>
             </div>
           </div>
         </div>
@@ -147,58 +149,95 @@ export default function AdminDashboard({ user, showBrokerLink }) {
       {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow p-6 mb-8">
         <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Link
             to="/admin/referrals"
             className="flex items-center justify-center px-4 py-3 border border-blue-300 bg-blue-50 rounded-md hover:bg-blue-100"
           >
             <TrendingUp className="h-5 w-5 mr-2 text-blue-600" />
-            <span className="font-medium text-blue-700">Manage Referrals</span>
+            <span className="font-medium text-blue-700">Manage Leads</span>
           </Link>
           <Link
             to="/search"
             className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50"
           >
             <HomeIcon className="h-5 w-5 mr-2 text-gray-600" />
-            <span className="font-medium">View All Properties</span>
+            <span className="font-medium">View Properties</span>
           </Link>
-          <button className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50">
-            <Users className="h-5 w-5 mr-2 text-gray-600" />
-            <span className="font-medium">Manage Customers</span>
-          </button>
-          <button className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50">
+          <Link
+            to="/admin/brokers"
+            className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50"
+          >
             <UserCheck className="h-5 w-5 mr-2 text-gray-600" />
-            <span className="font-medium">Manage Agents</span>
-          </button>
+            <span className="font-medium">Manage Brokers</span>
+          </Link>
         </div>
       </div>
 
-      {/* Recent Leads */}
-      <div className="bg-white rounded-lg shadow mb-8">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold">Recent Leads</h2>
+      {/* Pending Leads - Needs Attention */}
+      {stats.pendingReferrals > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mb-8">
+          <div className="flex items-center mb-4">
+            <AlertCircle className="h-6 w-6 text-orange-600 mr-2" />
+            <h2 className="text-xl font-semibold text-orange-900">
+              {stats.pendingReferrals} Lead{stats.pendingReferrals !== 1 ? 's' : ''} Awaiting Assignment
+            </h2>
+          </div>
+          <p className="text-orange-800 mb-4">
+            You have unassigned leads that need to be reviewed and assigned to brokers.
+          </p>
+          <Link
+            to="/admin/referrals"
+            className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700"
+          >
+            Assign Leads Now →
+          </Link>
         </div>
-        {recentLeads.length === 0 ? (
+      )}
+
+      {/* Recent Unassigned Leads */}
+      <div className="bg-white rounded-lg shadow mb-8">
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Recent Unassigned Leads</h2>
+          <Link to="/admin/referrals" className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+            View All →
+          </Link>
+        </div>
+        {recentReferrals.length === 0 ? (
           <div className="px-6 py-12 text-center text-gray-500">
-            No leads yet
+            No pending leads
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {recentLeads.map((lead) => (
-              <div key={lead.id} className="px-6 py-4 hover:bg-gray-50">
+            {recentReferrals.map((referral) => (
+              <div key={referral.id} className="px-6 py-4 hover:bg-gray-50">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="font-semibold text-gray-900">{lead.customer_name}</h3>
-                    <p className="text-sm text-gray-600">{lead.customer_email}</p>
-                    {lead.properties && (
+                    <h3 className="font-semibold text-gray-900">
+                      {referral.first_name} {referral.last_name}
+                    </h3>
+                    <p className="text-sm text-gray-600">{referral.email} • {referral.phone}</p>
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800">
+                        {referral.source === 'property_inquiry' ? 'Property Inquiry' : 
+                         referral.source === 'website' ? 'Website' : referral.source}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        <MapPin className="inline h-3 w-3" /> {referral.state}
+                      </span>
+                    </div>
+                    {referral.property_address && (
                       <p className="text-sm text-gray-500 mt-1">
-                        <MapPin className="inline h-4 w-4" /> {lead.properties.address}, {lead.properties.city}
+                        Interested in: {referral.property_address}
                       </p>
                     )}
                   </div>
-                  <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800">
-                    {lead.status}
-                  </span>
+                  <Link
+                    to="/admin/referrals"
+                    className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                  >
+                    Assign →
+                  </Link>
                 </div>
               </div>
             ))}
@@ -208,8 +247,11 @@ export default function AdminDashboard({ user, showBrokerLink }) {
 
       {/* Recent Properties */}
       <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-xl font-semibold">Recent Properties</h2>
+          <Link to="/search" className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+            View All →
+          </Link>
         </div>
         {recentProperties.length === 0 ? (
           <div className="px-6 py-12 text-center text-gray-500">

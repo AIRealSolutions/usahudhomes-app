@@ -38,3 +38,10 @@
 - [x] Investigate states_covered field format (array vs string)
 - [x] Add debugging info to assignment modal
 - [ ] Test broker filtering with real broker data
+
+### Admin Navigation Optimization
+- [x] Remove debug info from referral assignment modal
+- [x] Review admin dashboard for duplicate sections
+- [x] Consolidate customers and leads sections
+- [x] Ensure clear distinction between referrals (unassigned leads) and consultations (accepted leads)
+- [x] Optimize admin quick actions layout
