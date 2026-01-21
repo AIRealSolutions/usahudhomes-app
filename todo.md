@@ -114,3 +114,35 @@
 - [ ] Create Property Management dashboard
 - [x] Update AdminDashboard with proper navigation to all sections
 - [ ] Ensure Customer section shows all broker actions and events
+
+### Property Management System
+**Phase 1: Property Management Dashboard**
+- [ ] Create property management dashboard (list all properties)
+- [ ] Add property filtering (by state, status, price range)
+- [ ] Add property search functionality
+- [ ] Add property stats (total, active, sold, etc.)
+
+**Phase 2: Property Details Page with Edit Features**
+- [ ] Create admin property details page (/admin/properties/:caseNumber)
+- [ ] Add edit mode for property information
+- [ ] Add image upload/management
+- [ ] Add property status management
+- [ ] Add notes/internal comments section
+
+**Phase 3: Social Media Sharing Features**
+- [ ] Create social media share modal
+- [ ] Add Facebook sharing with optimized content
+- [ ] Add Instagram sharing with optimized content
+- [ ] Add Twitter/X sharing with optimized content
+- [ ] Add LinkedIn sharing with optimized content
+- [ ] Generate platform-specific preview text
+- [ ] Include property image, price, city, beds, baths
+- [ ] Add contact number (9103636147) and USAHUDhomes.com
+- [ ] Generate shareable link to public property page
+- [ ] Add copy-to-clipboard functionality
+
+**Phase 4: Integration**
+- [ ] Add Property Management link to admin dashboard
+- [ ] Create admin route /admin/properties
+- [ ] Test property editing workflow
+- [ ] Test social media sharing on each platform
