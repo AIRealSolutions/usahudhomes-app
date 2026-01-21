@@ -201,4 +201,10 @@
 - [x] Update all React components to use image URL fix (via getImageUrl)
 - [x] Fix images on main page/search results (via getImageUrl)
 - [x] Fix images on property detail pages (via getImageUrl)
-- [ ] Deploy and verify all images display correctly
+- [x] Deploy and verify all images display correctly (deployed, awaiting verification)
+
+
+### Remove View Properties from Admin Dashboard
+- [x] Locate View Properties link/button in admin dashboard
+- [x] Remove View Properties from admin interface
+- [ ] Deploy the change
