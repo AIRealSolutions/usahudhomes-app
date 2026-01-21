@@ -148,18 +148,18 @@
 - [x] Test social media sharing on each platform
 
 ### Property Import Wizard
-- [ ] Create PropertyImportWizard component with multi-step interface
-- [ ] Implement file upload (JSON and CSV support)
-- [ ] Build CSV parser with validation
-- [ ] Build JSON parser with validation
-- [ ] Create data preview table
-- [ ] Implement state-specific import logic (only update selected state)
-- [ ] Add new properties from import file
-- [ ] Update existing properties (match by case_number)
-- [ ] Mark properties NOT in import as "Pending" (state-specific only)
-- [ ] Build import summary/results display
-- [ ] Add route for import wizard (/admin/properties/import)
-- [ ] Add "Import Properties" button to Property Management dashboard
-- [ ] Test with sample JSON file
-- [ ] Test with sample CSV file
-- [ ] Create documentation for import wizard
+- [x] Create PropertyImportWizard component with multi-step interface
+- [x] Implement file upload (JSON and CSV support)
+- [x] Build CSV parser with validation
+- [x] Build JSON parser with validation
+- [x] Create data preview table
+- [x] Implement state-specific import logic (only update selected state)
+- [x] Add new properties from import file
+- [x] Update existing properties (match by case_number)
+- [x] Mark properties NOT in import as "Pending" (state-specific only)
+- [x] Build import summary/results display
+- [x] Add route for import wizard (/admin/properties/import)
+- [x] Add "Import Properties" button to Property Management dashboard
+- [x] Test with sample JSON file
+- [x] Test with sample CSV file
+- [x] Create documentation for import wizard
