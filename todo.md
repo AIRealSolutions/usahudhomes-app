@@ -104,3 +104,13 @@
 - [ ] Add admin notification email on new lead (9103636147@verizon.net)
 - [ ] Test contact form submission
 - [ ] Test property inquiry submission
+
+### Admin Section Structure
+- [x] Design admin navigation with 3 main sections: Leads, Customers, Properties
+- [x] Create Lead Management dashboard (all incoming leads)
+- [ ] Create Lead Details Page with communication tools and event timeline
+- [ ] Create Customer Management dashboard (onboarded customers - master control)
+- [ ] Create Customer Details Page with full broker action visibility
+- [ ] Create Property Management dashboard
+- [x] Update AdminDashboard with proper navigation to all sections
+- [ ] Ensure Customer section shows all broker actions and events

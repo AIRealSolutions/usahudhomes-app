@@ -23,25 +23,25 @@ export default function AdminDashboard({ user, showBrokerLink }) {
   const fetchDashboardData = async () => {
     try {
       // Fetch stats
-      const [propertiesRes, brokersRes, referralsRes, consultationsRes] = await Promise.all([
+      const [propertiesRes, brokersRes, leadsRes, consultationsRes] = await Promise.all([
         supabase.from('properties').select('id', { count: 'exact', head: true }),
         supabase.from('agents').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
-        supabase.from('referrals').select('id', { count: 'exact', head: true }).eq('status', 'unassigned'),
+        supabase.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'new_lead'),
         supabase.from('consultations').select('id', { count: 'exact', head: true }).eq('status', 'active')
       ])
 
       setStats({
         properties: propertiesRes.count || 0,
         brokers: brokersRes.count || 0,
-        pendingReferrals: referralsRes.count || 0,
+        pendingReferrals: leadsRes.count || 0,
         activeConsultations: consultationsRes.count || 0
       })
 
-      // Fetch recent unassigned referrals (pending leads)
+      // Fetch recent new leads
       const { data: referralsData } = await supabase
-        .from('referrals')
+        .from('leads')
         .select('*')
-        .eq('status', 'unassigned')
+        .eq('status', 'new_lead')
         .order('created_at', { ascending: false })
         .limit(5)
 
@@ -151,7 +151,7 @@ export default function AdminDashboard({ user, showBrokerLink }) {
         <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Link
-            to="/admin/referrals"
+            to="/admin/leads"
             className="flex items-center justify-center px-4 py-3 border border-blue-300 bg-blue-50 rounded-md hover:bg-blue-100"
           >
             <TrendingUp className="h-5 w-5 mr-2 text-blue-600" />
@@ -187,10 +187,10 @@ export default function AdminDashboard({ user, showBrokerLink }) {
             You have unassigned leads that need to be reviewed and assigned to brokers.
           </p>
           <Link
-            to="/admin/referrals"
+            to="/admin/leads"
             className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700"
           >
-            Assign Leads Now →
+            Review Leads Now →
           </Link>
         </div>
       )}
@@ -199,7 +199,7 @@ export default function AdminDashboard({ user, showBrokerLink }) {
       <div className="bg-white rounded-lg shadow mb-8">
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-xl font-semibold">Recent Unassigned Leads</h2>
-          <Link to="/admin/referrals" className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+          <Link to="/admin/leads" className="text-blue-600 hover:text-blue-700 text-sm font-medium">
             View All →
           </Link>
         </div>
@@ -233,10 +233,10 @@ export default function AdminDashboard({ user, showBrokerLink }) {
                     )}
                   </div>
                   <Link
-                    to="/admin/referrals"
+                    to="/admin/leads"
                     className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                   >
-                    Assign →
+                    View →
                   </Link>
                 </div>
               </div>
