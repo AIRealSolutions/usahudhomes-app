@@ -163,3 +163,20 @@
 - [x] Test with sample JSON file
 - [x] Test with sample CSV file
 - [x] Create documentation for import wizard
+
+
+### Social Media Sharing Improvements - Open Graph & Twitter Cards
+- [ ] Research Open Graph meta tag requirements for Facebook/LinkedIn
+- [ ] Research Twitter Card meta tag requirements
+- [ ] Implement dynamic meta tags in public property page
+- [ ] Add og:title with property address
+- [ ] Add og:description with price, beds, baths
+- [ ] Add og:image with property main image
+- [ ] Add og:url with property public URL
+- [ ] Add og:type as "website"
+- [ ] Add Twitter Card meta tags (twitter:card, twitter:title, twitter:description, twitter:image)
+- [ ] Test Facebook sharing preview
+- [ ] Test LinkedIn sharing preview
+- [ ] Test Twitter sharing preview
+- [ ] Test Instagram sharing (link in bio)
+- [ ] Update documentation with Open Graph implementation
