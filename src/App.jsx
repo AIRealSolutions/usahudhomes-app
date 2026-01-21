@@ -292,8 +292,24 @@ function BenefitsSection() {
 function PropertyCard({ property }) {
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow">
-      <div className="h-48 bg-gray-200 flex items-center justify-center">
-        <HomeIcon className="h-16 w-16 text-gray-400" />
+      <div className="h-48 bg-gray-200 relative overflow-hidden">
+        {property.main_image ? (
+          <img 
+            src={property.main_image} 
+            alt={property.address}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              e.target.style.display = 'none'
+              e.target.nextSibling.style.display = 'flex'
+            }}
+          />
+        ) : null}
+        <div 
+          className="absolute inset-0 flex items-center justify-center bg-gray-200"
+          style={{display: property.main_image ? 'none' : 'flex'}}
+        >
+          <HomeIcon className="h-16 w-16 text-gray-400" />
+        </div>
       </div>
       <div className="p-6">
         <h3 className="text-xl font-semibold mb-2">{property.address}</h3>
@@ -307,7 +323,7 @@ function PropertyCard({ property }) {
           </span>
         </div>
         <div className="text-sm text-gray-600 mb-4">
-          {property.bedrooms} bed • {property.bathrooms} bath • {property.square_feet?.toLocaleString()} sqft
+          {property.bedrooms || 'N/A'} bed • {property.bathrooms || 'N/A'} bath • {property.square_feet ? property.square_feet.toLocaleString() + ' sqft' : 'N/A'}
         </div>
         <Link
           to={`/property/${property.case_number}`}
