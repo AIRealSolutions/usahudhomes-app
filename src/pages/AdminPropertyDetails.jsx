@@ -142,13 +142,14 @@ export default function AdminPropertyDetails() {
   // Generate platform-specific content
   const generateSocialContent = (platform) => {
     console.log('Generating social content with property:', property);
-    console.log('Beds:', property.beds, 'Baths:', property.baths);
+    console.log('Beds:', property.beds, 'Baths:', property.baths, 'Price:', property.price);
     
     const price = property.price?.toLocaleString() || 'Price Available';
     const city = property.city || '';
     const state = property.state || '';
-    const beds = property.beds || 0;
-    const baths = property.baths || 0;
+    // Use the actual values, or 'TBD' if missing - don't default to 0
+    const beds = property.beds != null && property.beds !== 0 ? property.beds : 'TBD';
+    const baths = property.baths != null && property.baths !== 0 ? property.baths : 'TBD';
     const contact = '910.363.6147';
     const website = 'USAHUDhomes.com';
 
