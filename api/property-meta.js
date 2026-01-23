@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     // Build meta tag values
     const propertyUrl = `https://usahudhomes.com/property/${property.case_number}`;
     const propertyTitle = escapeHtml(`${property.address} - ${property.city}, ${property.state}`);
-    const propertyDescription = escapeHtml(`$${property.list_price?.toLocaleString() || 'Price Available'} | ${property.bedrooms || 0} beds | ${property.bathrooms || 0} baths | HUD Home in ${property.city}, ${property.state}. Contact Lightkeeper Realty at 910-363-6147 for more information.`);
+    const propertyDescription = escapeHtml(`$${property.price?.toLocaleString() || 'Price Available'} | ${property.beds || 0} beds | ${property.baths || 0} baths | HUD Home in ${property.city}, ${property.state}. Contact Lightkeeper Realty at 910-363-6147 for more information.`);
     
     // Fix image URL: convert .jog to .jpg
     let imageUrl = property.main_image || 'https://usahudhomes.com/default-property-image.jpg';
