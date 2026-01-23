@@ -56,7 +56,12 @@ export default function AdminPropertyDetails() {
       }
 
       console.log('Save successful:', data);
-      setProperty(editedProperty);
+      // Refresh property from database to ensure we have latest data
+      if (data && data[0]) {
+        setProperty(data[0]);
+      } else {
+        setProperty(editedProperty);
+      }
       setEditMode(false);
       alert('Property updated successfully!');
     } catch (error) {
@@ -136,6 +141,9 @@ export default function AdminPropertyDetails() {
 
   // Generate platform-specific content
   const generateSocialContent = (platform) => {
+    console.log('Generating social content with property:', property);
+    console.log('Beds:', property.beds, 'Baths:', property.baths);
+    
     const price = property.price?.toLocaleString() || 'Price Available';
     const city = property.city || '';
     const state = property.state || '';
