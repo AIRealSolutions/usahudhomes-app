@@ -42,19 +42,26 @@ export default function AdminPropertyDetails() {
 
   const handleSave = async () => {
     try {
-      const { error } = await supabase
+      console.log('Saving property data:', editedProperty);
+      
+      const { data, error } = await supabase
         .from('properties')
         .update(editedProperty)
-        .eq('id', property.id);
+        .eq('id', property.id)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
+      console.log('Save successful:', data);
       setProperty(editedProperty);
       setEditMode(false);
       alert('Property updated successfully!');
     } catch (error) {
       console.error('Error updating property:', error);
-      alert('Failed to update property');
+      alert(`Failed to update property: ${error.message || error}`);
     }
   };
 
