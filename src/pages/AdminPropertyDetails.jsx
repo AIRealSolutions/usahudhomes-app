@@ -358,14 +358,7 @@ ${publicUrl}`,
                   <Share2 className="h-4 w-4" />
                   Share
                 </button>
-                <Link
-                  to={`/property/${property.case_number}`}
-                  target="_blank"
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  View Public
-                </Link>
+
               </>
             )}
           </div>
