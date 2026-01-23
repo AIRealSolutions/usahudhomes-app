@@ -40,7 +40,7 @@ const SocialShareModal = ({ consultation, property, onClose }) => {
       name: 'Facebook',
       icon: Facebook,
       color: 'bg-blue-600 hover:bg-blue-700',
-      url: `https://www.facebook.com/dialog/share?app_id=966242223397117&href=${encodeURIComponent(propertyUrl)}&quote=${encodeURIComponent(shareText)}`,
+      url: `https://www.facebook.com/sharer.php?u=${encodeURIComponent(propertyUrl)}&quote=${encodeURIComponent(shareText)}`,
       platform: 'facebook'
     },
     {

@@ -71,7 +71,7 @@ const PropertyDetailsAdmin = () => {
   const shareToFacebook = () => {
     const url = getPropertyUrl()
     // Use Facebook's modern share dialog which works better on mobile
-    window.open(`https://www.facebook.com/dialog/share?app_id=966242223397117&href=${encodeURIComponent(url)}&display=popup`, '_blank', 'width=600,height=400')
+    window.open(`https://www.facebook.com/sharer.php?u=${encodeURIComponent(url)}&display=popup`, '_blank', 'width=600,height=400')
   }
 
   const shareToTwitter = () => {
