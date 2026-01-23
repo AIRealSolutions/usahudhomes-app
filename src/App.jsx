@@ -323,7 +323,7 @@ function PropertyCard({ property }) {
           </span>
         </div>
         <div className="text-sm text-gray-600 mb-4">
-          {property.bedrooms || 'N/A'} bed • {property.bathrooms || 'N/A'} bath • {property.square_feet ? property.square_feet.toLocaleString() + ' sqft' : 'N/A'}
+          {property.beds || 'N/A'} bed • {property.baths || 'N/A'} bath • {property.sq_ft ? property.sq_ft.toLocaleString() + ' sqft' : 'N/A'}
         </div>
         <Link
           to={`/property/${property.case_number}`}
@@ -478,8 +478,8 @@ function SearchPage() {
         if (filters.city) query = query.eq('city', filters.city)
         if (filters.minPrice) query = query.gte('price', parseFloat(filters.minPrice))
         if (filters.maxPrice) query = query.lte('price', parseFloat(filters.maxPrice))
-        if (filters.bedrooms) query = query.gte('bedrooms', parseInt(filters.bedrooms))
-        if (filters.bathrooms) query = query.gte('bathrooms', parseFloat(filters.bathrooms))
+        if (filters.bedrooms) query = query.gte('beds', parseInt(filters.bedrooms))
+        if (filters.bathrooms) query = query.gte('baths', parseFloat(filters.bathrooms))
         if (filters.status) query = query.eq('status', filters.status)
 
         query = query.order('price', { ascending: true }).limit(100)

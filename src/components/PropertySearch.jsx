@@ -390,7 +390,7 @@ const PropertySearch = () => {
                   </div>
                   <div className="flex items-center">
                     <Home className="h-4 w-4 mr-1" />
-                    {property.sqft?.toLocaleString()} sqft
+                    {property.sq_ft?.toLocaleString()} sqft
                   </div>
                 </div>
 
