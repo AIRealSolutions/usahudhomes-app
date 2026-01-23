@@ -292,8 +292,17 @@ ${publicUrl}`,
 
   const shareToFacebook = () => {
     const url = encodeURIComponent(publicUrl);
-    // Opens Facebook app on mobile, web on desktop
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
+    // Try to open in Facebook app first, fallback to web
+    const fbAppUrl = `fb://facewebmodal/f?href=https://www.facebook.com/sharer/sharer.php?u=${url}`;
+    const fbWebUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
+    
+    // Attempt to open in app
+    window.location.href = fbAppUrl;
+    
+    // Fallback to web after short delay if app doesn't open
+    setTimeout(() => {
+      window.open(fbWebUrl, '_blank');
+    }, 500);
   };
 
   const shareToTwitter = () => {
