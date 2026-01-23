@@ -17,8 +17,7 @@ import {
   Download,
   Upload,
   Image as ImageIcon,
-  Loader2,
-  Eye
+  Loader2
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { propertyService } from '../../services/database'
@@ -800,14 +799,6 @@ function PropertyAdmin() {
                   </div>
                 </div>
                 <div className="flex gap-2 ml-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => navigate(`/admin/property/${property.case_number}`)}
-                    title="View Details & Marketing"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
                   <Button variant="outline" size="sm" onClick={() => handleEdit(property)}>
                     <Edit className="h-4 w-4" />
                   </Button>
