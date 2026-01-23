@@ -292,8 +292,8 @@ ${publicUrl}`,
 
   const shareToFacebook = () => {
     const url = encodeURIComponent(publicUrl);
-    // Direct navigation to Facebook sharer - mobile OS will open in app if installed
-    window.location.href = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
+    // window.open triggers app on mobile if Facebook app is installed
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
   };
 
   const shareToTwitter = () => {
