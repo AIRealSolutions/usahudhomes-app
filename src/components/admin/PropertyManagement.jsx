@@ -315,7 +315,7 @@ export default function PropertyManagement() {
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <h3 className="font-semibold text-gray-900 text-lg">
-                      ${property.list_price?.toLocaleString()}
+                      ${property.price?.toLocaleString()}
                     </h3>
                     <p className="text-sm text-gray-600 flex items-center mt-1">
                       <MapPin className="h-4 w-4 mr-1" />
@@ -327,11 +327,11 @@ export default function PropertyManagement() {
                 <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
                   <span className="flex items-center">
                     <Bed className="h-4 w-4 mr-1" />
-                    {property.bedrooms} beds
+                    {property.beds} beds
                   </span>
                   <span className="flex items-center">
                     <Bath className="h-4 w-4 mr-1" />
-                    {property.bathrooms} baths
+                    {property.baths} baths
                   </span>
                 </div>
 
