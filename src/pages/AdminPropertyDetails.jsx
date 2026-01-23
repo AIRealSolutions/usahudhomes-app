@@ -64,7 +64,12 @@ export default function AdminPropertyDetails() {
   };
 
   const handleChange = (field, value) => {
-    setEditedProperty({ ...editedProperty, [field]: value });
+    // Handle numeric fields properly - convert NaN to null
+    let processedValue = value;
+    if (typeof value === 'number' && isNaN(value)) {
+      processedValue = null;
+    }
+    setEditedProperty({ ...editedProperty, [field]: processedValue });
   };
 
   const handleImageUpload = async (event) => {
@@ -455,7 +460,7 @@ ${publicUrl}`,
                   <input
                     type="number"
                     value={editedProperty.list_price || ''}
-                    onChange={(e) => handleChange('list_price', parseInt(e.target.value))}
+                    onChange={(e) => handleChange('list_price', e.target.value === '' ? null : parseInt(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 ) : (
@@ -490,7 +495,7 @@ ${publicUrl}`,
                   <input
                     type="number"
                     value={editedProperty.bedrooms || ''}
-                    onChange={(e) => handleChange('bedrooms', parseInt(e.target.value))}
+                    onChange={(e) => handleChange('bedrooms', e.target.value === '' ? null : parseInt(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 ) : (
@@ -507,7 +512,7 @@ ${publicUrl}`,
                     type="number"
                     step="0.5"
                     value={editedProperty.bathrooms || ''}
-                    onChange={(e) => handleChange('bathrooms', parseFloat(e.target.value))}
+                    onChange={(e) => handleChange('bathrooms', e.target.value === '' ? null : parseFloat(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 ) : (
