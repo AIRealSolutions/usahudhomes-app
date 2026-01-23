@@ -292,8 +292,8 @@ ${publicUrl}`,
 
   const shareToFacebook = () => {
     const url = encodeURIComponent(publicUrl);
-    // Use Facebook's share URL - works without app configuration
-    window.open(`https://www.facebook.com/sharer.php?u=${url}`, '_blank', 'width=600,height=600');
+    // Use mobile web version to avoid opening the app
+    window.location.href = `https://m.facebook.com/sharer.php?u=${url}`;
   };
 
   const shareToTwitter = () => {
