@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../config/supabase';
-import AIMarketingAssistant from '../components/admin/AIMarketingAssistant';
 import { 
   ArrowLeft, Edit2, Save, X, Share2, Copy, Check,
   Facebook, Twitter, Linkedin, Instagram, ExternalLink, Upload, Trash2
@@ -650,16 +649,6 @@ ${publicUrl}`,
           </div>
         </div>
       </div>
-
-      {/* AI Marketing Assistant */}
-      {!editMode && property && (
-        <div className="bg-white rounded-lg shadow-md p-6 mt-6">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <span>🤖</span> AI Marketing Assistant
-          </h2>
-          <AIMarketingAssistant property={property} />
-        </div>
-      )}
 
       {/* Social Share Modal */}
       {showShareModal && (
