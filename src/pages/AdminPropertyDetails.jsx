@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../config/supabase';
+import AIMarketingAssistant from '../components/admin/AIMarketingAssistant';
 import { 
   ArrowLeft, Edit2, Save, X, Share2, Copy, Check,
   Facebook, Twitter, Linkedin, Instagram, ExternalLink, Upload, Trash2
@@ -11,7 +12,7 @@ export default function AdminPropertyDetails() {
   const navigate = useNavigate();
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [editMode, setEditMode] = useState(true);
+  const [editMode, setEditMode] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [copiedPlatform, setCopiedPlatform] = useState(null);
   const [editedProperty, setEditedProperty] = useState(null);
@@ -649,6 +650,16 @@ ${publicUrl}`,
           </div>
         </div>
       </div>
+
+      {/* AI Marketing Assistant */}
+      {!editMode && (
+        <div className="bg-white rounded-lg shadow-md p-6 mt-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <span>🤖</span> AI Marketing Assistant
+          </h2>
+          <AIMarketingAssistant property={property} />
+        </div>
+      )}
 
       {/* Social Share Modal */}
       {showShareModal && (
