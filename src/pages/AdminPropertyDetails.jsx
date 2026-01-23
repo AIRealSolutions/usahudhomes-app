@@ -652,7 +652,7 @@ ${publicUrl}`,
       </div>
 
       {/* AI Marketing Assistant */}
-      {!editMode && (
+      {!editMode && property && (
         <div className="bg-white rounded-lg shadow-md p-6 mt-6">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             <span>🤖</span> AI Marketing Assistant
