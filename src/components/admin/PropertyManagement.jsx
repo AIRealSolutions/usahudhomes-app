@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../config/supabase';
 import { 
   Search, Home, DollarSign, MapPin, Bed, Bath, 
-  Calendar, Filter, Edit, Share2, Eye, Upload
+  Calendar, Filter, Edit, Upload
 } from 'lucide-react';
 
 export default function PropertyManagement() {
@@ -340,27 +340,14 @@ export default function PropertyManagement() {
                 </p>
 
                 {/* Action Buttons */}
-                <div className="flex gap-2">
+                <div>
                   <Link
                     to={`/admin/properties/${property.case_number}`}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                   >
                     <Edit className="h-4 w-4" />
                     Edit
                   </Link>
-                  <Link
-                    to={`/property/${property.case_number}`}
-                    target="_blank"
-                    className="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Link>
-                  <button
-                    onClick={() => {/* TODO: Open share modal */}}
-                    className="flex items-center justify-center px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200"
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </button>
                 </div>
 
                 {/* Case Number */}
