@@ -676,35 +676,26 @@ ${publicUrl}`,
                       </div>
                       <h3 className="font-semibold text-lg">Facebook</h3>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => copyToClipboard('facebook')}
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-                      >
-                        {copiedPlatform === 'facebook' ? (
-                          <>
-                            <Check className="h-4 w-4" />
-                            Copied!
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-4 w-4" />
-                            Copy
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={shareToFacebook}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                      >
-                        Share
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(publicUrl);
+                        alert('Link copied! Now:\n1. Open Facebook\n2. Create a new post\n3. Paste the link\n4. Facebook will show the property preview automatically');
+                      }}
+                      className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+                    >
+                      <Copy className="h-5 w-5" />
+                      Copy Link to Share on Facebook
+                    </button>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans">
                       {generateSocialContent('facebook').text}
                     </pre>
+                  </div>
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>💡 Tip:</strong> Pasting the link directly in Facebook works best and shows all property details automatically (beds, baths, price, image).
+                    </p>
                   </div>
                 </div>
 
