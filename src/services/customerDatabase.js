@@ -478,6 +478,27 @@ USAhudHomes.com System
       c.priority === 'high' || this.calculateLeadScore(c.id) > 80
     );
   }
+
+  // Delete lead
+  deleteLead(leadId) {
+    const leadIndex = this.leads.findIndex(lead => lead.id === leadId);
+    if (leadIndex !== -1) {
+      this.leads.splice(leadIndex, 1);
+      this.saveLeads();
+      
+      // Also clean up related data
+      const interactions = JSON.parse(localStorage.getItem('usahud_interactions') || '{}');
+      delete interactions[leadId];
+      localStorage.setItem('usahud_interactions', JSON.stringify(interactions));
+      
+      const tasks = JSON.parse(localStorage.getItem('usahud_tasks') || '{}');
+      delete tasks[leadId];
+      localStorage.setItem('usahud_tasks', JSON.stringify(tasks));
+      
+      return true;
+    }
+    return false;
+  }
 }
 
 // Lead status workflow definitions
