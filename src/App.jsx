@@ -871,7 +871,7 @@ function PropertyDetailPage() {
 
     const propertyUrl = `https://usahudhomes.com/property/${property.case_number}`
     const propertyTitle = `${property.address} - ${property.city}, ${property.state}`
-    const propertyDescription = `$${property.list_price?.toLocaleString() || 'Price Available'} | ${property.bedrooms || 0} beds | ${property.bathrooms || 0} baths | HUD Home in ${property.city}, ${property.state}. Contact Lightkeeper Realty at 910-363-6147 for more information.`
+    const propertyDescription = `$${property.price?.toLocaleString() || 'Price Available'} | ${property.beds || 0} beds | ${property.baths || 0} baths | HUD Home in ${property.city}, ${property.state}. Contact Lightkeeper Realty at 910-363-6147 for more information.`
     const propertyImage = property.main_image || 'https://usahudhomes.com/default-property-image.jpg'
 
     // Update document title
@@ -998,15 +998,15 @@ function PropertyDetailPage() {
           {/* Key Features */}
           <div className="grid grid-cols-3 gap-4 mb-8">
             <div className="bg-gray-50 p-4 rounded-lg text-center">
-              <p className="text-2xl font-bold text-gray-900">{property.bedrooms}</p>
+              <p className="text-2xl font-bold text-gray-900">{property.beds}</p>
               <p className="text-sm text-gray-600">Bedrooms</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg text-center">
-              <p className="text-2xl font-bold text-gray-900">{property.bathrooms}</p>
+              <p className="text-2xl font-bold text-gray-900">{property.baths}</p>
               <p className="text-sm text-gray-600">Bathrooms</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg text-center">
-              <p className="text-2xl font-bold text-gray-900">{property.square_feet?.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-gray-900">{property.sq_ft?.toLocaleString()}</p>
               <p className="text-sm text-gray-600">Sq Ft</p>
             </div>
           </div>
