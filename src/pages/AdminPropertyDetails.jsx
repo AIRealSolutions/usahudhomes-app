@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { 
   ArrowLeft, Edit2, Save, X, Share2, Copy, Check,
-  Facebook, Twitter, Linkedin, Instagram, ExternalLink, Upload
+  Facebook, Twitter, Linkedin, Instagram, ExternalLink, Upload, Trash2
 } from 'lucide-react';
 
 export default function AdminPropertyDetails() {
@@ -11,7 +11,7 @@ export default function AdminPropertyDetails() {
   const navigate = useNavigate();
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [editMode, setEditMode] = useState(false);
+  const [editMode, setEditMode] = useState(true);
   const [showShareModal, setShowShareModal] = useState(false);
   const [copiedPlatform, setCopiedPlatform] = useState(null);
   const [editedProperty, setEditedProperty] = useState(null);
@@ -73,6 +73,30 @@ export default function AdminPropertyDetails() {
   const handleCancel = () => {
     setEditedProperty(property);
     setEditMode(false);
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`Are you sure you want to delete this property at ${property.address}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('properties')
+        .delete()
+        .eq('id', property.id);
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      alert('Property deleted successfully!');
+      navigate('/admin/properties');
+    } catch (error) {
+      console.error('Error deleting property:', error);
+      alert(`Failed to delete property: ${error.message || error}`);
+    }
   };
 
   const handleChange = (field, value) => {
@@ -341,6 +365,13 @@ ${publicUrl}`,
                 >
                   <X className="h-4 w-4" />
                   Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
                 </button>
               </>
             ) : (
