@@ -292,7 +292,8 @@ ${publicUrl}`,
 
   const shareToFacebook = () => {
     const url = encodeURIComponent(publicUrl);
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
+    // Use Facebook's modern share dialog which works better on mobile
+    window.open(`https://www.facebook.com/dialog/share?app_id=966242223397117&href=${url}&display=popup`, '_blank', 'width=600,height=400');
   };
 
   const shareToTwitter = () => {
