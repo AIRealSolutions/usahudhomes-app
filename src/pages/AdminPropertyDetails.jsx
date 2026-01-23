@@ -136,11 +136,11 @@ export default function AdminPropertyDetails() {
 
   // Generate platform-specific content
   const generateSocialContent = (platform) => {
-    const price = property.list_price?.toLocaleString() || 'Price Available';
+    const price = property.price?.toLocaleString() || 'Price Available';
     const city = property.city || '';
     const state = property.state || '';
-    const beds = property.bedrooms || 0;
-    const baths = property.bathrooms || 0;
+    const beds = property.beds || 0;
+    const baths = property.baths || 0;
     const contact = '910.363.6147';
     const website = 'USAHUDhomes.com';
 
@@ -466,12 +466,12 @@ ${publicUrl}`,
                 {editMode ? (
                   <input
                     type="number"
-                    value={editedProperty.list_price || ''}
-                    onChange={(e) => handleChange('list_price', e.target.value === '' ? null : parseInt(e.target.value))}
+                    value={editedProperty.price || ''}
+                    onChange={(e) => handleChange('price', e.target.value === '' ? null : parseInt(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 ) : (
-                  <p className="text-gray-900">${property.list_price?.toLocaleString()}</p>
+                  <p className="text-gray-900">${property.price?.toLocaleString()}</p>
                 )}
               </div>
 
@@ -501,12 +501,12 @@ ${publicUrl}`,
                 {editMode ? (
                   <input
                     type="number"
-                    value={editedProperty.bedrooms || ''}
-                    onChange={(e) => handleChange('bedrooms', e.target.value === '' ? null : parseInt(e.target.value))}
+                    value={editedProperty.beds || ''}
+                    onChange={(e) => handleChange('beds', e.target.value === '' ? null : parseInt(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 ) : (
-                  <p className="text-gray-900">{property.bedrooms}</p>
+                  <p className="text-gray-900">{property.beds}</p>
                 )}
               </div>
 
@@ -518,12 +518,12 @@ ${publicUrl}`,
                   <input
                     type="number"
                     step="0.5"
-                    value={editedProperty.bathrooms || ''}
-                    onChange={(e) => handleChange('bathrooms', e.target.value === '' ? null : parseFloat(e.target.value))}
+                    value={editedProperty.baths || ''}
+                    onChange={(e) => handleChange('baths', e.target.value === '' ? null : parseFloat(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 ) : (
-                  <p className="text-gray-900">{property.bathrooms}</p>
+                  <p className="text-gray-900">{property.baths}</p>
                 )}
               </div>
 
