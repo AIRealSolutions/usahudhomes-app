@@ -49,16 +49,7 @@ const PropertyDetailModal = ({ property, onClose, onShare }) => {
     })
   }
 
-  const handleCopyLink = () => {
-    const url = `${window.location.origin}/property/${property.case_number}`
-    navigator.clipboard.writeText(url)
-    setCopySuccess(true)
-    setTimeout(() => setCopySuccess(false), 2000)
-  }
 
-  const handleViewPublicPage = () => {
-    window.open(`/property/${property.case_number}`, '_blank')
-  }
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length)
@@ -150,29 +141,13 @@ const PropertyDetailModal = ({ property, onClose, onShare }) => {
               </div>
 
               {/* Quick Actions */}
-              <div className="grid grid-cols-2 gap-3">
+              <div>
                 <button
-                  onClick={onShare}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                  onClick={() => window.location.href = `/admin/property/${property.case_number}`}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                 >
-                  <Share2 className="w-5 h-5" />
-                  Share Property
-                </button>
-                <button
-                  onClick={handleCopyLink}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-                >
-                  {copySuccess ? (
-                    <>
-                      <Check className="w-5 h-5" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-5 h-5" />
-                      Copy Link
-                    </>
-                  )}
+                  <FileText className="w-5 h-5" />
+                  Edit Details
                 </button>
               </div>
 
