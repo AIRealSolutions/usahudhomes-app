@@ -292,8 +292,8 @@ ${publicUrl}`,
 
   const shareToFacebook = () => {
     const url = encodeURIComponent(publicUrl);
-    // Use mobile web version to avoid opening the app
-    window.location.href = `https://m.facebook.com/sharer.php?u=${url}`;
+    // Opens Facebook app on mobile, web on desktop
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
   };
 
   const shareToTwitter = () => {
@@ -677,14 +677,11 @@ ${publicUrl}`,
                       <h3 className="font-semibold text-lg">Facebook</h3>
                     </div>
                     <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(publicUrl);
-                        alert('Link copied! Now:\n1. Open Facebook\n2. Create a new post\n3. Paste the link\n4. Facebook will show the property preview automatically');
-                      }}
+                      onClick={shareToFacebook}
                       className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
                     >
-                      <Copy className="h-5 w-5" />
-                      Copy Link to Share on Facebook
+                      <Facebook className="h-5 w-5" />
+                      Share on Facebook
                     </button>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg">
@@ -694,7 +691,7 @@ ${publicUrl}`,
                   </div>
                   <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-800">
-                      <strong>💡 Tip:</strong> Pasting the link directly in Facebook works best and shows all property details automatically (beds, baths, price, image).
+                      <strong>💡 How to share:</strong> Click the button above to open Facebook app. In the app, tap the dropdown at the top to choose where to post (Your Timeline, a Page you manage, or a Group), then click Post. The property details will show automatically!
                     </p>
                   </div>
                 </div>
