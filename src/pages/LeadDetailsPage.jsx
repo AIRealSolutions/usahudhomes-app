@@ -4,7 +4,7 @@ import { supabase } from '../config/supabase';
 import { 
   ArrowLeft, Phone, Mail, MessageSquare, Calendar, MapPin, 
   DollarSign, Home, User, Clock, FileText, Send, X, Check,
-  AlertCircle, CheckCircle, Edit2, Save
+  AlertCircle, CheckCircle, Edit2, Save, Trash2
 } from 'lucide-react';
 
 export default function LeadDetailsPage() {
@@ -129,6 +129,28 @@ export default function LeadDetailsPage() {
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Failed to update status');
+    }
+  };
+
+  const handleDeleteLead = async () => {
+    const leadName = `${lead.first_name} ${lead.last_name}`.trim();
+    const confirmed = confirm(`Are you sure you want to delete ${leadName}? This action cannot be undone.`);
+    
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      alert('Lead deleted successfully!');
+      navigate('/admin/leads');
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      alert('Failed to delete lead: ' + error.message);
     }
   };
 
@@ -368,6 +390,15 @@ export default function LeadDetailsPage() {
               >
                 <FileText className="h-4 w-4" />
                 Add Note
+              </button>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <button
+                onClick={handleDeleteLead}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 w-full"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete Lead
               </button>
             </div>
           </div>
