@@ -12,11 +12,11 @@ import ReferralAgreementStep from './registration/ReferralAgreementStep'
 import ReviewAndSubmitStep from './registration/ReviewAndSubmitStep'
 
 const STEPS = [
-  { id: 1, title: 'Personal Info', icon: Building, description: 'Your contact information' },
-  { id: 2, title: 'Business Details', icon: FileText, description: 'License and experience' },
-  { id: 3, title: 'Territory & Specialties', icon: Shield, description: 'Where you operate' },
-  { id: 4, title: 'Referral Agreement', icon: FileText, description: 'Terms and conditions' },
-  { id: 5, title: 'Review & Submit', icon: CheckCircle, description: 'Confirm your application' }
+  { id: 1, title: 'Partner Profile', icon: Building, description: 'Basic contact information' },
+  { id: 2, title: 'Professional Credentials', icon: FileText, description: 'License and experience' },
+  { id: 3, title: 'Service Area', icon: Shield, description: 'Where you receive leads' },
+  { id: 4, title: 'Referral Agreement', icon: FileText, description: 'Partner terms' },
+  { id: 5, title: 'Final Review', icon: CheckCircle, description: 'Confirm and join' }
 ]
 
 const AgentRegistration = () => {
@@ -213,14 +213,14 @@ const AgentRegistration = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <Helmet>
-        <title>Become a HUD Home Lead Partner | USAHUDhomes.com</title>
-        <meta name="description" content="Join our network of licensed real estate professionals and receive qualified HUD home buyer leads. Grow your business with USAHUDhomes.com." />
+        <title>Join the USAHUDhomes.com Broker Referral Network | Exclusive HUD Leads</title>
+        <meta name="description" content="Partner with USAHUDhomes.com to receive high-quality, qualified HUD home buyer leads. Join our exclusive network of licensed real estate professionals today." />
         
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://usahudhomes.com/broker/register" />
-        <meta property="og:title" content="Become a HUD Home Lead Partner | USAHUDhomes.com" />
-        <meta property="og:description" content="Join our network of licensed real estate professionals and receive qualified HUD home buyer leads. Grow your business with USAHUDhomes.com." />
+        <meta property="og:title" content="Join the USAHUDhomes.com Broker Referral Network | Exclusive HUD Leads" />
+        <meta property="og:description" content="Partner with USAHUDhomes.com to receive high-quality, qualified HUD home buyer leads. Join our exclusive network of licensed real estate professionals today." />
         <meta property="og:image" content="https://usahudhomes.com/broker-recruitment-optimized.png" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="670" />
@@ -230,18 +230,18 @@ const AgentRegistration = () => {
         {/* Twitter */}
         <meta property="twitter:card" content="summary_large_image" />
         <meta property="twitter:url" content="https://usahudhomes.com/broker/register" />
-        <meta property="twitter:title" content="Become a HUD Home Lead Partner | USAHUDhomes.com" />
-        <meta property="twitter:description" content="Join our network of licensed real estate professionals and receive qualified HUD home buyer leads. Grow your business with USAHUDhomes.com." />
+        <meta property="twitter:title" content="Join the USAHUDhomes.com Broker Referral Network | Exclusive HUD Leads" />
+        <meta property="twitter:description" content="Partner with USAHUDhomes.com to receive high-quality, qualified HUD home buyer leads. Join our exclusive network of licensed real estate professionals today." />
         <meta property="twitter:image" content="https://usahudhomes.com/broker-recruitment-optimized.png" />
       </Helmet>
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Become a HUD Home Lead Partner
+            Join the USAHUDhomes.com Referral Network
           </h1>
           <p className="text-lg text-gray-600">
-            Join our network of licensed real estate professionals and receive qualified HUD home buyer leads
+            Partner with us to receive high-quality, qualified HUD home buyer leads in your service area.
           </p>
         </div>
 
