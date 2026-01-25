@@ -880,60 +880,10 @@ function PropertyDetailPage() {
     loadProperty()
   }, [caseNumber])
 
-  // Update meta tags for social media sharing
-  useEffect(() => {
-    if (!property) return
-
-    const propertyUrl = `https://usahudhomes.com/property/${property.case_number}`
-    const propertyTitle = `${property.address} - ${property.city}, ${property.state}`
-    const propertyDescription = `$${property.price?.toLocaleString() || 'Price Available'} | ${property.beds || 0} beds | ${property.baths || 0} baths | HUD Home in ${property.city}, ${property.state}. Contact Lightkeeper Realty at 910-363-6147 for more information.`
-    const propertyImage = property.main_image || 'https://usahudhomes.com/default-property-image.jpg'
-
-    // Update document title
-    document.title = propertyTitle
-
-    // Helper function to update or create meta tag
-    const updateMetaTag = (property, content) => {
-      let element = document.querySelector(`meta[property="${property}"]`) || document.querySelector(`meta[name="${property}"]`)
-      if (!element) {
-        element = document.createElement('meta')
-        if (property.startsWith('og:') || property.startsWith('twitter:')) {
-          element.setAttribute('property', property)
-        } else {
-          element.setAttribute('name', property)
-        }
-        document.head.appendChild(element)
-      }
-      element.setAttribute('content', content)
-    }
-
-    // Open Graph tags (Facebook, LinkedIn, WhatsApp)
-    updateMetaTag('og:title', propertyTitle)
-    updateMetaTag('og:description', propertyDescription)
-    updateMetaTag('og:image', propertyImage)
-    updateMetaTag('og:url', propertyUrl)
-    updateMetaTag('og:type', 'website')
-    updateMetaTag('og:site_name', 'USAHUDhomes.com')
-
-    // Twitter Card tags
-    updateMetaTag('twitter:card', 'summary_large_image')
-    updateMetaTag('twitter:title', propertyTitle)
-    updateMetaTag('twitter:description', propertyDescription)
-    updateMetaTag('twitter:image', propertyImage)
-
-    // Standard meta tags
-    updateMetaTag('description', propertyDescription)
-
-    // Cleanup function to reset meta tags when component unmounts
-    return () => {
-      document.title = 'USAHUDhomes.com - Find HUD Homes & Government Foreclosures'
-      updateMetaTag('og:title', 'USAHUDhomes.com - Find HUD Homes & Government Foreclosures')
-      updateMetaTag('og:description', 'Find HUD homes and government foreclosures in North Carolina and Tennessee. Expert guidance from Lightkeeper Realty.')
-      updateMetaTag('og:url', 'https://usahudhomes.com')
-      updateMetaTag('twitter:title', 'USAHUDhomes.com - Find HUD Homes & Government Foreclosures')
-      updateMetaTag('twitter:description', 'Find HUD homes and government foreclosures in North Carolina and Tennessee.')
-    }
-  }, [property])
+  const propertyUrl = property ? `https://usahudhomes.com/property/${property.case_number}` : ''
+  const propertyTitle = property ? `${property.address} - ${property.city}, ${property.state}` : 'Property Details'
+  const propertyDescription = property ? `$${property.list_price?.toLocaleString() || 'Price Available'} | ${property.beds || 0} beds | ${property.baths || 0} baths | HUD Home in ${property.city}, ${property.state}. Contact Lightkeeper Realty at 910-363-6147 for more information.` : ''
+  const propertyImage = property?.main_image || 'https://usahudhomes.com/us-map.png'
 
   if (loading) {
     return (
@@ -955,6 +905,27 @@ function PropertyDetailPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Helmet>
+        <title>{propertyTitle} | USAHUDhomes.com</title>
+        <meta name="description" content={propertyDescription} />
+        
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={propertyUrl} />
+        <meta property="og:title" content={propertyTitle} />
+        <meta property="og:description" content={propertyDescription} />
+        <meta property="og:image" content={propertyImage} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="fb:app_id" content="1993076721256699" />
+
+        {/* Twitter */}
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content={propertyUrl} />
+        <meta property="twitter:title" content={propertyTitle} />
+        <meta property="twitter:description" content={propertyDescription} />
+        <meta property="twitter:image" content={propertyImage} />
+      </Helmet>
       {/* Breadcrumb */}
       <div className="mb-6 text-sm text-gray-600">
         <Link to="/" className="hover:text-blue-600">Home</Link>
