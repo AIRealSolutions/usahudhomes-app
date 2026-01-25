@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -211,6 +212,24 @@ const AgentRegistration = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <Helmet>
+        <title>Become a HUD Home Lead Partner | USAHUDhomes.com</title>
+        <meta name="description" content="Join our network of licensed real estate professionals and receive qualified HUD home buyer leads. Grow your business with USAHUDhomes.com." />
+        
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://usahudhomes.com/broker/register" />
+        <meta property="og:title" content="Become a HUD Home Lead Partner | USAHUDhomes.com" />
+        <meta property="og:description" content="Join our network of licensed real estate professionals and receive qualified HUD home buyer leads. Grow your business with USAHUDhomes.com." />
+        <meta property="og:image" content="https://usahudhomes.com/us-map.png" />
+
+        {/* Twitter */}
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content="https://usahudhomes.com/broker/register" />
+        <meta property="twitter:title" content="Become a HUD Home Lead Partner | USAHUDhomes.com" />
+        <meta property="twitter:description" content="Join our network of licensed real estate professionals and receive qualified HUD home buyer leads. Grow your business with USAHUDhomes.com." />
+        <meta property="twitter:image" content="https://usahudhomes.com/us-map.png" />
+      </Helmet>
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">

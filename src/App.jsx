@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
+import { Helmet } from 'react-helmet-async'
 import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate } from 'react-router-dom'
+import { HelmetProvider } from 'react-helmet-async'
 import { supabase } from './config/supabase'
 import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User, Menu } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -369,6 +371,19 @@ function HomePage() {
 
   return (
     <div>
+      <Helmet>
+        <title>USAHUDhomes.com - Find HUD Homes & Government Foreclosures</title>
+        <meta name="description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://usahudhomes.com/" />
+        <meta property="og:title" content="USAHUDhomes.com - Find HUD Homes & Government Foreclosures" />
+        <meta property="og:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
+        <meta property="og:image" content="https://usahudhomes.com/us-map.png" />
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:title" content="USAHUDhomes.com - Find HUD Homes & Government Foreclosures" />
+        <meta property="twitter:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
+        <meta property="twitter:image" content="https://usahudhomes.com/us-map.png" />
+      </Helmet>
       <HeroSection />
       <BenefitsSection />
       
@@ -1126,6 +1141,7 @@ function PropertyDetailPage() {
 export default function App() {
   return (
     <ErrorBoundary>
+      <HelmetProvider>
       <AuthProvider>
         <Router>
         <div className="min-h-screen flex flex-col">
@@ -1156,6 +1172,7 @@ export default function App() {
         </div>
         </Router>
       </AuthProvider>
+      </HelmetProvider>
     </ErrorBoundary>
   )
 }
