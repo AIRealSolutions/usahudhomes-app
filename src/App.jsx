@@ -377,13 +377,10 @@ function HomePage() {
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://usahudhomes.com/" />
         <meta property="og:title" content="USAHUDhomes.com - Find HUD Homes & Government Foreclosures" />
-        <meta property="og:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
-        <meta property="og:image" content="https://usahudhomes.com/hud-buyer-clean-optimized.png" />
-        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="og:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties."         <meta property="og:image" content="https://usahudhomes.com/broker-special-icon-optimized.png" />        <meta property="twitter:card" content="summary_large_image" />
         <meta property="twitter:title" content="USAHUDhomes.com - Find HUD Homes & Government Foreclosures" />
         <meta property="twitter:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
-        <meta property="twitter:image" content="https://usahudhomes.com/hud-buyer-clean-optimized.png" />
-      </Helmet>
+        <meta property="twitter:image" content="https://usahudhomes.com/broker-special-icon-optimized.png" />   </Helmet>
       <HeroSection />
       <BenefitsSection />
       
