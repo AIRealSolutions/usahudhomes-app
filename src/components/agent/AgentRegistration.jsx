@@ -221,9 +221,9 @@ const AgentRegistration = () => {
         <meta property="og:url" content="https://usahudhomes.com/broker/register" />
         <meta property="og:title" content="Become a HUD Home Lead Partner | USAHUDhomes.com" />
         <meta property="og:description" content="Join our network of licensed real estate professionals and receive qualified HUD home buyer leads. Grow your business with USAHUDhomes.com." />
-        <meta property="og:image" content="https://usahudhomes.com/us-map.png" />
-        <meta property="og:image:width" content="1536" />
-        <meta property="og:image:height" content="1024" />
+        <meta property="og:image" content="https://usahudhomes.com/broker-recruitment-optimized.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="670" />
         <meta property="og:image:type" content="image/png" />
         <meta property="fb:app_id" content="1993076721256699" />
 
@@ -232,7 +232,7 @@ const AgentRegistration = () => {
         <meta property="twitter:url" content="https://usahudhomes.com/broker/register" />
         <meta property="twitter:title" content="Become a HUD Home Lead Partner | USAHUDhomes.com" />
         <meta property="twitter:description" content="Join our network of licensed real estate professionals and receive qualified HUD home buyer leads. Grow your business with USAHUDhomes.com." />
-        <meta property="twitter:image" content="https://usahudhomes.com/us-map.png" />
+        <meta property="twitter:image" content="https://usahudhomes.com/broker-recruitment-optimized.png" />
       </Helmet>
       <div className="max-w-4xl mx-auto">
         {/* Header */}
