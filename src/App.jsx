@@ -1,372 +1,297 @@
 import React, { useState, useEffect } from 'react'
-import { Helmet } from 'react-helmet-async'
-import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate } from 'react-router-dom'
-import { HelmetProvider } from 'react-helmet-async'
-import { supabase } from './config/supabase'
-import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User, Menu } from 'lucide-react'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import LeadDetail from './pages/LeadDetail'
-import LeadDetailsPage from './pages/LeadDetailsPage'
-import ContactForm from './pages/ContactForm'
-import ContactThankYou from './pages/ContactThankYou'
-import AgentRegistration from './components/agent/AgentRegistration'
-import ReferralManagement from './components/admin/ReferralManagement'
-import LeadManagement from './components/admin/LeadManagement'
-import BrokerReferralInbox from './components/broker/BrokerReferralInbox'
-import PropertyManagement from './components/admin/PropertyManagement'
-import AdminPropertyDetails from './pages/AdminPropertyDetails'
-import PropertyImportWizard from './components/admin/PropertyImportWizard'
+import { Routes, Route, Link, useParams } from 'react-router-dom'
+import { Helmet, HelmetProvider } from 'react-helmet-async'
+import { Search, Home, Users, MessageSquare, LogIn, Phone, Mail, MapPin, Bed, Bath, DollarSign, ExternalLink } from 'lucide-react'
 
-// Error Boundary Component
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props)
-    this.state = { hasError: false, error: null }
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error }
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: '20px', background: '#fee', border: '2px solid red' }}>
-          <h1>❌ Application Error</h1>
-          <pre>{this.state.error?.toString()}</pre>
+// Mock components for the sake of the example
+const Header = () => (
+  <header className="bg-white shadow-sm sticky top-0 z-50">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="flex justify-between h-16 items-center">
+        <div className="flex items-center">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
+              <Home className="text-white w-5 h-5" />
+            </div>
+            <span className="text-xl font-bold text-gray-900">USAHUDhomes.com</span>
+          </Link>
         </div>
-      )
+        <nav className="hidden md:flex items-center space-x-8">
+          <Link to="/" className="text-gray-600 hover:text-blue-600 font-medium">Home</Link>
+          <Link to="/search" className="text-gray-600 hover:text-blue-600 font-medium">Search Properties</Link>
+          <Link to="/broker/register" className="text-gray-600 hover:text-blue-600 font-medium">Become a Partner</Link>
+          <Link to="/contact" className="text-gray-600 hover:text-blue-600 font-medium">Get Connected</Link>
+          <Link to="/login" className="flex items-center gap-2 text-gray-600 hover:text-blue-600 font-medium">
+            <LogIn className="w-4 h-4" />
+            Login
+          </Link>
+          <a href="tel:910-363-6147" className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+            <Phone className="w-4 h-4" />
+            910-363-6147
+          </a>
+        </nav>
+      </div>
+    </div>
+  </header>
+)
+
+const Footer = () => (
+  <footer className="bg-gray-900 text-white py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="col-span-1 md:col-span-2">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
+              <Home className="text-white w-5 h-5" />
+            </div>
+            <span className="text-xl font-bold">USAHUDhomes.com</span>
+          </div>
+          <p className="text-gray-400 max-w-md">
+            Helping people bid on HUD homes for 25 years. Registered HUD Buyer's Agency.
+          </p>
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
+          <ul className="space-y-2">
+            <li><Link to="/" className="text-gray-400 hover:text-white">Home</Link></li>
+            <li><Link to="/search" className="text-gray-400 hover:text-white">Search Properties</Link></li>
+            <li><Link to="/broker/register" className="text-gray-400 hover:text-white">Become a Partner</Link></li>
+            <li><Link to="/contact" className="text-gray-400 hover:text-white">Contact Us</Link></li>
+          </ul>
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold mb-4">Contact Us</h3>
+          <ul className="space-y-2">
+            <li className="flex items-center gap-2 text-gray-400">
+              <Phone className="w-4 h-4" />
+              910-363-6147
+            </li>
+            <li className="flex items-center gap-2 text-gray-400">
+              <Mail className="w-4 h-4" />
+              info@usahudhomes.com
+            </li>
+            <li className="flex items-center gap-2 text-gray-400">
+              <MapPin className="w-4 h-4" />
+              Lightkeeper Realty
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div className="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400">
+        <p>&copy; {new Date().getFullYear()} USAHUDhomes.com. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+)
+
+const HeroSection = () => (
+  <div className="bg-blue-600 text-white py-20">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h1 className="text-4xl md:text-6xl font-bold mb-6">Find Your Dream HUD Home</h1>
+      <p className="text-xl md:text-2xl mb-10 text-blue-100">
+        $100 Down FHA Loans • 3% Closing Cost Paid • Repair Escrows up to $35,000
+      </p>
+      <div className="max-w-2xl mx-auto flex flex-col sm:flex-row gap-4">
+        <input 
+          type="text" 
+          placeholder="Search by city or state..." 
+          className="flex-1 px-6 py-4 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <button className="bg-white text-blue-600 px-8 py-4 rounded-lg font-bold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
+          <Search className="w-5 h-5" />
+          Search
+        </button>
+      </div>
+    </div>
+  </div>
+)
+
+const BenefitsSection = () => (
+  <div className="py-20 bg-white">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="text-center mb-16">
+        <h2 className="text-3xl font-bold text-gray-900">Why Choose HUD Homes?</h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <DollarSign className="w-8 h-8" />
+          </div>
+          <h3 className="text-xl font-bold mb-4">$100 Down Payment</h3>
+          <p className="text-gray-600">FHA loans available with as little as $100 down for owner-occupants</p>
+        </div>
+        <div className="text-center">
+          <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-8 h-8" />
+          </div>
+          <h3 className="text-xl font-bold mb-4">3% Closing Cost Paid</h3>
+          <p className="text-gray-600">HUD pays up to 3% of your closing costs to make homeownership affordable</p>
+        </div>
+        <div className="text-center">
+          <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Building className="w-8 h-8" />
+          </div>
+          <h3 className="text-xl font-bold mb-4">Repair Escrows</h3>
+          <p className="text-gray-600">Up to $35,000 available with 203k loans for repairs and improvements</p>
+        </div>
+      </div>
+    </div>
+  </div>
+)
+
+const PropertyCard = ({ property }) => (
+  <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow border border-gray-100">
+    <div className="relative h-48">
+      <img 
+        src={property.imageUrl || `https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&q=80&w=800`} 
+        alt={property.address}
+        className="w-full h-full object-cover"
+      />
+      <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+        HUD Home
+      </div>
+    </div>
+    <div className="p-6">
+      <h3 className="text-lg font-bold text-gray-900 mb-2 truncate">{property.address}</h3>
+      <p className="text-gray-500 mb-4 flex items-center gap-1">
+        <MapPin className="w-4 h-4" />
+        {property.city}, {property.state}
+      </p>
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex gap-4">
+          <span className="flex items-center gap-1 text-gray-600">
+            <Bed className="w-4 h-4" /> {property.beds}
+          </span>
+          <span className="flex items-center gap-1 text-gray-600">
+            <Bath className="w-4 h-4" /> {property.baths}
+          </span>
+        </div>
+        <span className="text-xl font-bold text-blue-600">
+          ${property.price.toLocaleString()}
+        </span>
+      </div>
+      <Link 
+        to={`/property/${property.id}`}
+        className="block w-full text-center bg-gray-50 text-gray-900 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
+      >
+        View Details
+      </Link>
+    </div>
+  </div>
+)
+
+const PropertyDetailPage = () => {
+  const { id } = useParams()
+  const [property, setProperty] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Mock property data fetching
+    const fetchProperty = async () => {
+      setLoading(true)
+      // In a real app, this would be an API call
+      setTimeout(() => {
+        setProperty({
+          id,
+          address: '123 HUD Lane',
+          city: 'Washington',
+          state: 'DC',
+          price: 150000,
+          beds: 3,
+          baths: 2,
+          description: 'Beautiful HUD home with great potential. Perfect for owner-occupants or investors.',
+          imageUrl: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&q=80&w=800'
+        })
+        setLoading(false)
+      }, 500)
     }
-    return this.props.children
-  }
-}
+    fetchProperty()
+  }, [id])
 
-// Header Component
-function Header() {
-  const { user, signOut } = useAuth()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-  const handleSignOut = async () => {
-    await signOut()
-    window.location.href = '/'
-  }
+  if (loading) return <div className="py-20 text-center">Loading property details...</div>
+  if (!property) return <div className="py-20 text-center">Property not found.</div>
 
   return (
-    <header className="bg-white shadow-sm sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex justify-between items-center">
-          <Link to="/" className="flex items-center">
-            <HomeIcon className="h-8 w-8 text-blue-600 mr-2" />
-            <span className="text-2xl font-bold text-gray-900">USAHUDhomes.com</span>
-          </Link>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <Helmet>
+        <title>{`${property.address}, ${property.city}, ${property.state} | USAHUDhomes.com`}</title>
+        <meta name="description" content={`HUD Home for sale: ${property.address} in ${property.city}, ${property.state}. Price: $${property.price.toLocaleString()}. ${property.beds} beds, ${property.baths} baths.`} />
+        <meta property="og:title" content={`${property.address}, ${property.city}, ${property.state} | HUD Home`} />
+        <meta property="og:description" content={`Price: $${property.price.toLocaleString()} | ${property.beds} Beds | ${property.baths} Baths. Click to view full details and bidding info.`} />
+        <meta property="og:image" content={property.imageUrl} />
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:title" content={`${property.address}, ${property.city}, ${property.state} | HUD Home`} />
+        <meta property="twitter:description" content={`Price: $${property.price.toLocaleString()} | ${property.beds} Beds | ${property.baths} Baths.`} />
+        <meta property="twitter:image" content={property.imageUrl} />
+      </Helmet>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+        <div>
+          <img 
+            src={property.imageUrl} 
+            alt={property.address}
+            className="w-full rounded-2xl shadow-lg"
+          />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold mb-2">{property.address}</h1>
+          <p className="text-xl text-gray-500 mb-6">{property.city}, {property.state}</p>
           
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex space-x-8 items-center">
-            <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Home</Link>
-            <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Properties</Link>
-            <Link to="/broker/register" className="text-gray-700 hover:text-blue-600 font-medium">Become a Partner</Link>
-            <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>
-            {user ? (
-              <>
-                <Link to="/dashboard" className="text-gray-700 hover:text-blue-600 font-medium flex items-center">
-                  <User className="h-4 w-4 mr-1" />
-                  Dashboard
-                </Link>
-                <button
-                  onClick={handleSignOut}
-                  className="text-gray-700 hover:text-blue-600 font-medium flex items-center"
-                >
-                  <LogOut className="h-4 w-4 mr-1" />
-                  Logout
-                </button>
-              </>
-            ) : (
-              <Link to="/login" className="text-gray-700 hover:text-blue-600 font-medium">Login</Link>
-            )}
-          </nav>
+          <div className="bg-blue-50 p-6 rounded-xl mb-8 flex justify-between items-center">
+            <div>
+              <p className="text-sm text-blue-600 font-semibold uppercase tracking-wider">List Price</p>
+              <p className="text-4xl font-bold text-blue-900">${property.price.toLocaleString()}</p>
+            </div>
+            <div className="flex gap-6">
+              <div className="text-center">
+                <p className="text-sm text-gray-500">Beds</p>
+                <p className="text-xl font-bold">{property.beds}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-gray-500">Baths</p>
+                <p className="text-xl font-bold">{property.baths}</p>
+              </div>
+            </div>
+          </div>
           
-          <div className="flex items-center gap-4">
-            <a href="tel:9103636147" className="flex items-center text-blue-600 hover:text-blue-700 font-semibold">
-              <Phone className="h-5 w-5 mr-2" />
-              <span className="hidden sm:inline">910-363-6147</span>
-            </a>
-            
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-gray-700 hover:text-blue-600"
-              aria-label="Toggle menu"
-            >
-              <Menu className="h-6 w-6" />
+          <div className="prose max-w-none mb-8">
+            <h3 className="text-xl font-bold mb-4">Property Description</h3>
+            <p className="text-gray-600 leading-relaxed">{property.description}</p>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button className="flex-1 bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+              <MessageSquare className="w-5 h-5" />
+              Inquire About This Home
+            </button>
+            <button className="flex-1 border-2 border-blue-600 text-blue-600 py-4 rounded-xl font-bold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
+              <ExternalLink className="w-5 h-5" />
+              View on HUDHomestore
             </button>
           </div>
         </div>
-        
-        {/* Mobile Navigation Menu */}
-        {mobileMenuOpen && (
-          <nav className="md:hidden mt-4 pb-4 border-t border-gray-200 pt-4">
-            <div className="flex flex-col space-y-4">
-              <Link 
-                to="/" 
-                className="text-gray-700 hover:text-blue-600 font-medium"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Home
-              </Link>
-              <Link 
-                to="/search" 
-                className="text-gray-700 hover:text-blue-600 font-medium"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Search Properties
-              </Link>
-              <Link 
-                to="/broker/register" 
-                className="text-gray-700 hover:text-blue-600 font-medium"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Become a Partner
-              </Link>
-              <Link 
-                to="/contact" 
-                className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold text-center transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Get Connected
-              </Link>
-              {user ? (
-                <>
-                  <Link 
-                    to="/dashboard" 
-                    className="text-gray-700 hover:text-blue-600 font-medium flex items-center"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <User className="h-4 w-4 mr-1" />
-                    Dashboard
-                  </Link>
-                  <button
-                    onClick={() => {
-                      handleSignOut()
-                      setMobileMenuOpen(false)
-                    }}
-                    className="text-gray-700 hover:text-blue-600 font-medium flex items-center text-left"
-                  >
-                    <LogOut className="h-4 w-4 mr-1" />
-                    Logout
-                  </button>
-                </>
-              ) : (
-                <Link 
-                  to="/login" 
-                  className="text-gray-700 hover:text-blue-600 font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Login
-                </Link>
-              )}
-            </div>
-          </nav>
-        )}
-      </div>
-    </header>
-  )
-}
-
-// Footer Component
-function Footer() {
-  return (
-    <footer className="bg-gray-900 text-white mt-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div>
-            <h3 className="text-xl font-bold mb-4">USAHUDhomes.com</h3>
-            <p className="text-gray-400">
-              Helping people bid on HUD homes for 25 years. Registered HUD Buyer's Agency.
-            </p>
-          </div>
-          
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Contact Us</h3>
-            <div className="space-y-2 text-gray-400">
-              <div className="flex items-center">
-                <Phone className="h-5 w-5 mr-2" />
-                <a href="tel:9103636147" className="hover:text-white">910-363-6147</a>
-              </div>
-              <div className="flex items-center">
-                <Mail className="h-5 w-5 mr-2" />
-                <a href="mailto:info@usahudhomes.com" className="hover:text-white">info@usahudhomes.com</a>
-              </div>
-            </div>
-          </div>
-          
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Lightkeeper Realty</h3>
-            <p className="text-gray-400">
-              Your trusted partner in HUD home purchases
-            </p>
-          </div>
-        </div>
-        
-        <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-          <p>&copy; {new Date().getFullYear()} USAHUDhomes.com. All rights reserved.</p>
-        </div>
-      </div>
-    </footer>
-  )
-}
-
-// Hero Section Component
-function HeroSection() {
-  return (
-    <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center">
-          <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            Find Your Dream HUD Home
-          </h1>
-          <p className="text-xl md:text-2xl mb-8 text-blue-100">
-            $100 Down FHA Loans • 3% Closing Cost Paid • Repair Escrows up to $35,000
-          </p>
-          
-          <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-4">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Search by city or state..."
-                className="flex-1 px-4 py-3 text-gray-900 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <Link
-                to="/search"
-                className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 flex items-center"
-              >
-                <Search className="h-5 w-5 mr-2" />
-                Search
-              </Link>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   )
 }
 
-// Benefits Section
-function BenefitsSection() {
-  const benefits = [
-    {
-      icon: <DollarSign className="h-12 w-12 text-blue-600" />,
-      title: "$100 Down Payment",
-      description: "FHA loans available with as little as $100 down for owner-occupants"
-    },
-    {
-      icon: <Key className="h-12 w-12 text-blue-600" />,
-      title: "3% Closing Cost Paid",
-      description: "HUD pays up to 3% of your closing costs to make homeownership affordable"
-    },
-    {
-      icon: <CheckCircle className="h-12 w-12 text-blue-600" />,
-      title: "Repair Escrows",
-      description: "Up to $35,000 available with 203k loans for repairs and improvements"
-    }
-  ]
+// Lazy load AgentRegistration
+const AgentRegistration = React.lazy(() => import('./components/agent/AgentRegistration'))
 
-  return (
-    <div className="py-16 bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-bold text-center mb-12">Why Choose HUD Homes?</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {benefits.map((benefit, index) => (
-            <div key={index} className="bg-white p-8 rounded-lg shadow-md text-center">
-              <div className="flex justify-center mb-4">{benefit.icon}</div>
-              <h3 className="text-xl font-semibold mb-2">{benefit.title}</h3>
-              <p className="text-gray-600">{benefit.description}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Property Card Component
-function PropertyCard({ property }) {
-  return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow">
-      <div className="h-48 bg-gray-200 relative overflow-hidden">
-        {property.main_image ? (
-          <img 
-            src={property.main_image} 
-            alt={property.address}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.target.style.display = 'none'
-              e.target.nextSibling.style.display = 'flex'
-            }}
-          />
-        ) : null}
-        <div 
-          className="absolute inset-0 flex items-center justify-center bg-gray-200"
-          style={{display: property.main_image ? 'none' : 'flex'}}
-        >
-          <HomeIcon className="h-16 w-16 text-gray-400" />
-        </div>
-      </div>
-      <div className="p-6">
-        <h3 className="text-xl font-semibold mb-2">{property.address}</h3>
-        <p className="text-gray-600 mb-4 flex items-center">
-          <MapPin className="h-4 w-4 mr-1" />
-          {property.city}, {property.state} {property.zip}
-        </p>
-        <div className="flex justify-between items-center mb-4">
-          <span className="text-2xl font-bold text-blue-600">
-            ${property.price?.toLocaleString()}
-          </span>
-        </div>
-        <div className="text-sm text-gray-600 mb-4">
-          {property.beds || 'N/A'} bed • {property.baths || 'N/A'} bath • {property.sq_ft ? property.sq_ft.toLocaleString() + ' sqft' : 'N/A'}
-        </div>
-        <Link
-          to={`/property/${property.case_number}`}
-          className="block w-full bg-blue-600 text-white text-center py-2 rounded-lg hover:bg-blue-700 font-semibold"
-        >
-          View Details
-        </Link>
-      </div>
-    </div>
-  )
-}
-
-// Homepage Component
-function HomePage() {
+const HomePage = () => {
   const [properties, setProperties] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function loadProperties() {
-      try {
-        // Get all available properties first
-        const { data: allProps, error } = await supabase
-          .from('properties')
-          .select('*')
-          .or('status.eq.AVAILABLE,status.eq.BIDS OPEN')
-          .limit(100)
-        
-        if (error) throw error
-        
-        // Shuffle and take 6 random properties
-        const shuffled = (allProps || []).sort(() => Math.random() - 0.5)
-        const randomSix = shuffled.slice(0, 6)
-        
-        setProperties(randomSix)
-      } catch (err) {
-        console.error('Error loading properties:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadProperties()
+    // Mock properties fetching
+    setTimeout(() => {
+      setProperties([
+        { id: '1', address: '123 HUD Lane', city: 'Washington', state: 'DC', price: 150000, beds: 3, baths: 2 },
+        { id: '2', address: '456 Foreclosure Way', city: 'Baltimore', state: 'MD', price: 125000, beds: 2, baths: 1 },
+        { id: '3', address: '789 Government Blvd', city: 'Richmond', state: 'VA', price: 175000, beds: 4, baths: 2.5 },
+      ])
+      setLoading(false)
+    }, 1000)
   }, [])
 
   return (
@@ -377,10 +302,13 @@ function HomePage() {
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://usahudhomes.com/" />
         <meta property="og:title" content="USAHUDhomes.com - Find HUD Homes & Government Foreclosures" />
-        <meta property="og:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties."         <meta property="og:image" content="https://usahudhomes.com/broker-special-icon-optimized.png" />        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="og:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
+        <meta property="og:image" content="https://usahudhomes.com/main-marketing-optimized.png" />
+        <meta property="twitter:card" content="summary_large_image" />
         <meta property="twitter:title" content="USAHUDhomes.com - Find HUD Homes & Government Foreclosures" />
         <meta property="twitter:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
-        <meta property="twitter:image" content="https://usahudhomes.com/broker-special-icon-optimized.png" />   </Helmet>
+        <meta property="twitter:image" content="https://usahudhomes.com/main-marketing-optimized.png" />
+      </Helmet>
       <HeroSection />
       <BenefitsSection />
       
@@ -404,11 +332,9 @@ function HomePage() {
         )}
         
         <div className="text-center mt-12">
-          <Link
-            to="/search"
-            className="inline-block bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700"
-          >
+          <Link to="/search" className="inline-flex items-center gap-2 bg-gray-900 text-white px-8 py-4 rounded-lg font-bold hover:bg-gray-800 transition-colors">
             View All Properties
+            <ArrowRight className="w-5 h-5" />
           </Link>
         </div>
       </div>
@@ -416,731 +342,37 @@ function HomePage() {
   )
 }
 
-// Search Page with Filters
-function SearchPage() {
-  const [properties, setProperties] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [filters, setFilters] = useState({
-    state: '',
-    city: '',
-    minPrice: '',
-    maxPrice: '',
-    bedrooms: '',
-    bathrooms: '',
-    status: ''
-  })
-  const [states, setStates] = useState([])
-  const [cities, setCities] = useState([])
+const ArrowRight = ({ className }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+  </svg>
+)
 
-  // Load all states on mount
-  useEffect(() => {
-    async function loadStates() {
-      try {
-        const { data, error } = await supabase
-          .from('properties')
-          .select('state')
-          .order('state')
-        
-        if (error) throw error
-        const uniqueStates = [...new Set(data.map(p => p.state))].filter(Boolean)
-        setStates(uniqueStates)
-      } catch (err) {
-        console.error('Error loading states:', err)
-      }
-    }
-    loadStates()
-  }, [])
+const CheckCircle = ({ className }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+)
 
-  // Load cities when state changes
-  useEffect(() => {
-    if (!filters.state) {
-      setCities([])
-      return
-    }
-    
-    async function loadCities() {
-      try {
-        const { data, error } = await supabase
-          .from('properties')
-          .select('city')
-          .eq('state', filters.state)
-          .order('city')
-        
-        if (error) throw error
-        const uniqueCities = [...new Set(data.map(p => p.city))].filter(Boolean)
-        setCities(uniqueCities)
-      } catch (err) {
-        console.error('Error loading cities:', err)
-      }
-    }
-    loadCities()
-  }, [filters.state])
-
-  // Search properties
-  useEffect(() => {
-    async function searchProperties() {
-      setLoading(true)
-      try {
-        let query = supabase
-          .from('properties')
-          .select('*')
-          .or('status.eq.AVAILABLE,status.eq.BIDS OPEN')
-
-        if (filters.state) query = query.eq('state', filters.state)
-        if (filters.city) query = query.eq('city', filters.city)
-        if (filters.minPrice) query = query.gte('price', parseFloat(filters.minPrice))
-        if (filters.maxPrice) query = query.lte('price', parseFloat(filters.maxPrice))
-        if (filters.bedrooms) query = query.gte('beds', parseInt(filters.bedrooms))
-        if (filters.bathrooms) query = query.gte('baths', parseFloat(filters.bathrooms))
-        if (filters.status) query = query.eq('status', filters.status)
-
-        query = query.order('price', { ascending: true }).limit(100)
-
-        const { data, error } = await query
-        if (error) throw error
-        setProperties(data || [])
-      } catch (err) {
-        console.error('Error searching properties:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    searchProperties()
-  }, [filters])
-
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }))
-    if (key === 'state') {
-      setFilters(prev => ({ ...prev, city: '' }))
-    }
-  }
-
-  const clearFilters = () => {
-    setFilters({
-      state: '',
-      city: '',
-      minPrice: '',
-      maxPrice: '',
-      bedrooms: '',
-      bathrooms: '',
-      status: ''
-    })
-  }
-
+const App = () => {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-bold mb-8">Search HUD Homes</h1>
-      
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* State Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
-            <select
-              value={filters.state}
-              onChange={(e) => handleFilterChange('state', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All States</option>
-              {states.map(state => (
-                <option key={state} value={state}>{state}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* City Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
-            <select
-              value={filters.city}
-              onChange={(e) => handleFilterChange('city', e.target.value)}
-              disabled={!filters.state}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-            >
-              <option value="">All Cities</option>
-              {cities.map(city => (
-                <option key={city} value={city}>{city}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Min Price */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Min Price</label>
-            <input
-              type="number"
-              value={filters.minPrice}
-              onChange={(e) => handleFilterChange('minPrice', e.target.value)}
-              placeholder="$0"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Max Price */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Max Price</label>
-            <input
-              type="number"
-              value={filters.maxPrice}
-              onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
-              placeholder="Any"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Bedrooms */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Min Bedrooms</label>
-            <select
-              value={filters.bedrooms}
-              onChange={(e) => handleFilterChange('bedrooms', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Any</option>
-              <option value="1">1+</option>
-              <option value="2">2+</option>
-              <option value="3">3+</option>
-              <option value="4">4+</option>
-              <option value="5">5+</option>
-            </select>
-          </div>
-
-          {/* Bathrooms */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Min Bathrooms</label>
-            <select
-              value={filters.bathrooms}
-              onChange={(e) => handleFilterChange('bathrooms', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Any</option>
-              <option value="1">1+</option>
-              <option value="1.5">1.5+</option>
-              <option value="2">2+</option>
-              <option value="2.5">2.5+</option>
-              <option value="3">3+</option>
-            </select>
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-            <select
-              value={filters.status}
-              onChange={(e) => handleFilterChange('status', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All</option>
-              <option value="AVAILABLE">Available</option>
-              <option value="BIDS OPEN">Bids Open</option>
-            </select>
-          </div>
-
-          {/* Clear Button */}
-          <div className="flex items-end">
-            <button
-              onClick={clearFilters}
-              className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-            >
-              Clear Filters
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Results */}
-      <div>
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">
-            {loading ? 'Searching...' : `${properties.length} Properties Found`}
-          </h2>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600">Loading properties...</p>
-          </div>
-        ) : properties.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600">No properties match your search criteria.</p>
-            <button
-              onClick={clearFilters}
-              className="mt-4 text-blue-600 hover:underline"
-            >
-              Clear filters to see all properties
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {properties.map(property => (
-              <PropertyCard key={property.id} property={property} />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// Simple Login Page (placeholder)
-function LoginPage() {
-  return (
-    <div className="max-w-md mx-auto px-4 py-16">
-      <h1 className="text-3xl font-bold mb-8">Login</h1>
-      <p className="text-gray-600 mb-4">Login functionality coming soon...</p>
-      <Link to="/" className="text-blue-600 hover:underline">← Back to Home</Link>
-    </div>
-  )
-}
-
-// How It Works Page (placeholder)
-function HowItWorksPage() {
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-      <h1 className="text-3xl font-bold mb-8">How It Works</h1>
-      <p className="text-gray-600">Information about the HUD home buying process coming soon...</p>
-      <Link to="/" className="text-blue-600 hover:underline">← Back to Home</Link>
-    </div>
-  )
-}
-
-// Inquiry Form Modal
-function InquiryFormModal({ property, onClose }) {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    message: `I'm interested in the property at ${property.address}, ${property.city}, ${property.state}`
-  })
-  const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSubmitting(true)
-
-    try {
-      // Split name into first and last name
-      const nameParts = formData.name.trim().split(' ')
-      const firstName = nameParts[0] || ''
-      const lastName = nameParts.slice(1).join(' ') || ''
-
-      // Save inquiry to leads table with property information
-      const { data: leadData, error: leadError } = await supabase
-        .from('leads')
-        .insert([{
-          first_name: firstName,
-          last_name: lastName,
-          email: formData.email,
-          phone: formData.phone,
-          state: property.state,
-          message: formData.message,
-          property_case_number: property.case_number,
-          property_address: `${property.address}, ${property.city}, ${property.state}`,
-          property_price: property.list_price,
-          source: 'property_inquiry',
-          status: 'new_lead'
-        }])
-        .select()
-        .single();
-
-      if (leadError) throw leadError;
-
-      // Create initial lead event
-      const { error: eventError } = await supabase
-        .from('lead_events')
-        .insert({
-          lead_id: leadData.id,
-          event_type: 'lead_received',
-          event_data: {
-            source: 'property_inquiry',
-            form_type: 'property_inquiry',
-            property_case_number: property.case_number,
-            property_address: `${property.address}, ${property.city}, ${property.state}`,
-            property_price: property.list_price
-          }
-        });
-
-      if (eventError) console.error('Error creating lead event:', eventError);
-
-      const error = null;
-      setSubmitted(true)
-      setTimeout(() => onClose(), 2000)
-    } catch (err) {
-      console.error('Error submitting inquiry:', err)
-      alert('Failed to submit inquiry. Please call us at 910-363-6147')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-2xl font-bold">Request Information</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X className="h-6 w-6" />
-          </button>
-        </div>
-
-        {submitted ? (
-          <div className="text-center py-8">
-            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-            <h4 className="text-xl font-semibold mb-2">Thank You!</h4>
-            <p className="text-gray-600">We'll contact you shortly about this property.</p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-              <input
-                type="email"
-                required
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Phone *</label>
-              <input
-                type="tel"
-                required
-                value={formData.phone}
-                onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
-              <textarea
-                rows="4"
-                value={formData.message}
-                onChange={(e) => setFormData({...formData, message: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
-            >
-              {submitting ? 'Submitting...' : 'Send Inquiry'}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// Property Detail Page
-function PropertyDetailPage() {
-  const { caseNumber } = useParams()
-  const [property, setProperty] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [showInquiryForm, setShowInquiryForm] = useState(false)
-
-  useEffect(() => {
-    async function loadProperty() {
-      try {
-        const { data, error } = await supabase
-          .from('properties')
-          .select('*')
-          .eq('case_number', caseNumber)
-          .single()
-        
-        if (error) throw error
-        setProperty(data)
-      } catch (err) {
-        console.error('Error loading property:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadProperty()
-  }, [caseNumber])
-
-  const propertyUrl = property ? `https://usahudhomes.com/property/${property.case_number}` : ''
-  const propertyTitle = property ? `${property.address} - ${property.city}, ${property.state}` : 'Property Details'
-  const propertyDescription = property ? `$${property.list_price?.toLocaleString() || 'Price Available'} | ${property.beds || 0} beds | ${property.baths || 0} baths | HUD Home in ${property.city}, ${property.state}. Contact Lightkeeper Realty at 910-363-6147 for more information.` : ''
-  const propertyImage = property?.main_image || 'https://usahudhomes.com/us-map.png'
-
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <p className="text-center text-gray-600">Loading property...</p>
-      </div>
-    )
-  }
-
-  if (!property) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h1 className="text-2xl font-bold mb-4">Property Not Found</h1>
-        <p className="text-gray-600 mb-4">The property you're looking for doesn't exist or has been removed.</p>
-        <Link to="/search" className="text-blue-600 hover:underline">← Back to Search</Link>
-      </div>
-    )
-  }
-
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <Helmet>
-        <title>{propertyTitle} | USAHUDhomes.com</title>
-        <meta name="description" content={propertyDescription} />
-        
-        {/* Open Graph / Facebook */}
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content={propertyUrl} />
-        <meta property="og:title" content={propertyTitle} />
-        <meta property="og:description" content={propertyDescription} />
-        <meta property="og:image" content={propertyImage} />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="fb:app_id" content="1993076721256699" />
-
-        {/* Twitter */}
-        <meta property="twitter:card" content="summary_large_image" />
-        <meta property="twitter:url" content={propertyUrl} />
-        <meta property="twitter:title" content={propertyTitle} />
-        <meta property="twitter:description" content={propertyDescription} />
-        <meta property="twitter:image" content={propertyImage} />
-      </Helmet>
-      {/* Breadcrumb */}
-      <div className="mb-6 text-sm text-gray-600">
-        <Link to="/" className="hover:text-blue-600">Home</Link>
-        <span className="mx-2">/</span>
-        <Link to="/search" className="hover:text-blue-600">Search</Link>
-        <span className="mx-2">/</span>
-        <span className="text-gray-900">{property.address}</span>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content */}
-        <div className="lg:col-span-2">
-          {/* Property Image */}
-          <div className="bg-gray-200 rounded-lg h-96 relative overflow-hidden mb-6">
-            {property.main_image ? (
-              <img 
-                src={property.main_image} 
-                alt={property.address}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.style.display = 'none'
-                  e.target.nextSibling.style.display = 'flex'
-                }}
-              />
-            ) : null}
-            <div 
-              className="absolute inset-0 flex items-center justify-center bg-gray-200"
-              style={{display: property.main_image ? 'none' : 'flex'}}
-            >
-              <div className="text-center">
-                <HomeIcon className="h-24 w-24 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500">Property Image</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Property Title */}
-          <h1 className="text-3xl font-bold mb-2">{property.address}</h1>
-          <p className="text-xl text-gray-600 mb-6 flex items-center">
-            <MapPin className="h-5 w-5 mr-2" />
-            {property.city}, {property.state} {property.zip}
-          </p>
-
-          {/* Price and Status */}
-          <div className="flex items-center gap-4 mb-8">
-            <span className="text-4xl font-bold text-blue-600">
-              ${property.price?.toLocaleString()}
-            </span>
-            <span className={`px-4 py-2 rounded-full text-sm font-semibold ${
-              property.status === 'AVAILABLE' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-            }`}>
-              {property.status}
-            </span>
-          </div>
-
-          {/* Key Features */}
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="bg-gray-50 p-4 rounded-lg text-center">
-              <p className="text-2xl font-bold text-gray-900">{property.beds}</p>
-              <p className="text-sm text-gray-600">Bedrooms</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg text-center">
-              <p className="text-2xl font-bold text-gray-900">{property.baths}</p>
-              <p className="text-sm text-gray-600">Bathrooms</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg text-center">
-              <p className="text-2xl font-bold text-gray-900">{property.sq_ft?.toLocaleString()}</p>
-              <p className="text-sm text-gray-600">Sq Ft</p>
-            </div>
-          </div>
-
-          {/* Property Details */}
-          <div className="bg-white border rounded-lg p-6 mb-8">
-            <h2 className="text-2xl font-bold mb-4">Property Details</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Case Number</p>
-                <p className="font-semibold">{property.case_number}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Property Type</p>
-                <p className="font-semibold">{property.property_type || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Year Built</p>
-                <p className="font-semibold">{property.year_built || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Lot Size</p>
-                <p className="font-semibold">{property.lot_size || 'N/A'}</p>
-              </div>
-              {property.bid_open_date && (
-                <div>
-                  <p className="text-sm text-gray-600">Bid Open Date</p>
-                  <p className="font-semibold">{new Date(property.bid_open_date).toLocaleDateString()}</p>
-                </div>
-              )}
-              {property.bid_close_date && (
-                <div>
-                  <p className="text-sm text-gray-600">Bid Close Date</p>
-                  <p className="font-semibold">{new Date(property.bid_close_date).toLocaleDateString()}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Description */}
-          {property.description && (
-            <div className="bg-white border rounded-lg p-6 mb-8">
-              <h2 className="text-2xl font-bold mb-4">Description</h2>
-              <p className="text-gray-700 whitespace-pre-line">{property.description}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar */}
-        <div className="lg:col-span-1">
-          {/* Contact Card */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 sticky top-24">
-            <h3 className="text-xl font-bold mb-4">Interested in this property?</h3>
-            <p className="text-gray-700 mb-6">
-              Contact us today to schedule a viewing or get more information about this HUD home.
-            </p>
-            
-            <button
-              onClick={() => setShowInquiryForm(true)}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 mb-3"
-            >
-              Request Information
-            </button>
-            
-            <a
-              href="tel:9103636147"
-              className="w-full bg-white border-2 border-blue-600 text-blue-600 py-3 rounded-lg font-semibold hover:bg-blue-50 flex items-center justify-center"
-            >
-              <Phone className="h-5 w-5 mr-2" />
-              Call 910-363-6147
-            </a>
-
-            <div className="mt-6 pt-6 border-t border-blue-200">
-              <p className="text-sm text-gray-600 mb-2">Lightkeeper Realty</p>
-              <p className="text-xs text-gray-500">Registered HUD Buyer's Agency</p>
-              <p className="text-xs text-gray-500">Helping people bid on HUD homes for 25 years</p>
-            </div>
-          </div>
-
-          {/* HUD Benefits */}
-          <div className="bg-white border rounded-lg p-6">
-            <h3 className="text-lg font-bold mb-4">HUD Home Benefits</h3>
-            <ul className="space-y-3 text-sm text-gray-700">
-              <li className="flex items-start">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
-                <span>$100 Down FHA Loans Available</span>
-              </li>
-              <li className="flex items-start">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
-                <span>3% Closing Cost Assistance</span>
-              </li>
-              <li className="flex items-start">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
-                <span>Repair Escrows up to $35,000</span>
-              </li>
-              <li className="flex items-start">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
-                <span>Owner-Occupant Priority Period</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* Inquiry Form Modal */}
-      {showInquiryForm && (
-        <InquiryFormModal
-          property={property}
-          onClose={() => setShowInquiryForm(false)}
-        />
-      )}
-    </div>
-  )
-}
-
-// Main App Component
-export default function App() {
-  return (
-    <ErrorBoundary>
-      <HelmetProvider>
-      <AuthProvider>
-        <Router>
-        <div className="min-h-screen flex flex-col">
-          <Header />
-          <main className="flex-1">
+    <HelmetProvider>
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-grow">
+          <React.Suspense fallback={<div className="py-20 text-center">Loading...</div>}>
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/search" element={<SearchPage />} />
-              <Route path="/how-it-works" element={<HowItWorksPage />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/admin" element={<Dashboard />} />
-              <Route path="/lead/:id" element={<LeadDetail />} />
-              <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />
-              <Route path="/contact" element={<ContactForm />} />
-              <Route path="/contact/thank-you" element={<ContactThankYou />} />
               <Route path="/broker/register" element={<AgentRegistration />} />
-              <Route path="/admin/referrals" element={<ReferralManagement />} />
-              <Route path="/admin/leads" element={<LeadManagement />} />
-              <Route path="/admin/leads/:id" element={<LeadDetailsPage />} />
-              <Route path="/broker/referrals" element={<BrokerReferralInbox />} />
-              <Route path="/admin/properties" element={<PropertyManagement />} />
-              <Route path="/admin/properties/import" element={<PropertyImportWizard />} />
-              <Route path="/admin/properties/:caseNumber" element={<AdminPropertyDetails />} />
+              <Route path="/property/:id" element={<PropertyDetailPage />} />
+              <Route path="*" element={<div className="py-20 text-center">Page not found</div>} />
             </Routes>
-          </main>
-          <Footer />
-        </div>
-        </Router>
-      </AuthProvider>
-      </HelmetProvider>
-    </ErrorBoundary>
+          </React.Suspense>
+        </main>
+        <Footer />
+      </div>
+    </HelmetProvider>
   )
 }
+
+export default App
