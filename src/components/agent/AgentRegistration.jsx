@@ -222,6 +222,9 @@ const AgentRegistration = () => {
         <meta property="og:title" content="Become a HUD Home Lead Partner | USAHUDhomes.com" />
         <meta property="og:description" content="Join our network of licensed real estate professionals and receive qualified HUD home buyer leads. Grow your business with USAHUDhomes.com." />
         <meta property="og:image" content="https://usahudhomes.com/us-map.png" />
+        <meta property="og:image:width" content="1536" />
+        <meta property="og:image:height" content="1024" />
+        <meta property="og:image:type" content="image/png" />
 
         {/* Twitter */}
         <meta property="twitter:card" content="summary_large_image" />
