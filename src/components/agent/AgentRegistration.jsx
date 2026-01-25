@@ -225,6 +225,7 @@ const AgentRegistration = () => {
         <meta property="og:image:width" content="1536" />
         <meta property="og:image:height" content="1024" />
         <meta property="og:image:type" content="image/png" />
+        <meta property="fb:app_id" content="1993076721256699" />
 
         {/* Twitter */}
         <meta property="twitter:card" content="summary_large_image" />
