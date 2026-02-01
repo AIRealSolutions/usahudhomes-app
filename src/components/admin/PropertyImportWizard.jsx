@@ -138,6 +138,21 @@ export default function PropertyImportWizard() {
     }
   };
 
+  const interpretBaths = (val) => {
+    if (val === null || val === undefined || val === '') return null;
+    let num = parseFloat(val);
+    if (isNaN(num)) return null;
+    
+    // Rule: .1 represents a half bath (e.g., 1.1 -> 1.5)
+    const integerPart = Math.floor(num);
+    const fractionalPart = Math.round((num - integerPart) * 10) / 10;
+    
+    if (fractionalPart === 0.1) {
+      return integerPart + 0.5;
+    }
+    return num;
+  };
+
   const validateData = (data) => {
     const errors = [];
     const requiredFields = ['case_number', 'address', 'city', 'state'];
@@ -220,13 +235,13 @@ export default function PropertyImportWizard() {
           address: p.address,
           city: p.city,
           state: selectedState,
-          list_price: p.list_price ? parseInt(p.list_price) : null,
-          bedrooms: p.bedrooms ? parseInt(p.bedrooms) : null,
-          bathrooms: p.bathrooms ? parseFloat(p.bathrooms) : null,
-          status: p.status || 'Available',
+          price: p.list_price ? parseFloat(p.list_price) : 0,
+          beds: p.bedrooms ? parseInt(p.bedrooms) : null,
+          baths: interpretBaths(p.bathrooms),
+          status: p.status || 'AVAILABLE',
           main_image: p.main_image || null,
-          property_type: p.property_type || null,
-          square_feet: p.square_feet ? parseInt(p.square_feet) : null,
+          property_type: p.property_type || 'Single Family',
+          sq_ft: p.square_feet ? parseInt(p.square_feet) : null,
           lot_size: p.lot_size || null,
           year_built: p.year_built ? parseInt(p.year_built) : null,
           description: p.description || null
@@ -250,13 +265,13 @@ export default function PropertyImportWizard() {
             address: property.address,
             city: property.city,
             state: selectedState,
-            list_price: property.list_price ? parseInt(property.list_price) : null,
-            bedrooms: property.bedrooms ? parseInt(property.bedrooms) : null,
-            bathrooms: property.bathrooms ? parseFloat(property.bathrooms) : null,
-            status: property.status || 'Available',
+            price: property.list_price ? parseFloat(property.list_price) : 0,
+            beds: property.bedrooms ? parseInt(property.bedrooms) : null,
+            baths: interpretBaths(property.bathrooms),
+            status: property.status || 'AVAILABLE',
             main_image: property.main_image || null,
-            property_type: property.property_type || null,
-            square_feet: property.square_feet ? parseInt(property.square_feet) : null,
+            property_type: property.property_type || 'Single Family',
+            sq_ft: property.square_feet ? parseInt(property.square_feet) : null,
             lot_size: property.lot_size || null,
             year_built: property.year_built ? parseInt(property.year_built) : null,
             description: property.description || null

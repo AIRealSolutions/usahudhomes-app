@@ -103,6 +103,21 @@ export default function PropertyImportAgent({ onPropertyAdded }) {
   /**
    * Add property to database
    */
+  const interpretBaths = (val) => {
+    if (val === null || val === undefined || val === '') return null;
+    let num = parseFloat(val);
+    if (isNaN(num)) return null;
+    
+    // Rule: .1 represents a half bath (e.g., 1.1 -> 1.5)
+    const integerPart = Math.floor(num);
+    const fractionalPart = Math.round((num - integerPart) * 10) / 10;
+    
+    if (fractionalPart === 0.1) {
+      return integerPart + 0.5;
+    }
+    return num;
+  };
+
   const handleAddProperty = async () => {
     if (!propertyData) return;
 
@@ -121,6 +136,9 @@ export default function PropertyImportAgent({ onPropertyAdded }) {
       // Add property to database
       const newProperty = await propertyService.addProperty({
         ...propertyData,
+        beds: propertyData.bedrooms,
+        baths: interpretBaths(propertyData.bathrooms),
+        sq_ft: propertyData.square_feet,
         images: images.length > 0 ? JSON.stringify(images) : null
       });
 

@@ -227,8 +227,12 @@ function HUDImport({ onImportComplete }) {
         }
 
         // Handle .1 bath as 0.5 (half bath)
-        if (mappedKey === 'baths' && value === 0.1) {
-          value = 0.5
+        if (mappedKey === 'baths' && typeof value === 'number') {
+          const integerPart = Math.floor(value);
+          const fractionalPart = Math.round((value - integerPart) * 10) / 10;
+          if (fractionalPart === 0.1) {
+            value = integerPart + 0.5;
+          }
         }
 
         // Format dates
