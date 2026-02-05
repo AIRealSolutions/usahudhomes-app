@@ -22,6 +22,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { propertyService } from '../../services/database'
 import { supabase } from '../../config/supabase'
+import { getImageUrl, getImageUrlFromCaseNumber } from '../../utils/imageUtils'
 import PropertyImportAgent from './PropertyImportAgent'
 import HUDSyncAdmin from './HUDSyncAdmin'
 import HUDImport from './HUDImport'
@@ -761,8 +762,21 @@ function PropertyAdmin() {
               <div className="flex justify-between items-start">
                 <div className="flex gap-4 flex-1">
                   <div className="w-32 h-32 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                    {property.main_image ? (
-                      <img src={property.main_image} alt={property.address} className="w-full h-full object-cover" />
+                    {(property.main_image || property.case_number) ? (
+                      <>
+                        <img 
+                          src={getImageUrl(property.main_image) || getImageUrlFromCaseNumber(property.case_number)} 
+                          alt={property.address} 
+                          className="w-full h-full object-cover" 
+                          onError={(e) => {
+                            e.target.style.display = 'none'
+                            e.target.nextSibling.style.display = 'flex'
+                          }}
+                        />
+                        <div className="hidden w-full h-full items-center justify-center">
+                          <Home className="h-12 w-12 text-gray-400" />
+                        </div>
+                      </>
                     ) : (
                       <Home className="h-12 w-12 text-gray-400" />
                     )}

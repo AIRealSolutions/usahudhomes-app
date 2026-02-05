@@ -43,12 +43,23 @@ export const getImageUrl = (imagePath) => {
     return imagePath;
   }
   
-  // Get public URL from Supabase Storage
-  const { data } = supabase.storage
-    .from('USAHUDhomes')
-    .getPublicUrl(imagePath);
+  // Handle local paths (legacy support)
+  if (imagePath.startsWith('/property-images/') || imagePath.startsWith('property-images/')) {
+    // Return as-is for local public folder images
+    return imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+  }
   
-  return data?.publicUrl || null;
+  // Get public URL from Supabase Storage
+  try {
+    const { data } = supabase.storage
+      .from('USAHUDhomes')
+      .getPublicUrl(imagePath);
+    
+    return data?.publicUrl || null;
+  } catch (error) {
+    console.error('Error getting image URL:', error);
+    return null;
+  }
 };
 
 /**
@@ -59,7 +70,18 @@ export const getImageUrl = (imagePath) => {
 export const getImageUrlFromCaseNumber = (caseNumber) => {
   if (!caseNumber) return null;
   const filename = caseNumberToFilename(caseNumber);
-  return `https://lpqjndfjbenolhneqzec.supabase.co/storage/v1/object/public/USAHUDhomes/${filename}`;
+  
+  // Use Supabase client to get public URL (more reliable)
+  try {
+    const { data } = supabase.storage
+      .from('USAHUDhomes')
+      .getPublicUrl(filename);
+    
+    return data?.publicUrl || null;
+  } catch (error) {
+    console.error('Error constructing image URL from case number:', error);
+    return null;
+  }
 };
 
 /**

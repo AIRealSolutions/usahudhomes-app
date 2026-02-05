@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { propertyService } from '../../services/database'
 import AIMarketingAssistant from './AIMarketingAssistant'
-import { getImageUrl } from '../../utils/imageUtils'
+import { getImageUrl, getImageUrlFromCaseNumber } from '../../utils/imageUtils'
 import {
   ArrowLeft,
   Home,
@@ -168,7 +168,8 @@ Generated: ${new Date().toLocaleString()}
     )
   }
 
-  const imageUrl = getImageUrl(property.image_url)
+  // Fix: Use correct field name (main_image) and add fallback to case number
+  const imageUrl = getImageUrl(property.main_image) || getImageUrlFromCaseNumber(property.case_number)
 
   return (
     <>
