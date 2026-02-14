@@ -512,9 +512,10 @@ function SearchPage() {
   }, [filters])
 
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }))
     if (key === 'state') {
-      setFilters(prev => ({ ...prev, city: '' }))
+      setFilters(prev => ({ ...prev, [key]: value, city: '' }))
+    } else {
+      setFilters(prev => ({ ...prev, [key]: value }))
     }
   }
 
