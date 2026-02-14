@@ -487,7 +487,7 @@ function SearchPage() {
         let query = supabase
           .from('properties')
           .select('*')
-          .or('status.eq.AVAILABLE,status.eq.BIDS OPEN')
+          .eq('is_active', true)
 
         if (filters.state) query = query.eq('state', filters.state)
         if (filters.city) query = query.eq('city', filters.city)
