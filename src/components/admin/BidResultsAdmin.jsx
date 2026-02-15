@@ -8,6 +8,19 @@ export default function BidResultsAdmin() {
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [saving, setSaving] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [addForm, setAddForm] = useState({
+    case_number: '',
+    address: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    net_to_hud: '',
+    broker_name: '',
+    purchaser_type: 'Investor',
+    date_accepted: '',
+    status: 'pending'
+  })
 
   useEffect(() => {
     fetchBidResults()
@@ -150,6 +163,268 @@ export default function BidResultsAdmin() {
           Manage properties under contract and track successful deals
         </p>
       </div>
+
+      {/* Add New Button */}
+      <div className="mb-6 flex justify-end">
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
+        >
+          {showAddForm ? 'Cancel' : '+ Add New Bid Result'}
+        </button>
+      </div>
+
+      {/* Add New Form */}
+      {showAddForm && (
+        <div className="mb-6 bg-white shadow-md rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Add New Bid Result</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Case Number *
+              </label>
+              <input
+                type="text"
+                value={addForm.case_number}
+                onChange={(e) => setAddForm({ ...addForm, case_number: e.target.value })}
+                placeholder="e.g., 387-620178"
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Broker Name *
+              </label>
+              <input
+                type="text"
+                value={addForm.broker_name}
+                onChange={(e) => setAddForm({ ...addForm, broker_name: e.target.value })}
+                placeholder="e.g., ABC Realty"
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Address *
+              </label>
+              <input
+                type="text"
+                value={addForm.address}
+                onChange={(e) => setAddForm({ ...addForm, address: e.target.value })}
+                placeholder="e.g., 123 Main St"
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                City *
+              </label>
+              <input
+                type="text"
+                value={addForm.city}
+                onChange={(e) => setAddForm({ ...addForm, city: e.target.value })}
+                placeholder="e.g., Charlotte"
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                State *
+              </label>
+              <input
+                type="text"
+                value={addForm.state}
+                onChange={(e) => setAddForm({ ...addForm, state: e.target.value.toUpperCase() })}
+                placeholder="e.g., NC"
+                maxLength="2"
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Zip Code *
+              </label>
+              <input
+                type="text"
+                value={addForm.zip_code}
+                onChange={(e) => setAddForm({ ...addForm, zip_code: e.target.value })}
+                placeholder="e.g., 28202"
+                maxLength="10"
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Net to HUD *
+              </label>
+              <input
+                type="number"
+                value={addForm.net_to_hud}
+                onChange={(e) => setAddForm({ ...addForm, net_to_hud: e.target.value })}
+                placeholder="e.g., 100000"
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Purchaser Type *
+              </label>
+              <select
+                value={addForm.purchaser_type}
+                onChange={(e) => setAddForm({ ...addForm, purchaser_type: e.target.value })}
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+              >
+                <option value="Investor">Investor</option>
+                <option value="Owner-Occupant">Owner-Occupant</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date Accepted *
+              </label>
+              <input
+                type="date"
+                value={addForm.date_accepted}
+                onChange={(e) => setAddForm({ ...addForm, date_accepted: e.target.value })}
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                value={addForm.status}
+                onChange={(e) => setAddForm({ ...addForm, status: e.target.value })}
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+              >
+                <option value="pending">Pending</option>
+                <option value="closed">Closed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end space-x-2">
+            <button
+              onClick={() => {
+                setShowAddForm(false)
+                setAddForm({
+                  case_number: '',
+                  address: '',
+                  city: '',
+                  state: '',
+                  zip_code: '',
+                  net_to_hud: '',
+                  broker_name: '',
+                  purchaser_type: 'Investor',
+                  date_accepted: '',
+                  status: 'pending'
+                })
+              }}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={async () => {
+                if (!addForm.case_number || !addForm.address || !addForm.city || !addForm.state || !addForm.zip_code || !addForm.net_to_hud || !addForm.broker_name || !addForm.date_accepted) {
+                  alert('Please fill in all required fields')
+                  return
+                }
+
+                setSaving(true)
+                try {
+                  // Check if broker exists, create if not
+                  const { data: existingBroker } = await supabase
+                    .from('brokers')
+                    .select('id')
+                    .eq('name', addForm.broker_name)
+                    .single()
+
+                  let brokerId = existingBroker?.id
+
+                  if (!brokerId) {
+                    const { data: newBroker, error: brokerError } = await supabase
+                      .from('brokers')
+                      .insert({ name: addForm.broker_name })
+                      .select('id')
+                      .single()
+
+                    if (brokerError) throw brokerError
+                    brokerId = newBroker.id
+                  }
+
+                  // Calculate estimated sale price
+                  const estimatedSalePrice = parseFloat(addForm.net_to_hud) * 1.06
+
+                  // Insert bid result
+                  const { error } = await supabase
+                    .from('bid_results')
+                    .insert({
+                      case_number: addForm.case_number,
+                      address: addForm.address,
+                      city: addForm.city,
+                      state: addForm.state,
+                      zip_code: addForm.zip_code,
+                      net_to_hud: parseFloat(addForm.net_to_hud),
+                      estimated_sale_price: estimatedSalePrice,
+                      broker_name: addForm.broker_name,
+                      broker_id: brokerId,
+                      purchaser_type: addForm.purchaser_type,
+                      date_accepted: addForm.date_accepted,
+                      status: addForm.status
+                    })
+
+                  if (error) throw error
+
+                  alert('Bid result added successfully!')
+                  setShowAddForm(false)
+                  setAddForm({
+                    case_number: '',
+                    address: '',
+                    city: '',
+                    state: '',
+                    zip_code: '',
+                    net_to_hud: '',
+                    broker_name: '',
+                    purchaser_type: 'Investor',
+                    date_accepted: '',
+                    status: 'pending'
+                  })
+                  fetchBidResults()
+                } catch (error) {
+                  console.error('Error adding bid result:', error)
+                  alert('Error adding bid result: ' + error.message)
+                } finally {
+                  setSaving(false)
+                }
+              }}
+              disabled={saving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? 'Adding...' : 'Add Bid Result'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       <div className="mb-6 border-b border-gray-200">
