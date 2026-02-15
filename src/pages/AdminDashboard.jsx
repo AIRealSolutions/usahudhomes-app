@@ -164,6 +164,13 @@ export default function AdminDashboard({ user, showBrokerLink }) {
             <HomeIcon className="h-5 w-5 mr-2 text-purple-600" />
             <span className="font-medium text-purple-700">Manage Properties</span>
           </Link>
+          <Link
+            to="/admin/bid-results"
+            className="flex items-center justify-center px-4 py-3 border border-green-300 bg-green-50 rounded-md hover:bg-green-100"
+          >
+            <DollarSign className="h-5 w-5 mr-2 text-green-600" />
+            <span className="font-medium text-green-700">Bid Results</span>
+          </Link>
 
           <Link
             to="/admin/brokers"

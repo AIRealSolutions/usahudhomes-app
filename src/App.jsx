@@ -18,6 +18,8 @@ import BrokerReferralInbox from './components/broker/BrokerReferralInbox'
 import PropertyManagement from './components/admin/PropertyManagement'
 import AdminPropertyDetails from './pages/AdminPropertyDetails'
 import PropertyImportWizard from './components/admin/PropertyImportWizard'
+import BidResultsAdmin from './components/admin/BidResultsAdmin'
+import SuccessfulDeals from './components/SuccessfulDeals'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -66,6 +68,7 @@ function Header() {
           <nav className="hidden md:flex space-x-8 items-center">
             <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Home</Link>
             <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Properties</Link>
+            <Link to="/deals" className="text-gray-700 hover:text-blue-600 font-medium">Successful Deals</Link>
             <Link to="/broker/register" className="text-gray-700 hover:text-blue-600 font-medium">Become a Partner</Link>
             <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>
             {user ? (
@@ -1138,6 +1141,8 @@ export default function App() {
               <Route path="/admin/properties" element={<PropertyManagement />} />
               <Route path="/admin/properties/import" element={<PropertyImportWizard />} />
               <Route path="/admin/properties/:caseNumber" element={<AdminPropertyDetails />} />
+              <Route path="/admin/bid-results" element={<BidResultsAdmin />} />
+              <Route path="/deals" element={<SuccessfulDeals />} />
             </Routes>
           </main>
           <Footer />
