@@ -184,9 +184,18 @@ export default function SuccessfulDeals() {
                         </div>
                         <div className="text-sm text-gray-500">Sale Price</div>
                         
-                        {savings && (
+                        {deal.original_list_price && (
+                          <div className="text-sm text-gray-500 line-through">
+                            Was {formatCurrency(deal.original_list_price)}
+                          </div>
+                        )}
+                        
+                        {deal.original_list_price && deal.actual_sale_price && (
                           <div className="mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Saved {formatCurrency(savings)}
+                            Saved {formatCurrency(deal.original_list_price - deal.actual_sale_price)}
+                            {deal.discount_percentage && (
+                              <span className="ml-1">({deal.discount_percentage}% off)</span>
+                            )}
                           </div>
                         )}
                       </div>

@@ -267,6 +267,19 @@ export default function BidResultsAdmin() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                Original List Price
+              </label>
+              <input
+                type="number"
+                value={addForm.original_list_price || ''}
+                onChange={(e) => setAddForm({ ...addForm, original_list_price: e.target.value })}
+                placeholder="e.g., 120000"
+                className="w-full border border-gray-300 rounded-md px-3 py-2"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Net to HUD *
               </label>
               <input
@@ -386,6 +399,7 @@ export default function BidResultsAdmin() {
                       zip_code: addForm.zip_code,
                       net_to_hud: parseFloat(addForm.net_to_hud),
                       estimated_sale_price: estimatedSalePrice,
+                      original_list_price: addForm.original_list_price ? parseFloat(addForm.original_list_price) : null,
                       broker_name: addForm.broker_name,
                       broker_id: brokerId,
                       purchaser_type: addForm.purchaser_type,
@@ -476,6 +490,9 @@ export default function BidResultsAdmin() {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Broker
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Original List
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Net to HUD
@@ -621,6 +638,15 @@ export default function BidResultsAdmin() {
                               </span>
                             )}
                           </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {result.original_list_price ? (
+                            <span className="font-medium text-blue-600">
+                              {formatCurrency(result.original_list_price)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           <span className="font-medium text-red-600">
