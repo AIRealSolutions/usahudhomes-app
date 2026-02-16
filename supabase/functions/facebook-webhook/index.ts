@@ -335,7 +335,7 @@ async function processNewLead(
 
     if (eventError) {
       console.error(`Error creating customer_event: ${eventError.message}`);
-      // Non-fatal — the lead was already saved
+      // Non-fatal - the lead was already saved
     } else {
       console.log(`Event logged for consultation ${insertedData.id}`);
     }
