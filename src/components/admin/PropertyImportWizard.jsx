@@ -252,6 +252,22 @@ export default function PropertyImportWizard() {
    * Accepts both scraper field names (list_price, bedrooms, bathrooms)
    * and legacy DB field names (price, beds, baths).
    */
+  /**
+   * Supabase storage bucket base URL for property images.
+   * Images are stored as {case_number_with_underscores}.jpg
+   */
+  const BUCKET_BASE = 'https://lpqjndfjbenolhneqzec.supabase.co/storage/v1/object/public/USAHUDhomes';
+
+  /**
+   * Auto-generate the main_image URL from the case number.
+   * Converts hyphens to underscores and appends .jpg
+   */
+  const buildImageUrl = (caseNumber) => {
+    if (!caseNumber) return null;
+    const filename = caseNumber.replace(/-/g, '_') + '.jpg';
+    return `${BUCKET_BASE}/${filename}`;
+  };
+
   const buildRecord = (p) => {
     const priceRaw = p.list_price || p.price;
     const bedsRaw = p.bedrooms || p.beds;
@@ -268,10 +284,9 @@ export default function PropertyImportWizard() {
       baths: interpretBaths(bathsRaw),
       status: normalizeStatus(p.status),
       county: p.county || null,
-      main_image: p.main_image || null,
+      main_image: buildImageUrl(p.case_number),
       bids_open: p.bids_open || null,
       listing_period: p.listing_period || null,
-      image_url: p.image_url || null,
       property_type: p.property_type || 'Single Family',
       sq_ft: p.square_feet ? parseInt(p.square_feet, 10) : (p.sq_ft ? parseInt(p.sq_ft, 10) : null),
       lot_size: p.lot_size || null,
@@ -554,8 +569,8 @@ JSON example:
 [{"case_number": "381-850249", "address": "123 Main St", ...}]
 
 CSV example:
-case_number,address,city,state,list_price,bedrooms,bathrooms,status,zip_code,county,bids_open,listing_period,main_image,image_url
-381-850249,123 Main St,Raleigh,NC,125000,3,2,Available,27601,Wake County,02/27/2026,Extended,381_850249.jpg,"https://..."
+case_number,address,city,state,list_price,bedrooms,bathrooms,status,zip_code,county,bids_open,listing_period
+381-850249,123 Main St,Raleigh,NC,125000,3,2,Available,27601,Wake County,02/27/2026,Extended
 `}
                 className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
               />
@@ -599,7 +614,7 @@ case_number,address,city,state,list_price,bedrooms,bathrooms,status,zip_code,cou
             <h3 className="font-semibold text-blue-900 mt-4 mb-2">Scraper Fields (auto-mapped)</h3>
             <ul className="text-sm text-blue-700 space-y-1">
               <li>• list_price, bedrooms, bathrooms, status, zip_code, county</li>
-              <li>• bids_open, listing_period, main_image, image_url</li>
+              <li>• bids_open, listing_period (main_image is auto-generated)</li>
             </ul>
             <h3 className="font-semibold text-blue-900 mt-4 mb-2">Other Optional Fields</h3>
             <ul className="text-sm text-blue-700 space-y-1">
@@ -614,7 +629,7 @@ case_number,address,city,state,list_price,bedrooms,bathrooms,status,zip_code,cou
               <button
                 onClick={() => {
                   const sample = [
-                    { case_number: '387-123456', address: '123 Main St', city: 'Raleigh', state: 'NC', list_price: 125000, bedrooms: 3, bathrooms: 2, status: 'Available', zip_code: '27601', county: 'Wake County', bids_open: '02/27/2026', listing_period: 'Extended', main_image: '387_123456.jpg', image_url: 'https://example.com/image.jpg' }
+                    { case_number: '387-123456', address: '123 Main St', city: 'Raleigh', state: 'NC', list_price: 125000, bedrooms: 3, bathrooms: 2, status: 'Available', zip_code: '27601', county: 'Wake County', bids_open: '02/27/2026', listing_period: 'Extended' }
                   ];
                   const blob = new Blob([JSON.stringify(sample, null, 2)], { type: 'application/json' });
                   const url = URL.createObjectURL(blob);
@@ -630,7 +645,7 @@ case_number,address,city,state,list_price,bedrooms,bathrooms,status,zip_code,cou
               </button>
               <button
                 onClick={() => {
-                  const csv = 'case_number,address,city,state,list_price,bedrooms,bathrooms,status,zip_code,county,bids_open,listing_period,main_image,image_url\n387-123456,123 Main St,Raleigh,NC,125000,3,2,Available,27601,Wake County,02/27/2026,Extended,387_123456.jpg,"https://example.com/image.jpg"';
+                  const csv = 'case_number,address,city,state,list_price,bedrooms,bathrooms,status,zip_code,county,bids_open,listing_period\n387-123456,123 Main St,Raleigh,NC,125000,3,2,Available,27601,Wake County,02/27/2026,Extended';
                   const blob = new Blob([csv], { type: 'text/csv' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');

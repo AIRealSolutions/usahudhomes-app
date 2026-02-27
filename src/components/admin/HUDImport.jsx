@@ -21,7 +21,8 @@ import { propertyService } from '../../services/database/index'
  * Allows admins to import HUD properties from the scraper CSV/JSON output.
  * Supports all 14 fields from the HUD scraper:
  *   case_number, address, city, state, list_price, bedrooms, bathrooms, status,
- *   zip_code, county, bids_open, listing_period, main_image, image_url
+ *   zip_code, county, bids_open, listing_period
+ *   (main_image is auto-generated from case_number using Supabase bucket URL)
  * 
  * Features:
  * - File upload (.csv, .json) or copy/paste
@@ -205,16 +206,8 @@ function HUDImport({ onImportComplete }) {
     'listingPeriod': 'listing_period',
     'Listing Period': 'listing_period',
 
-    // Main image filename
-    'main_image': 'main_image',
-    'mainImage': 'main_image',
-    'Main Image': 'main_image',
-    'image': 'main_image',
-
-    // Image URL (new scraper field — original Cloudinary URL)
-    'image_url': 'image_url',
-    'imageUrl': 'image_url',
-    'Image URL': 'image_url',
+    // main_image and image_url are ignored from CSV input;
+    // main_image is auto-generated from case_number using Supabase bucket URL
 
     // Existing DB fields that may appear in other sources
     'sq_ft': 'sq_ft',
@@ -246,12 +239,18 @@ function HUDImport({ onImportComplete }) {
       status: 'AVAILABLE' // Default status
     }
 
+    // Supabase storage bucket base URL for property images
+    const BUCKET_BASE = 'https://lpqjndfjbenolhneqzec.supabase.co/storage/v1/object/public/USAHUDhomes'
+
     // Map fields using the lookup table
     Object.keys(prop).forEach(key => {
       const mappedKey = FIELD_MAPPINGS[key] || key.toLowerCase().replace(/\s+/g, '_')
       let value = prop[key]
 
       if (value === null || value === undefined || value === '') return
+
+      // Skip image_url and main_image from CSV — we auto-generate main_image
+      if (mappedKey === 'image_url' || mappedKey === 'main_image') return
 
       // Clean and format values based on target field
       switch (mappedKey) {
@@ -325,6 +324,10 @@ function HUDImport({ onImportComplete }) {
     if (!formatted.case_number) {
       formatted.case_number = `TEMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     }
+
+    // Auto-generate main_image from case_number using Supabase bucket URL
+    const filename = formatted.case_number.replace(/-/g, '_') + '.jpg'
+    formatted.main_image = `${BUCKET_BASE}/${filename}`
 
     return formatted
   }
@@ -569,7 +572,7 @@ function HUDImport({ onImportComplete }) {
           <div className="text-xs text-gray-400 text-center">— or paste data below —</div>
 
           <Textarea
-            placeholder={`Paste CSV or JSON data here...\n\nExpected CSV header:\ncase_number,address,city,state,list_price,bedrooms,bathrooms,status,zip_code,county,bids_open,listing_period,main_image,image_url`}
+            placeholder={`Paste CSV or JSON data here...\n\nExpected CSV header:\ncase_number,address,city,state,list_price,bedrooms,bathrooms,status,zip_code,county,bids_open,listing_period`}
             value={rawData}
             onChange={handlePaste}
             rows={10}
@@ -650,7 +653,7 @@ function HUDImport({ onImportComplete }) {
                   <div className="text-xs text-gray-500 mt-1">
                     {prop.bids_open ? `Bids Open: ${prop.bids_open}` : ''}
                     {prop.listing_period ? ` | Period: ${prop.listing_period}` : ''}
-                    {prop.main_image ? ` | Image: ${prop.main_image}` : ''}
+                    {prop.main_image ? ` | Image: ✓` : ''}
                   </div>
                   <Badge variant="outline" className="mt-2 text-xs">
                     {prop.status}

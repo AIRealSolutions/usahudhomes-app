@@ -165,7 +165,6 @@ class PropertyService {
           bid_deadline: propertyData.bid_deadline || propertyData.bidDeadline,
           bids_open: propertyData.bids_open,
           listing_period: propertyData.listing_period,
-          image_url: propertyData.image_url,
           is_active: true
         }])
         .select()
@@ -214,7 +213,6 @@ class PropertyService {
       if (updates.bid_deadline || updates.bidDeadline) updateData.bid_deadline = updates.bid_deadline || updates.bidDeadline
       if (updates.bids_open) updateData.bids_open = updates.bids_open
       if (updates.listing_period) updateData.listing_period = updates.listing_period
-      if (updates.image_url) updateData.image_url = updates.image_url
       if (updates.is_active !== undefined || updates.isActive !== undefined) updateData.is_active = updates.is_active !== undefined ? updates.is_active : updates.isActive
 
       // Add updated_at timestamp
