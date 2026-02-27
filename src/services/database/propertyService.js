@@ -163,6 +163,9 @@ class PropertyService {
           images: propertyData.images || [],
           main_image: propertyData.main_image || propertyData.mainImage,
           bid_deadline: propertyData.bid_deadline || propertyData.bidDeadline,
+          bids_open: propertyData.bids_open,
+          listing_period: propertyData.listing_period,
+          image_url: propertyData.image_url,
           is_active: true
         }])
         .select()
@@ -209,6 +212,9 @@ class PropertyService {
       if (updates.images) updateData.images = updates.images
       if (updates.main_image || updates.mainImage) updateData.main_image = updates.main_image || updates.mainImage
       if (updates.bid_deadline || updates.bidDeadline) updateData.bid_deadline = updates.bid_deadline || updates.bidDeadline
+      if (updates.bids_open) updateData.bids_open = updates.bids_open
+      if (updates.listing_period) updateData.listing_period = updates.listing_period
+      if (updates.image_url) updateData.image_url = updates.image_url
       if (updates.is_active !== undefined || updates.isActive !== undefined) updateData.is_active = updates.is_active !== undefined ? updates.is_active : updates.isActive
 
       // Add updated_at timestamp
@@ -428,6 +434,56 @@ class PropertyService {
     } catch (error) {
       console.error('Error calculating state statistics:', error)
       return { success: false, error: error.message, data: {} }
+    }
+  }
+
+  /**
+   * Mark properties in a state as "pending" if they are NOT in the provided case number list.
+   * This ensures properties no longer on the HUD site are flagged.
+   * Only affects properties in the given state; other states are untouched.
+   * @param {string} state - Two-letter state code
+   * @param {string[]} activeCaseNumbers - Case numbers from the current import
+   * @returns {Promise<number>} Number of properties marked as pending
+   */
+  async markMissingAsPending(state, activeCaseNumbers) {
+    try {
+      // Get all active properties in this state
+      const { data: stateProperties, error: fetchError } = await supabase
+        .from(TABLES.PROPERTIES)
+        .select('id, case_number')
+        .eq('state', state)
+        .eq('is_active', true)
+        .neq('status', 'SOLD')
+
+      if (fetchError) {
+        console.error('Error fetching state properties:', fetchError)
+        return 0
+      }
+
+      if (!stateProperties || stateProperties.length === 0) return 0
+
+      // Find properties not in the import list
+      const caseSet = new Set(activeCaseNumbers)
+      const toMarkPending = stateProperties.filter(p => !caseSet.has(p.case_number))
+
+      if (toMarkPending.length === 0) return 0
+
+      // Update them to pending
+      const ids = toMarkPending.map(p => p.id)
+      const { error: updateError } = await supabase
+        .from(TABLES.PROPERTIES)
+        .update({ status: 'PENDING', updated_at: new Date().toISOString() })
+        .in('id', ids)
+
+      if (updateError) {
+        console.error('Error marking properties as pending:', updateError)
+        return 0
+      }
+
+      return toMarkPending.length
+    } catch (error) {
+      console.error('Error in markMissingAsPending:', error)
+      return 0
     }
   }
 }
