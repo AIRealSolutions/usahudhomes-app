@@ -20,14 +20,15 @@ import {
   FileText,
   Heart,
   Share2,
-  Camera
+  Camera,
+  Info,
+  Clock,
+  ShieldCheck
 } from 'lucide-react'
 import { propertyService } from '../services/database'
 
 function PropertyDetail() {
-  console.log('PropertyDetail component mounting')
   const { caseNumber } = useParams()
-  console.log('Case number from URL:', caseNumber)
   const navigate = useNavigate()
   const [property, setProperty] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -41,27 +42,21 @@ function PropertyDetail() {
   })
 
   useEffect(() => {
-    // Load property from Supabase
     const loadProperty = async () => {
-      console.log('Loading property for case number:', caseNumber)
       setLoading(true)
       const result = await propertyService.getPropertyByCaseNumber(caseNumber)
-      console.log('Property load result:', result)
       if (result.success) {
-        console.log('Property data:', result.data)
         setProperty(result.data)
       } else {
         console.error('Failed to load property:', result.error)
       }
       setLoading(false)
-      console.log('Loading complete, property:', result.data)
     }
     loadProperty()
   }, [caseNumber])
 
   const handleContactSubmit = (e) => {
     e.preventDefault()
-    // Handle form submission
     alert('Thank you! A HUD-registered broker will contact you within 24 hours.')
     setShowContactForm(false)
     setContactForm({ name: '', email: '', phone: '', message: '' })
@@ -109,6 +104,13 @@ function PropertyDetail() {
     )
   }
 
+  const displayPrice = property.price || 0;
+  const displayBeds = property.beds || property.bedrooms || 'N/A';
+  const displayBaths = property.baths || property.bathrooms || 'N/A';
+  const displaySqft = property.sq_ft || property.sqft || 0;
+  const displayYearBuilt = property.year_built || property.yearBuilt || 'N/A';
+  const displayCaseNumber = property.case_number || property.caseNumber;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -149,27 +151,39 @@ function PropertyDetail() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Property Images */}
-            <Card>
+            <Card className="overflow-hidden">
               <CardContent className="p-0">
                 <div className="relative">
-                  <div className="aspect-video bg-gradient-to-br from-gray-200 to-gray-300 rounded-t-lg flex items-center justify-center">
-                    <div className="text-center">
-                      <Camera className="h-16 w-16 text-gray-400 mx-auto mb-2" />
-                      <p className="text-gray-500">Property Photos</p>
-                      <p className="text-sm text-gray-400">Virtual tour available</p>
+                  {property.main_image ? (
+                    <img 
+                      src={property.main_image} 
+                      alt={property.address}
+                      className="w-full aspect-video object-cover"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = 'https://via.placeholder.com/800x450?text=Property+Image+Coming+Soon';
+                      }}
+                    />
+                  ) : (
+                    <div className="aspect-video bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                      <div className="text-center">
+                        <Camera className="h-16 w-16 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-500">Property Photos</p>
+                        <p className="text-sm text-gray-400">Image Coming Soon</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   
                   <div className="absolute top-4 left-4">
-                    <Badge variant={property.status === 'New Listing' ? 'default' : 'secondary'}>
-                      {property.status}
+                    <Badge className="bg-blue-600 hover:bg-blue-700">
+                      {property.status || 'AVAILABLE'}
                     </Badge>
                   </div>
                   
-                  {property.originalPrice > property.price && (
+                  {property.listing_period && (
                     <div className="absolute top-4 right-4">
-                      <Badge variant="destructive">
-                        Price Reduced
+                      <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm text-blue-800 border-blue-200">
+                        {property.listing_period} Period
                       </Badge>
                     </div>
                   )}
@@ -180,119 +194,112 @@ function PropertyDetail() {
             {/* Property Details */}
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-start">
+                <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                   <div>
-                    <CardTitle className="text-2xl">{property.address}</CardTitle>
-                    <CardDescription className="text-lg">
-                      {property.city}, {property.state} {property.zipCode}
+                    <CardTitle className="text-3xl font-bold text-gray-900">{property.address}</CardTitle>
+                    <CardDescription className="text-xl mt-1">
+                      {property.city}, {property.state} {property.zip_code || property.zipCode}
                     </CardDescription>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold text-green-600">
-                      ${property.price.toLocaleString()}
-                    </div>
-                    {property.originalPrice > property.price && (
-                      <div className="text-sm text-gray-500 line-through">
-                        ${property.originalPrice.toLocaleString()}
+                    {property.county && (
+                      <div className="flex items-center gap-1 text-gray-500 mt-2">
+                        <MapPin className="h-4 w-4" />
+                        <span>{property.county}</span>
                       </div>
                     )}
-                    <div className="text-sm text-gray-600">
-                      Case #{property.case_number || property.caseNumber}
+                  </div>
+                  <div className="text-left md:text-right w-full md:w-auto">
+                    <div className="text-4xl font-bold text-green-600">
+                      ${displayPrice.toLocaleString()}
+                    </div>
+                    <div className="text-sm font-medium text-gray-500 mt-1">
+                      HUD Case #{displayCaseNumber}
                     </div>
                   </div>
                 </div>
               </CardHeader>
               
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-8">
                 {/* Key Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center p-3 bg-gray-50 rounded-lg">
-                    <Bed className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-                    <div className="font-semibold">{property.beds}</div>
-                    <div className="text-sm text-gray-600">Bedrooms</div>
+                  <div className="text-center p-4 bg-blue-50 rounded-xl border border-blue-100">
+                    <Bed className="h-7 w-7 text-blue-600 mx-auto mb-2" />
+                    <div className="text-xl font-bold text-gray-900">{displayBeds}</div>
+                    <div className="text-xs font-medium text-blue-600 uppercase tracking-wider">Bedrooms</div>
                   </div>
-                  <div className="text-center p-3 bg-gray-50 rounded-lg">
-                    <Bath className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-                    <div className="font-semibold">{property.baths}</div>
-                    <div className="text-sm text-gray-600">Bathrooms</div>
+                  <div className="text-center p-4 bg-blue-50 rounded-xl border border-blue-100">
+                    <Bath className="h-7 w-7 text-blue-600 mx-auto mb-2" />
+                    <div className="text-xl font-bold text-gray-900">{displayBaths}</div>
+                    <div className="text-xs font-medium text-blue-600 uppercase tracking-wider">Bathrooms</div>
                   </div>
-                  <div className="text-center p-3 bg-gray-50 rounded-lg">
-                    <Square className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-                    <div className="font-semibold">{property.sqft.toLocaleString()}</div>
-                    <div className="text-sm text-gray-600">Sq Ft</div>
+                  <div className="text-center p-4 bg-blue-50 rounded-xl border border-blue-100">
+                    <Square className="h-7 w-7 text-blue-600 mx-auto mb-2" />
+                    <div className="text-xl font-bold text-gray-900">{displaySqft > 0 ? displaySqft.toLocaleString() : 'N/A'}</div>
+                    <div className="text-xs font-medium text-blue-600 uppercase tracking-wider">Sq Ft</div>
                   </div>
-                  <div className="text-center p-3 bg-gray-50 rounded-lg">
-                    <Calendar className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-                    <div className="font-semibold">{property.yearBuilt}</div>
-                    <div className="text-sm text-gray-600">Year Built</div>
+                  <div className="text-center p-4 bg-blue-50 rounded-xl border border-blue-100">
+                    <Calendar className="h-7 w-7 text-blue-600 mx-auto mb-2" />
+                    <div className="text-xl font-bold text-gray-900">{displayYearBuilt}</div>
+                    <div className="text-xs font-medium text-blue-600 uppercase tracking-wider">Year Built</div>
                   </div>
                 </div>
 
                 {/* Description */}
                 <div>
-                  <h3 className="font-semibold text-lg mb-2">Description</h3>
-                  <p className="text-gray-700 leading-relaxed">{property.description}</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-blue-600" />
+                    Property Description
+                  </h3>
+                  <p className="text-gray-700 leading-relaxed text-lg">
+                    {property.description || `This ${property.property_type || 'property'} located at ${property.address} in ${property.city}, ${property.state} is now available as a HUD-owned listing. Featuring ${displayBeds} bedrooms and ${displayBaths} bathrooms, this home offers a great opportunity for buyers looking in ${property.county || property.city}.`}
+                  </p>
                 </div>
 
-                {/* Features */}
-                <div>
-                  <h3 className="font-semibold text-lg mb-3">Property Features</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                    {property.features.map((feature, index) => (
-                      <div key={index} className="flex items-center gap-2 text-sm">
-                        <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                        {feature}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Property Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Detailed Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div>
-                    <h3 className="font-semibold text-lg mb-3">Property Information</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Property Type:</span>
-                        <span>{property.propertyType}</span>
+                    <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <Info className="h-5 w-5 text-blue-600" />
+                      Listing Details
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between py-2 border-b border-gray-100">
+                        <span className="text-gray-600 font-medium">Property Type</span>
+                        <span className="text-gray-900 font-semibold">{property.property_type || 'Single Family'}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Lot Size:</span>
-                        <span>{property.lotSize}</span>
+                      <div className="flex justify-between py-2 border-b border-gray-100">
+                        <span className="text-gray-600 font-medium">Listing Period</span>
+                        <span className="text-gray-900 font-semibold">{property.listing_period || 'N/A'}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">County:</span>
-                        <span>{property.county}</span>
+                      <div className="flex justify-between py-2 border-b border-gray-100">
+                        <span className="text-gray-600 font-medium">Lot Size</span>
+                        <span className="text-gray-900 font-semibold">{property.lot_size || 'N/A'}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Neighborhood:</span>
-                        <span>{property.neighborhood}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Condition:</span>
-                        <span>{property.condition}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Parking:</span>
-                        <span>{property.parking}</span>
+                      <div className="flex justify-between py-2 border-b border-gray-100">
+                        <span className="text-gray-600 font-medium">County</span>
+                        <span className="text-gray-900 font-semibold">{property.county || 'N/A'}</span>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <h3 className="font-semibold text-lg mb-3">Schools</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Elementary:</span>
-                        <span>{property.schools.elementary}</span>
+                    <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-blue-600" />
+                      Bid Information
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between py-2 border-b border-gray-100">
+                        <span className="text-gray-600 font-medium">Bids Open Date</span>
+                        <span className="text-gray-900 font-semibold">{property.bids_open || 'N/A'}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Middle:</span>
-                        <span>{property.schools.middle}</span>
+                      <div className="flex justify-between py-2 border-b border-gray-100">
+                        <span className="text-gray-600 font-medium">Bid Deadline</span>
+                        <span className="text-gray-900 font-semibold">
+                          {property.bid_deadline ? new Date(property.bid_deadline).toLocaleDateString() : 'See HUD Site'}
+                        </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">High:</span>
-                        <span>{property.schools.high}</span>
+                      <div className="flex justify-between py-2 border-b border-gray-100">
+                        <span className="text-gray-600 font-medium">Status</span>
+                        <span className="text-blue-600 font-bold">{property.status || 'AVAILABLE'}</span>
                       </div>
                     </div>
                   </div>
@@ -303,48 +310,36 @@ function PropertyDetail() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Bid Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Bid Information</CardTitle>
+            {/* HUD Notice */}
+            <Card className="border-blue-200 bg-blue-50/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2 text-blue-900">
+                  <ShieldCheck className="h-5 w-5 text-blue-600" />
+                  HUD Listing Notice
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="flex items-center gap-2 text-yellow-800 mb-1">
-                    <Calendar className="h-4 w-4" />
-                    <span className="font-semibold">Bid Deadline</span>
-                  </div>
-                  <div className="text-sm text-yellow-700">
-                    {new Date(property.bidDeadline).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </div>
-                </div>
-                
-                <div className="text-sm text-gray-600">
-                  <p>Listed: {new Date(property.listingDate).toLocaleDateString()}</p>
-                  <p className="mt-2">
-                    This is a HUD-owned property. All bids must be submitted through a HUD-registered broker.
-                  </p>
-                </div>
+              <CardContent className="text-sm text-blue-800 space-y-3">
+                <p>
+                  This is a HUD-owned property. All bids must be submitted through a HUD-registered broker.
+                </p>
+                <p className="font-semibold">
+                  USAhudhomes.com connects you with registered brokers to help you secure this property.
+                </p>
               </CardContent>
             </Card>
 
             {/* Contact Form */}
-            <Card>
+            <Card className="shadow-md border-blue-100">
               <CardHeader>
-                <CardTitle className="text-lg">Get Connected</CardTitle>
-                <CardDescription>
-                  Connect with a HUD-registered broker to submit your bid
+                <CardTitle className="text-xl font-bold">Interested in this home?</CardTitle>
+                <CardDescription className="text-gray-600">
+                  Connect with a HUD-registered broker to submit your bid or get more info.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {!showContactForm ? (
                   <Button 
-                    className="w-full" 
+                    className="w-full py-6 text-lg font-bold bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200" 
                     onClick={() => setShowContactForm(true)}
                   >
                     Contact HUD Broker
@@ -357,6 +352,7 @@ function PropertyDetail() {
                         value={contactForm.name}
                         onChange={(e) => setContactForm({...contactForm, name: e.target.value})}
                         required
+                        className="bg-white"
                       />
                     </div>
                     <div>
@@ -366,6 +362,7 @@ function PropertyDetail() {
                         value={contactForm.email}
                         onChange={(e) => setContactForm({...contactForm, email: e.target.value})}
                         required
+                        className="bg-white"
                       />
                     </div>
                     <div>
@@ -375,24 +372,27 @@ function PropertyDetail() {
                         value={contactForm.phone}
                         onChange={(e) => setContactForm({...contactForm, phone: e.target.value})}
                         required
+                        className="bg-white"
                       />
                     </div>
                     <div>
                       <Textarea
-                        placeholder="Message (optional)"
+                        placeholder="I'm interested in HUD Case # ${displayCaseNumber}. Please contact me with more details."
                         value={contactForm.message}
                         onChange={(e) => setContactForm({...contactForm, message: e.target.value})}
-                        rows={3}
+                        rows={4}
+                        className="bg-white"
                       />
                     </div>
-                    <div className="flex gap-2">
-                      <Button type="submit" className="flex-1">
-                        Submit
+                    <div className="flex flex-col gap-2">
+                      <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
+                        Send Request
                       </Button>
                       <Button 
                         type="button" 
-                        variant="outline" 
+                        variant="ghost" 
                         onClick={() => setShowContactForm(false)}
+                        className="text-gray-500"
                       >
                         Cancel
                       </Button>
@@ -404,21 +404,32 @@ function PropertyDetail() {
 
             {/* Quick Info */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Quick Info</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-bold">Quick Reference</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-gray-400" />
-                  <span>{property.neighborhood}, {property.city}</span>
+              <CardContent className="space-y-4 text-sm">
+                <div className="flex items-start gap-3">
+                  <MapPin className="h-5 w-5 text-gray-400 shrink-0" />
+                  <div>
+                    <div className="font-semibold text-gray-900">Location</div>
+                    <div className="text-gray-600">{property.city}, {property.state}</div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-gray-400" />
-                  <span>${Math.round(property.price / property.sqft)} per sq ft</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-gray-400" />
-                  <span>HUD Case #{property.case_number || property.caseNumber}</span>
+                {displaySqft > 0 && (
+                  <div className="flex items-start gap-3">
+                    <DollarSign className="h-5 w-5 text-gray-400 shrink-0" />
+                    <div>
+                      <div className="font-semibold text-gray-900">Price per Sq Ft</div>
+                      <div className="text-gray-600">${Math.round(displayPrice / displaySqft)} / sq ft</div>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-start gap-3">
+                  <FileText className="h-5 w-5 text-gray-400 shrink-0" />
+                  <div>
+                    <div className="font-semibold text-gray-900">HUD Case Number</div>
+                    <div className="text-gray-600">{displayCaseNumber}</div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
