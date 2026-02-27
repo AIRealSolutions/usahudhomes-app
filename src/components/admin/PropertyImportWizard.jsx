@@ -37,22 +37,65 @@ export default function PropertyImportWizard() {
     setFileType(extension);
   };
 
+  /**
+   * Parse a single CSV line, respecting quoted fields.
+   * Handles commas inside double-quoted values (e.g., Cloudinary URLs).
+   */
+  const parseCSVLine = (line) => {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (inQuotes) {
+        if (char === '"') {
+          if (i + 1 < line.length && line[i + 1] === '"') {
+            current += '"';
+            i++; // skip escaped quote
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          current += char;
+        }
+      } else {
+        if (char === '"') {
+          inQuotes = true;
+        } else if (char === ',') {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
   const parseCSV = (text) => {
-    const lines = text.trim().split('\n');
+    const lines = text.trim().split(/\r?\n/);
     if (lines.length < 2) {
       throw new Error('CSV file must have headers and at least one data row');
     }
 
-    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+    const headers = parseCSVLine(lines[0]);
     const data = [];
 
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-      const row = {};
-      headers.forEach((header, index) => {
-        row[header] = values[index] || '';
-      });
-      data.push(row);
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const values = parseCSVLine(line);
+      if (values.length >= headers.length) {
+        const row = {};
+        headers.forEach((header, index) => {
+          row[header] = values[index] || '';
+        });
+        data.push(row);
+      }
     }
 
     return data;
@@ -153,6 +196,22 @@ export default function PropertyImportWizard() {
     return num;
   };
 
+  /**
+   * Normalize status value to uppercase DB format.
+   */
+  const normalizeStatus = (val) => {
+    if (!val) return 'AVAILABLE';
+    const lower = val.toLowerCase().trim();
+    if (lower === 'available' || lower === 'new listing' || lower === 'price reduced') {
+      return 'AVAILABLE';
+    } else if (lower === 'pending' || lower === 'under contract') {
+      return 'PENDING';
+    } else if (lower === 'sold') {
+      return 'SOLD';
+    }
+    return val.toUpperCase();
+  };
+
   const validateData = (data) => {
     const errors = [];
     const requiredFields = ['case_number', 'address', 'city', 'state'];
@@ -170,19 +229,55 @@ export default function PropertyImportWizard() {
         errors.push(`Row ${index + 1}: State "${row.state}" does not match selected state "${selectedState}"`);
       }
 
-      // Validate data types
-      if (row.list_price && isNaN(Number(row.list_price))) {
-        errors.push(`Row ${index + 1}: list_price must be a number`);
+      // Validate data types — accept both scraper and DB field names
+      const priceVal = row.list_price || row.price;
+      if (priceVal && isNaN(Number(String(priceVal).replace(/[$,]/g, '')))) {
+        errors.push(`Row ${index + 1}: price/list_price must be a number`);
       }
-      if (row.bedrooms && isNaN(Number(row.bedrooms))) {
-        errors.push(`Row ${index + 1}: bedrooms must be a number`);
+      const bedsVal = row.bedrooms || row.beds;
+      if (bedsVal && isNaN(Number(bedsVal))) {
+        errors.push(`Row ${index + 1}: bedrooms/beds must be a number`);
       }
-      if (row.bathrooms && isNaN(Number(row.bathrooms))) {
-        errors.push(`Row ${index + 1}: bathrooms must be a number`);
+      const bathsVal = row.bathrooms || row.baths;
+      if (bathsVal && isNaN(Number(bathsVal))) {
+        errors.push(`Row ${index + 1}: bathrooms/baths must be a number`);
       }
     });
 
     return errors;
+  };
+
+  /**
+   * Build a database-ready record from a parsed row.
+   * Accepts both scraper field names (list_price, bedrooms, bathrooms)
+   * and legacy DB field names (price, beds, baths).
+   */
+  const buildRecord = (p) => {
+    const priceRaw = p.list_price || p.price;
+    const bedsRaw = p.bedrooms || p.beds;
+    const bathsRaw = p.bathrooms || p.baths;
+
+    return {
+      case_number: p.case_number,
+      address: p.address,
+      city: p.city,
+      state: selectedState,
+      zip_code: p.zip_code || null,
+      price: priceRaw ? parseFloat(String(priceRaw).replace(/[$,]/g, '')) : 0,
+      beds: bedsRaw ? parseInt(bedsRaw, 10) : null,
+      baths: interpretBaths(bathsRaw),
+      status: normalizeStatus(p.status),
+      county: p.county || null,
+      main_image: p.main_image || null,
+      bids_open: p.bids_open || null,
+      listing_period: p.listing_period || null,
+      image_url: p.image_url || null,
+      property_type: p.property_type || 'Single Family',
+      sq_ft: p.square_feet ? parseInt(p.square_feet, 10) : (p.sq_ft ? parseInt(p.sq_ft, 10) : null),
+      lot_size: p.lot_size || null,
+      year_built: p.year_built ? parseInt(p.year_built, 10) : null,
+      description: p.description || null
+    };
   };
 
   // Step 2: Preview and Analyze
@@ -202,7 +297,9 @@ export default function PropertyImportWizard() {
       // Categorize properties
       const newProperties = parsedData.filter(p => !existingCaseNumbers.has(p.case_number));
       const updatedProperties = parsedData.filter(p => existingCaseNumbers.has(p.case_number));
-      const pendingProperties = existingProperties.filter(p => !importCaseNumbers.has(p.case_number));
+      const pendingProperties = existingProperties.filter(p => 
+        !importCaseNumbers.has(p.case_number) && p.status !== 'SOLD'
+      );
 
       setImportPreview({
         new: newProperties,
@@ -230,22 +327,7 @@ export default function PropertyImportWizard() {
     try {
       // 1. Insert new properties
       if (importPreview.new.length > 0) {
-        const newRecords = importPreview.new.map(p => ({
-          case_number: p.case_number,
-          address: p.address,
-          city: p.city,
-          state: selectedState,
-          price: p.list_price ? parseFloat(p.list_price) : 0,
-          beds: p.bedrooms ? parseInt(p.bedrooms) : null,
-          baths: interpretBaths(p.bathrooms),
-          status: p.status || 'AVAILABLE',
-          main_image: p.main_image || null,
-          property_type: p.property_type || 'Single Family',
-          sq_ft: p.square_feet ? parseInt(p.square_feet) : null,
-          lot_size: p.lot_size || null,
-          year_built: p.year_built ? parseInt(p.year_built) : null,
-          description: p.description || null
-        }));
+        const newRecords = importPreview.new.map(p => buildRecord(p));
 
         const { error: insertError } = await supabase
           .from('properties')
@@ -261,21 +343,9 @@ export default function PropertyImportWizard() {
       // 2. Update existing properties
       if (importPreview.updated.length > 0) {
         for (const property of importPreview.updated) {
-          const updateData = {
-            address: property.address,
-            city: property.city,
-            state: selectedState,
-            price: property.list_price ? parseFloat(property.list_price) : 0,
-            beds: property.bedrooms ? parseInt(property.bedrooms) : null,
-            baths: interpretBaths(property.bathrooms),
-            status: property.status || 'AVAILABLE',
-            main_image: property.main_image || null,
-            property_type: property.property_type || 'Single Family',
-            sq_ft: property.square_feet ? parseInt(property.square_feet) : null,
-            lot_size: property.lot_size || null,
-            year_built: property.year_built ? parseInt(property.year_built) : null,
-            description: property.description || null
-          };
+          const updateData = buildRecord(property);
+          // Remove case_number from update payload (it's the match key)
+          delete updateData.case_number;
 
           const { error: updateError } = await supabase
             .from('properties')
@@ -296,7 +366,7 @@ export default function PropertyImportWizard() {
         
         const { error: pendingError } = await supabase
           .from('properties')
-          .update({ status: 'Pending' })
+          .update({ status: 'PENDING' })
           .in('case_number', pendingCaseNumbers)
           .eq('state', selectedState);
 
@@ -328,6 +398,19 @@ export default function PropertyImportWizard() {
     setInputMode('file');
     setPastedData('');
   };
+
+  /**
+   * Helper to display price from either field name.
+   */
+  const displayPrice = (p) => {
+    const raw = p.list_price || p.price;
+    if (!raw) return '-';
+    const num = parseFloat(String(raw).replace(/[$,]/g, ''));
+    return isNaN(num) ? raw : `$${num.toLocaleString()}`;
+  };
+
+  const displayBeds = (p) => p.bedrooms || p.beds || '-';
+  const displayBaths = (p) => p.bathrooms || p.baths || '-';
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -471,8 +554,9 @@ JSON example:
 [{"case_number": "381-850249", "address": "123 Main St", ...}]
 
 CSV example:
-case_number,address,city,state,list_price
-381-850249,123 Main St,Raleigh,NC,125000`}
+case_number,address,city,state,list_price,bedrooms,bathrooms,status,zip_code,county,bids_open,listing_period,main_image,image_url
+381-850249,123 Main St,Raleigh,NC,125000,3,2,Available,27601,Wake County,02/27/2026,Extended,381_850249.jpg,"https://..."
+`}
                 className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
               />
               {pastedData && (
@@ -512,9 +596,13 @@ case_number,address,city,state,list_price
               <li>• <strong>city</strong> - City (required)</li>
               <li>• <strong>state</strong> - State code (required, must match selected state)</li>
             </ul>
-            <h3 className="font-semibold text-blue-900 mt-4 mb-2">Optional Fields</h3>
+            <h3 className="font-semibold text-blue-900 mt-4 mb-2">Scraper Fields (auto-mapped)</h3>
             <ul className="text-sm text-blue-700 space-y-1">
-              <li>• list_price, bedrooms, bathrooms, status, main_image</li>
+              <li>• list_price, bedrooms, bathrooms, status, zip_code, county</li>
+              <li>• bids_open, listing_period, main_image, image_url</li>
+            </ul>
+            <h3 className="font-semibold text-blue-900 mt-4 mb-2">Other Optional Fields</h3>
+            <ul className="text-sm text-blue-700 space-y-1">
               <li>• property_type, square_feet, lot_size, year_built, description</li>
             </ul>
           </div>
@@ -526,7 +614,7 @@ case_number,address,city,state,list_price
               <button
                 onClick={() => {
                   const sample = [
-                    { case_number: '387-123456', address: '123 Main St', city: 'Raleigh', state: 'NC', list_price: 125000, bedrooms: 3, bathrooms: 2, status: 'Available' }
+                    { case_number: '387-123456', address: '123 Main St', city: 'Raleigh', state: 'NC', list_price: 125000, bedrooms: 3, bathrooms: 2, status: 'Available', zip_code: '27601', county: 'Wake County', bids_open: '02/27/2026', listing_period: 'Extended', main_image: '387_123456.jpg', image_url: 'https://example.com/image.jpg' }
                   ];
                   const blob = new Blob([JSON.stringify(sample, null, 2)], { type: 'application/json' });
                   const url = URL.createObjectURL(blob);
@@ -542,7 +630,7 @@ case_number,address,city,state,list_price
               </button>
               <button
                 onClick={() => {
-                  const csv = 'case_number,address,city,state,list_price,bedrooms,bathrooms,status\n387-123456,123 Main St,Raleigh,NC,125000,3,2,Available';
+                  const csv = 'case_number,address,city,state,list_price,bedrooms,bathrooms,status,zip_code,county,bids_open,listing_period,main_image,image_url\n387-123456,123 Main St,Raleigh,NC,125000,3,2,Available,27601,Wake County,02/27/2026,Extended,387_123456.jpg,"https://example.com/image.jpg"';
                   const blob = new Blob([csv], { type: 'text/csv' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
@@ -601,6 +689,9 @@ case_number,address,city,state,list_price
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Beds</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Baths</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">County</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bids Open</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -609,12 +700,13 @@ case_number,address,city,state,list_price
                       <td className="px-4 py-3 text-sm text-gray-900">{property.case_number}</td>
                       <td className="px-4 py-3 text-sm text-gray-900">{property.address}</td>
                       <td className="px-4 py-3 text-sm text-gray-900">{property.city}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {property.list_price ? `$${parseInt(property.list_price).toLocaleString()}` : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{property.bedrooms || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{property.bathrooms || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{displayPrice(property)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{displayBeds(property)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{displayBaths(property)}</td>
                       <td className="px-4 py-3 text-sm text-gray-900">{property.status || 'Available'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{property.county || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{property.bids_open || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{property.listing_period || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -700,6 +792,7 @@ case_number,address,city,state,list_price
                   <li>• {importPreview.updated.length} existing properties will be updated</li>
                   <li>• {importPreview.pending.length} properties not in the import file will be marked as "Pending"</li>
                   <li>• Properties in other states will not be affected</li>
+                  <li>• Properties already marked as "SOLD" will not be changed to "Pending"</li>
                 </ul>
               </div>
             </div>
