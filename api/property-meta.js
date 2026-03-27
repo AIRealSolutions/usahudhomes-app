@@ -72,14 +72,18 @@ export default async function handler(req, res) {
     // Build meta tag values
     const propertyUrl = `https://usahudhomes.com/property/${property.case_number}`;
     const propertyTitle = escapeHtml(`${property.address} - ${property.city}, ${property.state}`);
-    const propertyDescription = escapeHtml(`$${property.price?.toLocaleString() || 'Price Available'} | ${property.beds || 0} beds | ${property.baths || 0} baths | HUD Home in ${property.city}, ${property.state}. Contact Lightkeeper Realty at 910-363-6147 for more information.`);
-    
-    // Fix image URL: convert .jog to .jpg
-    let imageUrl = property.main_image || 'https://usahudhomes.com/default-property-image.jpg';
-    if (imageUrl && imageUrl.endsWith('.jog')) {
-      imageUrl = imageUrl.replace(/\.jog$/, '.jpg');
-    }
-    const propertyImage = escapeHtml(imageUrl);
+    const propertyDescription = escapeHtml(
+      `${property.price ? '$' + Number(property.price).toLocaleString() : 'Price Available'} | ` +
+      `${property.beds || 0} beds | ${property.baths || 0} baths | ` +
+      `HUD Home in ${property.city}, ${property.state}. ` +
+      `$100 Down FHA Loans, 3% Closing Cost Allowance, Owner-Occupant Bidding Priority. ` +
+      `Contact Lightkeeper Realty at (910) 363-6147.`
+    );
+
+    // ── Dynamic OG image URL ──────────────────────────────────────────────────
+    // Points to our /api/og-image endpoint which generates a branded 1200×630
+    // image with the property photo, price, address, beds/baths, and branding.
+    const ogImageUrl = `https://usahudhomes.com/api/og-image?caseNumber=${encodeURIComponent(property.case_number)}`;
 
     // Read the index.html file
     const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
@@ -87,22 +91,27 @@ export default async function handler(req, res) {
 
     // Create meta tags
     const metaTags = `
-    <title>${propertyTitle}</title>
+    <title>${propertyTitle} | USAHUDhomes.com</title>
     <meta name="description" content="${propertyDescription}">
     
     <!-- Open Graph Meta Tags -->
     <meta property="og:title" content="${propertyTitle}">
     <meta property="og:description" content="${propertyDescription}">
-    <meta property="og:image" content="${propertyImage}">
+    <meta property="og:image" content="${ogImageUrl}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:type" content="image/png">
     <meta property="og:url" content="${propertyUrl}">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="USAHUDhomes.com">
+    <meta property="fb:app_id" content="1993076721256699">
     
     <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="${propertyTitle}">
     <meta name="twitter:description" content="${propertyDescription}">
-    <meta name="twitter:image" content="${propertyImage}">
+    <meta name="twitter:image" content="${ogImageUrl}">
+    <meta name="twitter:image:alt" content="${propertyTitle}">
     `;
 
     // Inject meta tags into the <head> section
