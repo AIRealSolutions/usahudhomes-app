@@ -40,6 +40,24 @@ function escapeHtml(text) {
     .replace(/'/g, '&#039;');
 }
 
+/**
+ * Removes all existing OG / Twitter meta tags and the <title> from the HTML
+ * so we can inject clean, property-specific ones without duplicates.
+ */
+function stripGenericMetaTags(html) {
+  // Remove existing <title>...</title>
+  html = html.replace(/<title>[^<]*<\/title>/gi, '');
+  // Remove all og: meta tags
+  html = html.replace(/<meta\s+property="og:[^"]*"[^>]*>/gi, '');
+  // Remove all twitter: meta tags (both property= and name= variants)
+  html = html.replace(/<meta\s+(?:property|name)="twitter:[^"]*"[^>]*>/gi, '');
+  // Remove generic description meta tag (we'll inject the property-specific one)
+  html = html.replace(/<meta\s+name="description"[^>]*>/gi, '');
+  // Remove fb:app_id (we'll re-add it in the injected block)
+  html = html.replace(/<meta\s+property="fb:app_id"[^>]*>/gi, '');
+  return html;
+}
+
 export default async function handler(req, res) {
   const { caseNumber } = req.query;
   const userAgent = req.headers['user-agent'] || '';
@@ -81,43 +99,46 @@ export default async function handler(req, res) {
     );
 
     // ── Dynamic OG image URL ──────────────────────────────────────────────────
-    // Points to our /api/og-image endpoint which generates a branded 1200×630
-    // image with the property photo, price, address, beds/baths, and branding.
+    // Points to /api/og-image which generates a branded 1200×630 PNG with the
+    // property photo, price, address, beds/baths, and USAHUDhomes.com branding.
     const ogImageUrl = `https://usahudhomes.com/api/og-image?caseNumber=${encodeURIComponent(property.case_number)}`;
 
-    // Read the index.html file
+    // Read and strip the generic meta tags from index.html
     const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
     let html = fs.readFileSync(indexPath, 'utf-8');
+    html = stripGenericMetaTags(html);
 
-    // Create meta tags
+    // Inject property-specific meta tags at the top of <head>
     const metaTags = `
     <title>${propertyTitle} | USAHUDhomes.com</title>
     <meta name="description" content="${propertyDescription}">
-    
-    <!-- Open Graph Meta Tags -->
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="${propertyUrl}">
+    <meta property="og:site_name" content="USAHUDhomes.com">
     <meta property="og:title" content="${propertyTitle}">
     <meta property="og:description" content="${propertyDescription}">
     <meta property="og:image" content="${ogImageUrl}">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:type" content="image/png">
-    <meta property="og:url" content="${propertyUrl}">
-    <meta property="og:type" content="website">
-    <meta property="og:site_name" content="USAHUDhomes.com">
     <meta property="fb:app_id" content="1993076721256699">
-    
-    <!-- Twitter Card Meta Tags -->
+
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="${propertyUrl}">
     <meta name="twitter:title" content="${propertyTitle}">
     <meta name="twitter:description" content="${propertyDescription}">
     <meta name="twitter:image" content="${ogImageUrl}">
     <meta name="twitter:image:alt" content="${propertyTitle}">
     `;
 
-    // Inject meta tags into the <head> section
-    html = html.replace('</head>', `${metaTags}\n</head>`);
+    // Inject right after <head>
+    html = html.replace('<head>', `<head>\n${metaTags}`);
 
     res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
     res.status(200).send(html);
   } catch (error) {
     console.error('Error fetching property:', error);
