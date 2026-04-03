@@ -1,9 +1,14 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true
-});
+let _openaiClient = null;
+function getOpenAI() {
+  if (!_openaiClient) {
+    const apiKey = import.meta?.env?.VITE_OPENAI_API_KEY || '';
+    if (!apiKey) return null;
+    _openaiClient = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+  }
+  return _openaiClient;
+}
 
 /**
  * Property Import AI Service
@@ -53,7 +58,9 @@ Return ONLY a JSON object with enhanced property data in this exact format:
   "validation_notes": "string (any issues or suggestions)"
 }`;
 
-      const response = await openai.chat.completions.create({
+      const _oa = getOpenAI();
+      if (!_oa) return { success: false, error: "OpenAI API key not configured" };
+      const response = await _oa.chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {
@@ -111,7 +118,9 @@ Extract all available information and return ONLY a JSON object in this format:
   "notes": "string (any additional information found)"
 }`;
 
-      const response = await openai.chat.completions.create({
+      const _oa = getOpenAI();
+      if (!_oa) return { success: false, error: "OpenAI API key not configured" };
+      const response = await _oa.chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {
@@ -163,7 +172,9 @@ Write a compelling 150-200 word description that:
 
 Return only the description text, no additional formatting.`;
 
-      const response = await openai.chat.completions.create({
+      const _oa = getOpenAI();
+      if (!_oa) return { success: false, error: "OpenAI API key not configured" };
+      const response = await _oa.chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {
@@ -247,7 +258,9 @@ ${context.currentProperty ? `Current Property: ${JSON.stringify(context.currentP
 
 Be helpful, concise, and professional.`;
 
-      const response = await openai.chat.completions.create({
+      const _oa = getOpenAI();
+      if (!_oa) return { success: false, error: "OpenAI API key not configured" };
+      const response = await _oa.chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {

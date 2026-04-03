@@ -5,9 +5,15 @@
 
 import OpenAI from 'openai'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
+let _openaiClient = null;
+function getOpenAI() {
+  if (!_openaiClient) {
+    const apiKey = (typeof process !== 'undefined' && process.env?.OPENAI_API_KEY) || '';
+    if (!apiKey) return null;
+    _openaiClient = new OpenAI({ apiKey });
+  }
+  return _openaiClient;
+}
 
 class LeadAgentService {
   /**
@@ -19,7 +25,9 @@ class LeadAgentService {
     try {
       const prompt = this.buildAnalysisPrompt(leadData)
       
-      const completion = await openai.chat.completions.create({
+      const _oa = getOpenAI();
+      if (!_oa) return { success: false, error: 'OpenAI API key not configured', data: null };
+      const completion = await _oa.chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {

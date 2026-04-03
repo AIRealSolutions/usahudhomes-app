@@ -2,10 +2,15 @@ import OpenAI from 'openai'
 import { customerService, consultationService } from '../database'
 
 // Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true // For client-side usage in development
-})
+let _openaiClient = null;
+function getOpenAI() {
+  if (!_openaiClient) {
+    const apiKey = import.meta?.env?.VITE_OPENAI_API_KEY || '';
+    if (!apiKey) return null;
+    _openaiClient = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+  }
+  return _openaiClient;
+}
 
 /**
  * Marketing AI Service
@@ -131,7 +136,9 @@ Platform Guidelines:
 Generate an engaging ${platform} post that highlights the property's best features and encourages potential buyers to take action. Include relevant details and make it compelling.`
 
     try {
-      const response = await openai.chat.completions.create({
+      const _oa = getOpenAI();
+      if (!_oa) return { success: false, error: "OpenAI API key not configured" };
+      const response = await _oa.chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {
@@ -197,7 +204,9 @@ Write a 150-200 word description that:
 Make it engaging and persuasive while remaining factual and professional.`
 
     try {
-      const response = await openai.chat.completions.create({
+      const _oa = getOpenAI();
+      if (!_oa) return { success: false, error: "OpenAI API key not configured" };
+      const response = await _oa.chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {
@@ -254,7 +263,9 @@ Focus on:
 Format as JSON.`
 
     try {
-      const response = await openai.chat.completions.create({
+      const _oa = getOpenAI();
+      if (!_oa) return { success: false, error: "OpenAI API key not configured" };
+      const response = await _oa.chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {
@@ -332,7 +343,9 @@ You can help with:
 Be helpful, professional, and provide actionable advice.`
 
     try {
-      const response = await openai.chat.completions.create({
+      const _oa = getOpenAI();
+      if (!_oa) return { success: false, error: "OpenAI API key not configured" };
+      const response = await _oa.chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {
@@ -383,7 +396,9 @@ Generate a complete marketing campaign including:
 Make it actionable and ready to implement.`
 
     try {
-      const response = await openai.chat.completions.create({
+      const _oa = getOpenAI();
+      if (!_oa) return { success: false, error: "OpenAI API key not configured" };
+      const response = await _oa.chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {
