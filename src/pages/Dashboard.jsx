@@ -3,7 +3,7 @@ import { Navigate, Link, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import UserDashboard from './UserDashboard'
 import BrokerDashboard from './BrokerDashboard'
-import AdminDashboard from './AdminDashboard'
+import AdminDashboard from '../components/AdminDashboard'
 
 export default function Dashboard() {
   const location = useLocation()
