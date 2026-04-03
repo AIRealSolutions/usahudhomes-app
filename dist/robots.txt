@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+
+# Block admin and private routes
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /broker/referrals
+Disallow: /login
+Disallow: /lead/
+Disallow: /admin/leads/
+Disallow: /admin/properties/import
+Disallow: /admin/bid-results
+Disallow: /admin/referrals
+
+# Sitemap
+Sitemap: https://usahudhomes.com/sitemap.xml

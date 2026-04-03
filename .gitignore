@@ -2,6 +2,7 @@ node_modules/
 .env
 .env.local
 .env.*.local
-dist/assets/
+# dist/assets/ - now tracked for Vercel static deploy
 *.log
 test-og-gen.mjs
+# # dist/assets/ - now tracked for Vercel static deploy is now committed to force Vercel to serve correct build
