@@ -7,9 +7,9 @@ import {
   UserCog,
   FileText,
   LogOut,
-  RefreshCw,
   ArrowLeft,
-  Upload
+  Upload,
+  Film
 } from 'lucide-react'
 import PropertyAdmin from './admin/PropertyAdmin'
 import CustomerAdmin from './admin/CustomerAdmin'
@@ -17,6 +17,7 @@ import LeadAdmin from './admin/LeadAdmin'
 import AgentAdmin from './admin/AgentAdmin'
 import AgentApplicationsAdmin from './admin/AgentApplicationsAdmin'
 import FacebookLeadsImport from './admin/FacebookLeadsImport'
+import VideoStudio from './admin/VideoStudio'
 
 const AdminDashboard = () => {
   const { user, profile, logout } = useAuth()
@@ -28,7 +29,8 @@ const AdminDashboard = () => {
     { id: 'leads', label: 'Leads', icon: MessageSquare, component: LeadAdmin },
     { id: 'agents', label: 'Agents', icon: UserCog, component: AgentAdmin },
     { id: 'applications', label: 'Agent Applications', icon: FileText, component: AgentApplicationsAdmin },
-    { id: 'facebook-import', label: 'Import Facebook Leads', icon: Upload, component: FacebookLeadsImport }
+    { id: 'facebook-import', label: 'Import Facebook Leads', icon: Upload, component: FacebookLeadsImport },
+    { id: 'video-studio', label: 'Video Studio', icon: Film, component: VideoStudio },
   ]
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component
@@ -44,7 +46,7 @@ const AdminDashboard = () => {
                 Admin Dashboard
               </h1>
               <p className="text-sm text-gray-600">
-                Manage properties, customers, consultations, and agents
+                Manage properties, customers, consultations, agents, and video marketing
               </p>
             </div>
             
@@ -71,7 +73,7 @@ const AdminDashboard = () => {
 
           {/* Tabs */}
           <div className="mt-6 border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 overflow-x-auto">
+            <nav className="-mb-px flex space-x-6 overflow-x-auto">
               {tabs.map((tab) => {
                 const Icon = tab.icon
                 const isActive = activeTab === tab.id
@@ -80,15 +82,20 @@ const AdminDashboard = () => {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`
-                      flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap
+                      flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors
                       ${isActive
-                        ? 'border-blue-600 text-blue-600'
+                        ? tab.id === 'video-studio'
+                          ? 'border-purple-600 text-purple-600'
+                          : 'border-blue-600 text-blue-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                       }
                     `}
                   >
                     <Icon className="w-5 h-5" />
                     {tab.label}
+                    {tab.id === 'video-studio' && (
+                      <span className="ml-1 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-semibold">NEW</span>
+                    )}
                   </button>
                 )
               })}
