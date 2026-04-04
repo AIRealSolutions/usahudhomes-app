@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import {
   Play, Square, CheckSquare, Filter, Search, RefreshCw,
   Film, Loader2, CheckCircle2, XCircle, Clock, AlertCircle,
-  ChevronDown, ChevronUp, Zap, ListChecks, Download, Terminal, Info
+  ChevronDown, ChevronUp, Zap, ListChecks, Download, Terminal, Info, Trash2
 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -24,12 +24,21 @@ const STATUS_ICONS = {
   error: XCircle,
 }
 
-function JobRow({ job, property }) {
+function JobRow({ job, property, onDelete }) {
   const Icon = STATUS_ICONS[job.status] || Clock
   const isDone = job.status === 'done'
+  const isProcessing = job.status === 'processing'
+
+  const handleDelete = (e) => {
+    e.stopPropagation()
+    if (window.confirm(`Remove "${property?.city || job.case_number}" from the queue?`)) {
+      onDelete(job.id)
+    }
+  }
+
   return (
-    <div className={`flex items-start gap-3 p-3 rounded-lg border ${isDone ? 'border-green-200 bg-green-50' : 'border-gray-100 bg-white'}`}>
-      <Icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${job.status === 'processing' ? 'animate-spin text-blue-600' : isDone ? 'text-green-600' : job.status === 'error' ? 'text-red-500' : 'text-gray-400'}`} />
+    <div className={`flex items-start gap-3 p-3 rounded-lg border ${isDone ? 'border-green-200 bg-green-50' : job.status === 'error' ? 'border-red-100 bg-red-50' : 'border-gray-100 bg-white'}`}>
+      <Icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${isProcessing ? 'animate-spin text-blue-600' : isDone ? 'text-green-600' : job.status === 'error' ? 'text-red-500' : 'text-gray-400'}`} />
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-gray-800 truncate">
           {property?.city || '—'}, {property?.state || '—'} — {job.case_number}
@@ -38,15 +47,15 @@ function JobRow({ job, property }) {
           <div className="text-xs text-gray-600 italic truncate mt-0.5">"{job.youtube_title}"</div>
         )}
         <div className="text-xs text-gray-500 mt-0.5">
-          {job.status === 'processing' && job.progress > 0
+          {isProcessing && job.progress > 0
             ? `${job.progress}% complete`
             : job.status === 'error'
             ? <span className="text-red-600">{job.error_message}</span>
             : isDone
-            ? <span className="text-green-700 font-medium">✓ Video ready — run worker to process</span>
+            ? <span className="text-green-700 font-medium">✓ Video ready</span>
             : 'Waiting in queue — run worker script to process'}
         </div>
-        {job.status === 'processing' && (
+        {isProcessing && (
           <div className="mt-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
             <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${job.progress || 0}%` }} />
           </div>
@@ -63,6 +72,15 @@ function JobRow({ job, property }) {
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[job.status]}`}>
           {job.status}
         </span>
+        {!isProcessing && (
+          <button
+            onClick={handleDelete}
+            title="Remove from queue"
+            className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -131,6 +149,17 @@ export default function VideoBulkGenerator() {
       .order('created_at', { ascending: false })
       .limit(50)
     setJobs(data || [])
+  }
+
+  // ── Delete job ──────────────────────────────────────────────────────────────
+  const deleteJob = async (jobId) => {
+    // Optimistic remove from UI immediately
+    setJobs(prev => prev.filter(j => j.id !== jobId))
+    const { error } = await supabase.from('video_jobs').delete().eq('id', jobId)
+    if (error) {
+      setError(`Failed to delete job: ${error.message}`)
+      await loadJobs() // re-sync if delete failed
+    }
   }
 
   // ── Filtering ──────────────────────────────────────────────────────────────
@@ -424,7 +453,7 @@ export default function VideoBulkGenerator() {
               </div>
             ) : (
               jobs.map(job => (
-                <JobRow key={job.id} job={job} property={job.properties} />
+                <JobRow key={job.id} job={job} property={job.properties} onDelete={deleteJob} />
               ))
             )}
           </div>
