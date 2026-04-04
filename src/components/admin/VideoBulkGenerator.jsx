@@ -151,6 +151,19 @@ export default function VideoBulkGenerator() {
     setJobs(data || [])
   }
 
+  // ── Clear entire queue (queued jobs only) ────────────────────────────────────
+  const clearQueue = async () => {
+    const queuedCount = jobs.filter(j => j.status === 'queued').length
+    if (queuedCount === 0) return
+    if (!window.confirm(`Remove all ${queuedCount} queued jobs? Processing and done jobs will not be affected.`)) return
+    setJobs(prev => prev.filter(j => j.status !== 'queued'))
+    const { error } = await supabase.from('video_jobs').delete().eq('status', 'queued')
+    if (error) {
+      setError(`Failed to clear queue: ${error.message}`)
+      await loadJobs()
+    }
+  }
+
   // ── Delete job ──────────────────────────────────────────────────────────────
   const deleteJob = async (jobId) => {
     // Optimistic remove from UI immediately
@@ -443,7 +456,18 @@ export default function VideoBulkGenerator() {
               {jobsByStatus.error > 0 && <Badge className="bg-red-100 text-red-700">{jobsByStatus.error} error</Badge>}
             </div>
           </div>
-          {showJobs ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          <div className="flex items-center gap-2">
+            {jobsByStatus.queued > 0 && (
+              <button
+                onClick={e => { e.stopPropagation(); clearQueue() }}
+                title="Remove all queued jobs"
+                className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors font-medium"
+              >
+                <Trash2 className="w-3 h-3" /> Clear Queue
+              </button>
+            )}
+            {showJobs ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          </div>
         </button>
         {showJobs && (
           <div className="p-4 pt-0 space-y-2 max-h-80 overflow-y-auto">
