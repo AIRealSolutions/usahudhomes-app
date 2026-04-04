@@ -1,0 +1,22 @@
+# HUD Pipeline — Python Requirements
+# Install with:  pip install -r requirements.txt
+
+# ── Video builder (Script 2) ──────────────────────────────────────────────────
+pillow                       # Image rendering (slides, overlays)
+numpy                        # Array operations for gradients and cross-fades
+opencv-python-headless       # Video encoding (headless = no GUI, works on Pi)
+qrcode[pil]                  # Real QR code generation for slide 5
+
+# ── Supabase worker (Script 4) ────────────────────────────────────────────────
+supabase                     # Supabase client (queue polling, job status updates)
+requests                     # HTTP downloads (property images from S3)
+openai                       # AI title/description generation (optional)
+
+# ── HUD Scraper (Script 1) ────────────────────────────────────────────────────
+selenium                     # Headless Chrome browser automation
+# Note: also requires chromium-chromedriver installed via apt (see SETUP.md)
+
+# ── YouTube Uploader (Script 3) ───────────────────────────────────────────────
+google-auth
+google-auth-oauthlib
+google-api-python-client     # YouTube Data API v3

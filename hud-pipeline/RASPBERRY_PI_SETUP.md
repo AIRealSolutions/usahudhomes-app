@@ -45,9 +45,10 @@ sudo apt install -y \
     libatlas-base-dev \
     libopenjp2-7 libtiff5 libjpeg-dev \
     libhdf5-dev libhdf5-serial-dev \
-    fonts-liberation
+    fonts-liberation \
+    fonts-noto-color-emoji \
+    chromium-browser chromium-chromedriver
 ```
-
 **What each package does:**
 
 | Package | Purpose |
@@ -55,26 +56,43 @@ sudo apt install -y \
 | `ffmpeg` | H.264 video encoding (required) |
 | `libatlas-base-dev` | Optimised BLAS for NumPy on ARM |
 | `libopenjp2-7 libtiff5 libjpeg-dev` | Pillow image format support |
-| `fonts-liberation` | LiberationSans fonts used by the video builder |
+| `fonts-liberation` | LiberationSans fonts used for all text in videos |
+| `fonts-noto-color-emoji` | Full-colour emoji rendering (beds 🛏, baths 🚿, phone 📞, etc.) |
+| `chromium-browser chromium-chromedriver` | Headless Chrome for the HUD scraper (Script 1) ||
 
 ---
 
-## Step 4 — Copy the pipeline scripts to the Pi
-
-**Option A — USB drive:** Copy the `hud-pipeline/scripts/` folder to a USB stick,
-plug it into the Pi, and copy to your home directory:
+## Step 4 — Clone the repository from GitHub
 
 ```bash
-cp -r /media/pi/USBDRIVE/scripts ~/hud-pipeline/
+cd ~
+git clone https://github.com/AIRealSolutions/usahudhomes-app.git
 ```
 
-**Option B — SCP from your Windows machine** (run in Windows PowerShell):
+The pipeline scripts are inside the repo under `hud-pipeline/`:
 
-```powershell
-scp -r "C:\Users\Lightkeeper\Web Applications Store\hud-pipeline\scripts" pi@<PI_IP>:~/hud-pipeline/
+```bash
+ls ~/usahudhomes-app/hud-pipeline/scripts/
+# 1_hud_scraper.py
+# 2_video_builder.py
+# 3_bulk_upload.py
+# 4_video_worker.py
 ```
 
-Replace `<PI_IP>` with your Pi's IP address (find it with `hostname -I` on the Pi).
+Copy the scripts to your working directory:
+
+```bash
+mkdir -p ~/hud-pipeline/output ~/hud-pipeline/videos ~/hud-pipeline/uploads
+cp -r ~/usahudhomes-app/hud-pipeline/scripts ~/hud-pipeline/
+cp ~/usahudhomes-app/hud-pipeline/requirements.txt ~/hud-pipeline/
+```
+
+To pull the latest updates in the future:
+
+```bash
+cd ~/usahudhomes-app && git pull
+cp -r ~/usahudhomes-app/hud-pipeline/scripts ~/hud-pipeline/
+```
 
 ---
 
@@ -86,17 +104,25 @@ python3 -m venv venv
 source venv/bin/activate
 
 pip install --upgrade pip
-pip install \
-    pillow \
-    numpy \
-    opencv-python-headless \
-    supabase \
-    requests \
-    openai
+pip install -r requirements.txt
 ```
 
-> **Note:** Use `opencv-python-headless` (not `opencv-python`) on the Pi — it
-> skips the GUI dependencies that are not available on a headless server.
+This installs all required packages:
+
+| Package | Used by |
+|---|---|
+| `pillow` | Video builder — image rendering |
+| `numpy` | Video builder — gradients, cross-fades |
+| `opencv-python-headless` | Video builder — MP4 encoding (headless = no GUI) |
+| `qrcode[pil]` | Video builder — real QR code on slide 5 |
+| `supabase` | Worker — queue polling and job updates |
+| `requests` | Worker — downloading property images |
+| `openai` | Worker — AI title/description generation (optional) |
+| `selenium` | Scraper — headless Chrome automation |
+| `google-auth google-auth-oauthlib google-api-python-client` | YouTube uploader |
+
+> **Note:** `opencv-python-headless` is used (not `opencv-python`) — it skips
+> GUI dependencies not available on a headless Pi.
 
 ---
 
@@ -118,9 +144,15 @@ OPENAI_API_KEY       = "sk-...your_openai_key..."         # ← optional
 
 Save with `Ctrl+O`, `Enter`, then `Ctrl+X`.
 
-**Where to get your Supabase service_role key:**
-Supabase Dashboard → Project Settings → API → copy the **service_role** key
-(the long `eyJ...` one — not the anon key).
+**Where to get your keys:**
+
+| Key | Location |
+|---|---|
+| `SUPABASE_SERVICE_KEY` | Supabase Dashboard → Project Settings → API → **service_role** key (the long `eyJ...` one — not the anon key) |
+| `OPENAI_API_KEY` | platform.openai.com → API Keys → Create new key |
+
+> The `OPENAI_API_KEY` is optional. If left blank the worker still builds videos
+> — it just skips generating AI YouTube titles and descriptions.
 
 ---
 
@@ -214,11 +246,15 @@ CPU time on ARM. Processing 3 videos per batch (the default) takes approximately
 |---|---|
 | `No module named 'PIL'` | `pip install pillow` inside the venv |
 | `No module named 'cv2'` | `pip install opencv-python-headless` |
-| `ffmpeg: command not found` | `sudo apt install ffmpeg -y` |
+| `No module named 'qrcode'` | `pip install qrcode[pil]` |
 | `No module named 'supabase'` | `pip install supabase` |
-| Video file not created | Run `ffmpeg -version` to confirm FFmpeg is installed |
-| Slow performance | Ensure you are using the 64-bit OS and have adequate cooling |
+| `No module named 'selenium'` | `pip install selenium` |
+| `ffmpeg: command not found` | `sudo apt install ffmpeg -y` |
+| Emoji renders as □ (broken glyph) | `sudo apt install fonts-noto-color-emoji -y` then rerun |
 | Font fallback (plain text) | `sudo apt install fonts-liberation -y` then rerun |
+| Scraper fails (ChromeDriver error) | `sudo apt install chromium-browser chromium-chromedriver -y` |
+| Video file not created | Run `ffmpeg -version` to confirm FFmpeg is installed |
+| Slow performance | Ensure 64-bit OS and adequate cooling (heatsink recommended) |
 
 ---
 
@@ -228,19 +264,32 @@ CPU time on ARM. Processing 3 videos per batch (the default) takes approximately
 # 1. Update system
 sudo apt update && sudo apt upgrade -y
 
-# 2. Install dependencies
+# 2. Install system dependencies
 sudo apt install -y python3 python3-pip python3-venv git ffmpeg \
-    libatlas-base-dev libopenjp2-7 libtiff5 libjpeg-dev fonts-liberation
+    libatlas-base-dev libopenjp2-7 libtiff5 libjpeg-dev \
+    fonts-liberation fonts-noto-color-emoji \
+    chromium-browser chromium-chromedriver
 
-# 3. Set up Python environment
+# 3. Clone repo and set up pipeline folder
+cd ~
+git clone https://github.com/AIRealSolutions/usahudhomes-app.git
+mkdir -p ~/hud-pipeline/output ~/hud-pipeline/videos ~/hud-pipeline/uploads
+cp -r ~/usahudhomes-app/hud-pipeline/scripts ~/hud-pipeline/
+cp ~/usahudhomes-app/hud-pipeline/requirements.txt ~/hud-pipeline/
+
+# 4. Create virtual environment and install all packages
 cd ~/hud-pipeline
 python3 -m venv venv
 source venv/bin/activate
-pip install pillow numpy opencv-python-headless supabase requests openai
+pip install --upgrade pip
+pip install -r requirements.txt
 
-# 4. Edit credentials (lines 50-52)
+# 5. Add your credentials (lines 50-52)
 nano scripts/4_video_worker.py
 
-# 5. Run
+# 6. Test
+python3 scripts/4_video_worker.py --once
+
+# 7. Run continuously
 python3 scripts/4_video_worker.py --watch
 ```

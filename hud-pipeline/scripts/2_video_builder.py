@@ -10,25 +10,23 @@ Produces a vertical 1080×1920 (9:16) MP4 Reel/Short for each property.
   Slide 2 — Listing details card (case #, county, bids open, status)
   Slide 3 — Owner-Occupant Incentives ($100 Down FHA, 3% Closing, 203k)
   Slide 4 — Lightkeeper Realty brand card
-  Slide 5 — Call-to-Action (USAHUDhomes.com, phone, steps)
+  Slide 5 — Call-to-Action (USAHUDhomes.com, phone, steps, QR code)
 
-Animated subscribe/like overlay appears on the last ~3 seconds of every slide:
-  • Pulsing red SUBSCRIBE button with bell icon
-  • Bouncing thumbs-up (👍 LIKE) badge
-  • Both animate in/out with smooth easing
+Animated subscribe/like overlay appears on the last ~3 seconds of every slide.
 
 Requirements:
-    pip install moviepy opencv-python-headless pillow numpy
+    pip install moviepy opencv-python-headless pillow numpy qrcode[pil]
 
 Usage:
     python3 2_video_builder.py --csv /path/to/hud_homes_NC.csv
     python3 2_video_builder.py --csv /path/to/hud_homes_NC.csv --limit 1
 """
 
-import os, sys, csv, argparse, math
+import os, sys, csv, argparse, math, io
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
+import qrcode
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Canvas / timing constants
@@ -63,8 +61,9 @@ SHADOW    = (0,    0,   0, 120)   # RGBA for shadow
 # ─────────────────────────────────────────────────────────────────────────────
 # Font helpers
 # ─────────────────────────────────────────────────────────────────────────────
-_FDIR = "/usr/share/fonts/truetype/liberation"
-_FC   = {
+_FDIR  = "/usr/share/fonts/truetype/liberation"
+_EMOJI = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
+_FC    = {
     "bold":   os.path.join(_FDIR, "LiberationSans-Bold.ttf"),
     "reg":    os.path.join(_FDIR, "LiberationSans-Regular.ttf"),
     "serif":  os.path.join(_FDIR, "LiberationSerif-Bold.ttf"),
@@ -74,6 +73,63 @@ _FC   = {
 def F(style, size):
     try:    return ImageFont.truetype(_FC[style], size)
     except: return ImageFont.load_default()
+
+def FE(size=109):
+    """Return NotoColorEmoji font. Size must be 109 (the only valid pixel size)."""
+    try:    return ImageFont.truetype(_EMOJI, 109)
+    except: return ImageFont.load_default()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Emoji drawing helper
+# ─────────────────────────────────────────────────────────────────────────────
+def draw_emoji(draw, xy, emoji_char, target_size, alpha=255):
+    """
+    Render a single emoji at xy scaled to target_size.
+    NotoColorEmoji renders at 109px; we resize down to target_size.
+    Returns (width, height) of the rendered emoji.
+    """
+    try:
+        fe = FE()
+        # Render to a temporary image
+        tmp = Image.new("RGBA", (200, 200), (0, 0, 0, 0))
+        td  = ImageDraw.Draw(tmp)
+        td.text((0, 0), emoji_char, font=fe, fill=(255, 255, 255, alpha), embedded_color=True)
+        # Crop to bounding box
+        bb = tmp.getbbox()
+        if not bb:
+            return (0, 0)
+        tmp = tmp.crop(bb)
+        # Scale to target size
+        ew, eh = tmp.size
+        scale  = target_size / max(ew, eh)
+        nw, nh = max(1, int(ew * scale)), max(1, int(eh * scale))
+        tmp    = tmp.resize((nw, nh), Image.LANCZOS)
+        # Apply alpha
+        if alpha < 255:
+            r, g, b, a = tmp.split()
+            a = a.point(lambda p: int(p * alpha / 255))
+            tmp = Image.merge("RGBA", (r, g, b, a))
+        # Composite onto the draw's image
+        draw._image.alpha_composite(tmp, (int(xy[0]), int(xy[1])))
+        return (nw, nh)
+    except Exception as e:
+        return (0, 0)
+
+
+def emoji_text(draw, xy, emoji, label, font, fill, emoji_size=40, gap=10, alpha=255):
+    """
+    Draw emoji + text label side by side.
+    Returns total width rendered.
+    """
+    ew, eh = draw_emoji(draw, (xy[0], xy[1] + 2), emoji, emoji_size, alpha=alpha)
+    tx = xy[0] + ew + gap
+    if alpha < 255:
+        draw.text((tx, xy[1]), label, font=font, fill=fill[:3] + (alpha,))
+    else:
+        draw.text((tx, xy[1]), label, font=font, fill=fill)
+    bb = draw.textbbox((0, 0), label, font=font)
+    return ew + gap + (bb[2] - bb[0])
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Drawing primitives
@@ -149,6 +205,21 @@ def icon_circle(draw, cx, cy, r, bg, text, font, fg):
     draw.text((cx-(bb[2]-bb[0])//2, cy-(bb[3]-bb[1])//2), text, font=font, fill=fg)
 
 
+def make_qr_image(url, size=300):
+    """Generate a real QR code PIL Image at the given pixel size."""
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGBA")
+    qr_img = qr_img.resize((size, size), Image.LANCZOS)
+    return qr_img
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Animated Subscribe / Like overlay
 # ─────────────────────────────────────────────────────────────────────────────
@@ -157,20 +228,13 @@ def make_subscribe_overlay(frame_idx, total_frames, w=W, h=H):
     """
     Returns an RGBA PIL Image overlay for one animation frame.
     frame_idx 0..total_frames-1
-
-    Animation phases:
-      0–20%  : slide in from right + scale up
-      20–80% : hold + pulse (subscribe button throbs)
-      80–100%: slide out to right + fade
     """
     t = frame_idx / max(total_frames - 1, 1)   # 0.0 → 1.0
 
-    # Easing
     def ease_out(x): return 1 - (1-x)**3
     def ease_in(x):  return x**3
     def pulse(x, speed=3): return 0.85 + 0.15*math.sin(x * speed * math.pi * 2)
 
-    # Slide-in / slide-out x offset
     if t < 0.20:
         progress = ease_out(t / 0.20)
         alpha    = int(255 * progress)
@@ -207,16 +271,15 @@ def make_subscribe_overlay(frame_idx, total_frames, w=W, h=H):
          (btn_cx+btn_w//2, btn_cy+btn_h//2)],
         radius=btn_h//2, fill=RED_YT+(alpha,)
     )
-    # Bell icon circle
-    bell_r = int(26*scale)
+
+    # Bell emoji in circle
+    bell_r  = int(26*scale)
     bell_cx = btn_cx - btn_w//2 + bell_r + 14
     d.ellipse([(bell_cx-bell_r, btn_cy-bell_r),
                (bell_cx+bell_r, btn_cy+bell_r)],
               fill=WHITE+(alpha,))
-    bell_font = F("bold", int(26*scale))
-    bb = d.textbbox((0,0), "🔔", font=bell_font)
-    d.text((bell_cx-(bb[2]-bb[0])//2, btn_cy-(bb[3]-bb[1])//2),
-           "🔔", font=bell_font, fill=(200,0,0,alpha))
+    bell_size = int(32*scale)
+    draw_emoji(d, (bell_cx - bell_size//2, btn_cy - bell_size//2), "🔔", bell_size, alpha=alpha)
 
     # Label
     sub_font = F("bold", int(28*scale))
@@ -243,11 +306,16 @@ def make_subscribe_overlay(frame_idx, total_frames, w=W, h=H):
          (lk_cx+lk_w//2, lk_cy+lk_h//2)],
         radius=lk_h//2, fill=(30,30,30, min(alpha, 220))
     )
+    # Thumbs up emoji + LIKE text
+    thumb_size = int(28*like_scale)
+    thumb_x = lk_cx - lk_w//2 + 12
+    thumb_y = lk_cy - thumb_size//2
+    draw_emoji(d, (thumb_x, thumb_y), "👍", thumb_size, alpha=alpha)
     like_font = F("bold", int(26*like_scale))
-    like_txt  = "👍  LIKE"
-    bb = d.textbbox((0,0), like_txt, font=like_font)
-    d.text((lk_cx-(bb[2]-bb[0])//2, lk_cy-(bb[3]-bb[1])//2),
-           like_txt, font=like_font, fill=WHITE+(alpha,))
+    like_label = "LIKE"
+    bb = d.textbbox((0,0), like_label, font=like_font)
+    d.text((thumb_x + thumb_size + 8, lk_cy - (bb[3]-bb[1])//2),
+           like_label, font=like_font, fill=WHITE+(alpha,))
 
     # ── "Follow for more HUD homes" micro-label ───────────────────────────────
     micro_font = F("bold", int(20*scale))
@@ -297,13 +365,12 @@ def _load_photo(path, target_w, target_h):
 
 def slide1_hero(prop, image_path):
     """Slide 1 — Full-bleed hero photo with overlay cards."""
-    # Full-bleed photo
     photo = _load_photo(image_path, W, H)
     img   = photo.copy()
     d     = ImageDraw.Draw(img, "RGBA")
 
     # Dark gradient overlay (top + bottom)
-    grad_top = gradient((0,0,0), (0,0,0,0) if False else (0,0,0), w=W, h=300)
+    grad_top = gradient((0,0,0), (0,0,0), w=W, h=300)
     grad_top_arr = np.array(grad_top)
     grad_top_arr[:,:,3] = np.linspace(200, 0, 300, dtype=np.uint8)[:,None]
     img.alpha_composite(Image.fromarray(grad_top_arr, "RGBA"), (0,0))
@@ -366,15 +433,32 @@ def slide1_hero(prop, image_path):
     d.text((cx+2, card_y+130), city_txt, font=city_font, fill=(0,0,0,140))
     d.text((cx,   card_y+127), city_txt, font=city_font, fill=WHITE+(255,))
 
-    # Beds / Baths row
-    beds  = prop.get("bedrooms","—")
-    baths = prop.get("bathrooms","—")
+    # Beds / Baths row — using emoji + text side by side, centered
+    beds  = str(prop.get("bedrooms","—"))
+    baths = str(prop.get("bathrooms","—"))
     bb_font = F("bold", 42)
-    items = [(f"🛏  {beds} BD", W//4), (f"🚿  {baths} BA", 3*W//4)]
-    for txt, icx in items:
-        bb = d.textbbox((0,0), txt, font=bb_font)
-        d.text((icx-(bb[2]-bb[0])//2+2, card_y+205), txt, font=bb_font, fill=(0,0,0,120))
-        d.text((icx-(bb[2]-bb[0])//2,   card_y+202), txt, font=bb_font, fill=OFFWHITE+(255,))
+    emoji_sz = 44
+
+    # Render beds item centered at W//4
+    bed_label  = f"{beds} BD"
+    bath_label = f"{baths} BA"
+    row_y = card_y + 202
+
+    # Beds: emoji + text, measure total width to center
+    tmp_d = ImageDraw.Draw(Image.new("RGBA", (1,1)))
+    bed_bb  = tmp_d.textbbox((0,0), bed_label,  font=bb_font)
+    bath_bb = tmp_d.textbbox((0,0), bath_label, font=bb_font)
+    bed_tw  = emoji_sz + 10 + (bed_bb[2]-bed_bb[0])
+    bath_tw = emoji_sz + 10 + (bath_bb[2]-bath_bb[0])
+
+    bed_x  = W//4  - bed_tw//2
+    bath_x = 3*W//4 - bath_tw//2
+
+    draw_emoji(d, (bed_x, row_y), "🛏", emoji_sz)
+    d.text((bed_x + emoji_sz + 10, row_y + 4), bed_label, font=bb_font, fill=OFFWHITE+(255,))
+
+    draw_emoji(d, (bath_x, row_y), "🚿", emoji_sz)
+    d.text((bath_x + emoji_sz + 10, row_y + 4), bath_label, font=bb_font, fill=OFFWHITE+(255,))
 
     # Divider
     d.line([(card_pad+30, card_y+270),(W-card_pad-30, card_y+270)],
@@ -386,13 +470,21 @@ def slide1_hero(prop, image_path):
     info_font = F("reg", 36)
     iy = card_y + 290
     if county:
-        bb = d.textbbox((0,0), f"📍 {county}", font=info_font)
-        d.text(((W-(bb[2]-bb[0]))//2, iy), f"📍 {county}", font=info_font, fill=LIGHT+(255,))
+        county_label = f"{county} County"
+        draw_emoji(d, ((W - (emoji_sz + 10 + d.textbbox((0,0), county_label, font=info_font)[2])) // 2, iy), "📍", 36)
+        bb = d.textbbox((0,0), county_label, font=info_font)
+        total_w = 36 + 10 + (bb[2]-bb[0])
+        ex = (W - total_w) // 2
+        draw_emoji(d, (ex, iy), "📍", 36)
+        d.text((ex + 36 + 10, iy + 2), county_label, font=info_font, fill=LIGHT+(255,))
         iy += 52
     if bids_open:
-        bo_txt = f"📅 Bids Open: {bids_open}"
-        bb = d.textbbox((0,0), bo_txt, font=info_font)
-        d.text(((W-(bb[2]-bb[0]))//2, iy), bo_txt, font=info_font, fill=GOLD+(255,))
+        bo_label = f"Bids Open: {bids_open}"
+        bb = d.textbbox((0,0), bo_label, font=info_font)
+        total_w = 36 + 10 + (bb[2]-bb[0])
+        ex = (W - total_w) // 2
+        draw_emoji(d, (ex, iy), "📅", 36)
+        d.text((ex + 36 + 10, iy + 2), bo_label, font=info_font, fill=GOLD+(255,))
 
     # ── BOTTOM BRAND BAR ──────────────────────────────────────────────────────
     d.rounded_rectangle([(0, H-110),(W, H)], radius=0, fill=NAVY+(240,))
@@ -416,22 +508,33 @@ def slide2_details(prop):
     title_font = F("bold", 54)
     centered_text(d, 40, "LISTING DETAILS", title_font, GOLD)
 
-    # Card
+    # Card background
     cx, cy = 60, 130
     cw, ch = W-120, H-280
     d.rounded_rectangle([(cx,cy),(cx+cw,cy+ch)], radius=32,
                         fill=DARK_CARD+(230,), outline=GOLD+(80,), width=2)
 
+    # Safe value helper — never return empty string
+    def safe(key, fallback="—"):
+        v = prop.get(key, "")
+        return str(v).strip() if str(v).strip() else fallback
+
+    # Format price safely
+    try:
+        price_val = f"${int(float(prop.get('list_price','0') or 0)):,}"
+    except:
+        price_val = safe("list_price")
+
     rows = [
-        ("Case #",          prop.get("case_number","—")),
-        ("City",            f"{prop.get('city','')}  {prop.get('zip_code','')}"),
-        ("County",          prop.get("county","—")),
-        ("List Price",      f"${int(float(prop.get('list_price','0') or 0)):,}"),
-        ("Bedrooms",        prop.get("bedrooms","—")),
-        ("Bathrooms",       prop.get("bathrooms","—")),
-        ("Status",          prop.get("status","Available")),
-        ("Bids Open",       prop.get("bids_open","—")),
-        ("Listing Period",  prop.get("listing_period","—")),
+        ("Case #",         safe("case_number")),
+        ("City",           f"{safe('city')}  {safe('zip_code', '')}".strip()),
+        ("County",         safe("county")),
+        ("List Price",     price_val),
+        ("Bedrooms",       safe("bedrooms")),
+        ("Bathrooms",      safe("bathrooms")),
+        ("Status",         safe("status", "Available")),
+        ("Bids Open",      safe("bids_open")),
+        ("Listing Period", safe("listing_period")),
     ]
 
     lbl_font = F("bold", 36)
@@ -439,13 +542,30 @@ def slide2_details(prop):
     row_h    = 88
     ry       = cy + 30
 
-    for label, value in rows:
-        # Row bg alternating
-        row_bg = (255,255,255,12) if rows.index((label,value)) % 2 == 0 else (0,0,0,0)
+    for i, (label, value) in enumerate(rows):
+        # Subtle alternating row tint — use very low alpha to avoid white blocks
+        row_bg = (255, 255, 255, 8) if i % 2 == 0 else (0, 0, 0, 0)
         d.rounded_rectangle([(cx+10, ry-8),(cx+cw-10, ry+row_h-20)],
                             radius=10, fill=row_bg)
+
+        # Label in gold
         d.text((cx+30, ry), f"{label}:", font=lbl_font, fill=GOLD+(255,))
-        d.text((cx+280, ry), str(value), font=val_font, fill=WHITE+(255,))
+
+        # Value in white — truncate if too long
+        max_val_w = cw - 310
+        val_str   = str(value)
+        vbb = d.textbbox((0,0), val_str, font=val_font)
+        if vbb[2]-vbb[0] > max_val_w:
+            # Truncate with ellipsis
+            while len(val_str) > 1:
+                val_str = val_str[:-1]
+                vbb = d.textbbox((0,0), val_str+"…", font=val_font)
+                if vbb[2]-vbb[0] <= max_val_w:
+                    val_str += "…"
+                    break
+        d.text((cx+280, ry), val_str, font=val_font, fill=WHITE+(255,))
+
+        # Separator line
         d.line([(cx+20, ry+row_h-22),(cx+cw-20, ry+row_h-22)],
                fill=(255,255,255,25), width=1)
         ry += row_h
@@ -487,7 +607,6 @@ def slide3_incentives():
 
     for i, (big, mid, small, body) in enumerate(incentives):
         cy = card_y + i*(card_h + card_gap)
-        # Card
         d.rounded_rectangle([(40,cy),(40+card_w,cy+card_h)],
                             radius=28, fill=DARK_CARD+(220,),
                             outline=GOLD+(60,), width=2)
@@ -500,7 +619,7 @@ def slide3_incentives():
         d.text((nc_x-(bb[2]-bb[0])//2, nc_y-(bb[3]-bb[1])//2),
                str(i+1), font=n_font, fill=NAVY+(255,))
 
-        # Big text
+        # Big / mid / small text
         bx = 185
         big_font  = F("bold", 80)
         mid_font  = F("bold", 36)
@@ -546,8 +665,7 @@ def slide4_lightkeeper():
 
     # Tagline
     tag_font = F("italic", 38)
-    centered_text(d, 250,
-                  "Helping People Bid on HUD Homes", tag_font, LIGHT)
+    centered_text(d, 250, "Helping People Bid on HUD Homes", tag_font, LIGHT)
     centered_text(d, 300, "for 25 Years", tag_font, LIGHT)
 
     # Divider
@@ -575,15 +693,20 @@ def slide4_lightkeeper():
         d.text(((W-(bb[2]-bb[0]))//2, by), line, font=body_font, fill=OFFWHITE+(240,))
         by += 52
 
-    # Phone badge
-    ph_font = F("bold", 48)
-    ph_txt  = "📞  Marc Spencer  •  910.363.6147"
-    bb = d.textbbox((0,0), ph_txt, font=ph_font)
-    pw, ph = bb[2]-bb[0]+60, bb[3]-bb[1]+30
-    px = (W-pw)//2
+    # Phone badge — using emoji + text
+    ph_font = F("bold", 44)
+    ph_label = "Marc Spencer  •  910.363.6147"
+    ph_bb = d.textbbox((0,0), ph_label, font=ph_font)
+    emoji_sz = 46
+    total_w = emoji_sz + 14 + (ph_bb[2]-ph_bb[0])
+    pw_full = total_w + 60
+    ph_h    = ph_bb[3]-ph_bb[1] + 30
+    px = (W - pw_full) // 2
     py = H - 265
-    d.rounded_rectangle([(px,py),(px+pw,py+ph)], radius=ph//2, fill=GOLD+(255,))
-    d.text((px+30, py+15), ph_txt, font=ph_font, fill=NAVY+(255,))
+    d.rounded_rectangle([(px, py),(px+pw_full, py+ph_h)], radius=ph_h//2, fill=GOLD+(255,))
+    # Emoji phone icon
+    draw_emoji(d, (px + 30, py + 8), "📞", emoji_sz)
+    d.text((px + 30 + emoji_sz + 14, py + 15), ph_label, font=ph_font, fill=NAVY+(255,))
 
     d.rectangle([(0,H-110),(W,H)], fill=NAVY+(240,))
     bar_font = F("bold", 30)
@@ -593,7 +716,7 @@ def slide4_lightkeeper():
 
 
 def slide5_cta():
-    """Slide 5 — Call to Action."""
+    """Slide 5 — Call to Action with real QR code."""
     img = gradient((60,15,5), (20,5,5)).convert("RGBA")
     d   = ImageDraw.Draw(img, "RGBA")
 
@@ -608,11 +731,11 @@ def slide5_cta():
     d.line([(80,305),(W-80,305)], fill=GOLD+(120,), width=3)
 
     # Website card
-    d.rounded_rectangle([(50,325),(W-50,560)], radius=24, fill=DARK_CARD+(210,))
-    site_font = F("bold", 62)
-    centered_text(d, 355, "USAHUDhomes.com", site_font, GOLD)
-    sub_font = F("reg", 36)
-    centered_text(d, 440, "Browse Every HUD Home in Your State", sub_font, LIGHT)
+    d.rounded_rectangle([(50,325),(W-50,530)], radius=24, fill=DARK_CARD+(210,))
+    site_font = F("bold", 58)
+    centered_text(d, 350, "USAHUDhomes.com", site_font, GOLD)
+    sub_font = F("reg", 34)
+    centered_text(d, 430, "Browse Every HUD Home in Your State", sub_font, LIGHT)
 
     # Steps
     steps = [
@@ -620,33 +743,51 @@ def slide5_cta():
         ("2", "Call Marc Spencer: 910.363.6147"),
         ("3", "Get pre-qualified & bid"),
     ]
-    sy = 590
-    step_font = F("bold", 40)
+    sy = 560
+    step_font = F("bold", 38)
     for num, txt in steps:
-        # Circle
         d.ellipse([(60,sy),(60+58,sy+58)], fill=GOLD+(255,))
         nb = d.textbbox((0,0), num, font=F("bold",34))
         d.text((60+(58-(nb[2]-nb[0]))//2, sy+(58-(nb[3]-nb[1]))//2),
                num, font=F("bold",34), fill=NAVY+(255,))
-        d.text((138, sy+8), txt, font=step_font, fill=WHITE+(255,))
-        sy += 100
+        d.text((138, sy+10), txt, font=step_font, fill=WHITE+(255,))
+        sy += 90
 
-    # QR-style placeholder box
-    d.rounded_rectangle([(W//2-90, sy+20),(W//2+90, sy+200)],
-                        radius=14, fill=(255,255,255,230))
-    qr_font = F("bold", 22)
-    bb = d.textbbox((0,0), "QR CODE", font=qr_font)
-    d.text(((W-(bb[2]-bb[0]))//2, sy+90), "QR CODE", font=qr_font, fill=NAVY+(200,))
-    bb2 = d.textbbox((0,0), "usahudhomes.com", font=qr_font)
-    d.text(((W-(bb2[2]-bb2[0]))//2, sy+120), "usahudhomes.com", font=qr_font, fill=NAVY+(200,))
+    # ── Real QR code ──────────────────────────────────────────────────────────
+    qr_size = 260
+    qr_img  = make_qr_image("https://usahudhomes.com", size=qr_size)
 
-    # Subscribe teaser (static — animated overlay handles the rest)
-    sub_y = sy + 225
-    d.rounded_rectangle([(80, sub_y),(W-80, sub_y+80)], radius=40, fill=RED_YT+(200,))
-    sub_font2 = F("bold", 38)
-    bb = d.textbbox((0,0), "🔔  SUBSCRIBE for HUD Home Alerts", font=sub_font2)
-    d.text(((W-(bb[2]-bb[0]))//2, sub_y+18),
-           "🔔  SUBSCRIBE for HUD Home Alerts", font=sub_font2, fill=WHITE+(255,))
+    # White rounded frame around QR
+    qr_x = (W - qr_size) // 2
+    qr_y = sy + 20
+    frame_pad = 16
+    d.rounded_rectangle(
+        [(qr_x - frame_pad, qr_y - frame_pad),
+         (qr_x + qr_size + frame_pad, qr_y + qr_size + frame_pad)],
+        radius=18, fill=(255,255,255,240)
+    )
+    img.alpha_composite(qr_img, (qr_x, qr_y))
+    d = ImageDraw.Draw(img, "RGBA")   # refresh draw after composite
+
+    # Label under QR
+    qr_label_font = F("bold", 26)
+    qr_label = "Scan to browse HUD homes"
+    bb = d.textbbox((0,0), qr_label, font=qr_label_font)
+    d.text(((W-(bb[2]-bb[0]))//2, qr_y + qr_size + frame_pad + 10),
+           qr_label, font=qr_label_font, fill=LIGHT+(220,))
+
+    # ── Subscribe button (static — animated overlay handles the rest) ─────────
+    sub_y = qr_y + qr_size + frame_pad + 52
+    d.rounded_rectangle([(80, sub_y),(W-80, sub_y+78)], radius=39, fill=RED_YT+(200,))
+    sub_font2 = F("bold", 36)
+    sub_label = "SUBSCRIBE for HUD Home Alerts"
+    # Bell emoji + text centered
+    sub_bb = d.textbbox((0,0), sub_label, font=sub_font2)
+    bell_sz = 38
+    total_sub_w = bell_sz + 10 + (sub_bb[2]-sub_bb[0])
+    sub_ex = (W - total_sub_w) // 2
+    draw_emoji(d, (sub_ex, sub_y + 18), "🔔", bell_sz)
+    d.text((sub_ex + bell_sz + 10, sub_y + 20), sub_label, font=sub_font2, fill=WHITE+(255,))
 
     d.rectangle([(0,H-110),(W,H)], fill=NAVY+(240,))
     bar_font = F("bold", 30)
@@ -698,7 +839,6 @@ def build_video(prop, images_dir, output_path):
         slide_rgb = slide.convert("RGB")
         slide_np  = np.array(slide_rgb)
 
-        # Overlay start frame (subscribe appears in last OVERLAY_FRAMES of each slide)
         overlay_start = SLIDE_FRAMES - OVERLAY_FRAMES
 
         for f in range(SLIDE_FRAMES):
@@ -710,7 +850,7 @@ def build_video(prop, images_dir, output_path):
                 frame  = slide_np
             out.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
 
-        # Cross-fade to next slide (overlay off during fade)
+        # Cross-fade to next slide
         if idx < len(slides)-1:
             for cf in crossfade(slides[idx], slides[idx+1], FADE_FRAMES):
                 out.write(cv2.cvtColor(np.array(cf), cv2.COLOR_RGB2BGR))
@@ -718,7 +858,6 @@ def build_video(prop, images_dir, output_path):
     out.release()
 
     # Re-encode H.264 for broad compatibility
-    # Using -preset ultrafast for Raspberry Pi 4 ARM performance
     raw = output_path.replace(".mp4","_raw.mp4")
     os.system(
         f'ffmpeg -y -i "{raw}" -vcodec libx264 -crf 24 -preset ultrafast '
