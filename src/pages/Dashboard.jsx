@@ -63,9 +63,9 @@ export default function Dashboard() {
   const hasAdminAccess = user?.email === 'marcspencer28461@gmail.com'
   const isAdminRoute = location.pathname === '/admin'
 
-  // If accessing /admin route and has admin access, show admin dashboard
+  // If accessing /admin route and has admin access, show admin dashboard with Video Studio
   if (isAdminRoute && hasAdminAccess) {
-    return <AdminDashboard user={user} showBrokerLink={true} />
+    return <AdminDashboard user={user} showBrokerLink={true} showVideoStudio={true} />
   }
 
   // Route to appropriate dashboard based on role
@@ -78,7 +78,7 @@ export default function Dashboard() {
   }
 
   if (userRole === 'admin') {
-    return <AdminDashboard user={user} />
+    return <AdminDashboard user={user} showVideoStudio={true} />
   }
 
   // Default fallback

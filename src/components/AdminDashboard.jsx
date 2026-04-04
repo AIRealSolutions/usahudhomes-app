@@ -19,19 +19,22 @@ import AgentApplicationsAdmin from './admin/AgentApplicationsAdmin'
 import FacebookLeadsImport from './admin/FacebookLeadsImport'
 import VideoStudio from './admin/VideoStudio'
 
-const AdminDashboard = () => {
+const AdminDashboard = ({ showVideoStudio = false }) => {
   const { user, profile, logout } = useAuth()
   const [activeTab, setActiveTab] = useState('properties')
 
-  const tabs = [
+  const baseTabs = [
     { id: 'properties', label: 'Properties', icon: Home, component: PropertyAdmin },
     { id: 'customers', label: 'Customers', icon: Users, component: CustomerAdmin },
     { id: 'leads', label: 'Leads', icon: MessageSquare, component: LeadAdmin },
     { id: 'agents', label: 'Agents', icon: UserCog, component: AgentAdmin },
     { id: 'applications', label: 'Agent Applications', icon: FileText, component: AgentApplicationsAdmin },
     { id: 'facebook-import', label: 'Import Facebook Leads', icon: Upload, component: FacebookLeadsImport },
-    { id: 'video-studio', label: 'Video Studio', icon: Film, component: VideoStudio },
   ]
+
+  const tabs = showVideoStudio
+    ? [...baseTabs, { id: 'video-studio', label: 'Video Studio', icon: Film, component: VideoStudio }]
+    : baseTabs
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component
 
@@ -43,22 +46,26 @@ const AdminDashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                Admin Dashboard
+                {showVideoStudio ? 'Admin Dashboard' : 'Broker Dashboard'}
               </h1>
               <p className="text-sm text-gray-600">
-                Manage properties, customers, consultations, agents, and video marketing
+                {showVideoStudio
+                  ? 'Manage properties, customers, leads, agents, and video marketing'
+                  : 'Manage properties, customers, consultations, and agents'}
               </p>
             </div>
             
             <div className="flex items-center gap-4">
-              {/* Back to Broker Dashboard */}
-              <a
-                href="/broker-dashboard"
-                className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-                <span className="hidden sm:inline">Broker Dashboard</span>
-              </a>
+              {/* Admin link — only show on broker dashboard */}
+              {!showVideoStudio && (
+                <a
+                  href="/admin"
+                  className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                  <span className="hidden sm:inline">Admin Dashboard</span>
+                </a>
+              )}
 
               {/* Logout */}
               <button 
