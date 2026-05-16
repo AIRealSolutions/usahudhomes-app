@@ -5,7 +5,7 @@
       "destination": "/api/property-meta?caseNumber=:caseNumber"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
