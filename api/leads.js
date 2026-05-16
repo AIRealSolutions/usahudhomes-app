@@ -178,16 +178,18 @@ async function handlePurgeUnderContract(req, res) {
     return res.status(200).json({
       success: true,
       deleted: 0,
+      days_threshold: days,
+      cutoff_date: cutoff,
       message: `No properties have been UNDER CONTRACT for more than ${days} days.`,
     })
   }
 
-  // Hard-delete the stale properties
-  const ids = stale.map(p => p.id)
+  // Hard-delete using filter conditions directly (avoids URL length limit with .in() on large arrays)
   const { error: deleteErr } = await supabase
     .from('properties')
     .delete()
-    .in('id', ids)
+    .eq('status', 'UNDER CONTRACT')
+    .lt('updated_at', cutoff)
 
   if (deleteErr) throw deleteErr
 
