@@ -10,15 +10,15 @@ import {
 // ─── All API calls go to Vercel serverless functions (same origin) ────────────
 // No separate Flask server needed — works in production on Vercel.
 const api = {
-  scrape:    (state)         => fetch('/api/hud-scrape',    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state }) }),
-  importDb:  (body)          => fetch('/api/hud-import',    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-  history:   (limit = 50)    => fetch(`/api/hud-history?limit=${limit}`),
-  queueMedia:(body)          => fetch('/api/hud-history?action=queue-media', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  scrape:    (state)         => fetch('/api/hud?action=scrape',      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state }) }),
+  importDb:  (body)          => fetch('/api/hud?action=import',      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  history:   (limit = 50)    => fetch(`/api/hud?action=history&limit=${limit}`),
+  queueMedia:(body)          => fetch('/api/hud?action=queue-media',  { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   schedules: {
-    list:   ()       => fetch('/api/hud-schedules'),
-    create: (body)   => fetch('/api/hud-schedules',         { method: 'POST',   headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-    update: (id, b)  => fetch(`/api/hud-schedules?id=${id}`,{ method: 'PATCH',  headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }),
-    delete: (id)     => fetch(`/api/hud-schedules?id=${id}`,{ method: 'DELETE' }),
+    list:   ()       => fetch('/api/hud?action=schedules'),
+    create: (body)   => fetch('/api/hud?action=schedules',          { method: 'POST',   headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+    update: (id, b)  => fetch(`/api/hud?action=schedules&id=${id}`, { method: 'PATCH',  headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }),
+    delete: (id)     => fetch(`/api/hud?action=schedules&id=${id}`, { method: 'DELETE' }),
   },
 }
 

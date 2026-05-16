@@ -283,14 +283,14 @@ class ConsultationService {
     try {
       // Route through the serverless API so the service-role key is used,
       // bypassing the anon-key RLS restriction on the consultations table.
-      const r = await fetch('/api/consultation-delete', {
+      const r = await fetch('/api/leads?action=delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       })
       const result = await r.json()
       if (!r.ok || !result.success) {
-        console.error('consultation-delete API error:', result)
+        console.error('leads delete API error:', result)
         return { success: false, error: result.error || 'Delete failed' }
       }
       return { success: true, deleted: result.deleted }

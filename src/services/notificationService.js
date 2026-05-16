@@ -28,8 +28,8 @@ export async function sendConsultationNotification(consultation) {
     console.log('API payload:', JSON.stringify(payload, null, 2))
     
     // Call the serverless function
-    console.log('Calling /api/send-notification...')
-    const response = await fetch('/api/send-notification', {
+    console.log('Calling /api/notifications?action=lead...')
+    const response = await fetch('/api/notifications?action=lead', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

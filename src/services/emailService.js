@@ -351,7 +351,7 @@ Marc Spencer: (910) 363-6147
       this.logEmail(emailData);
       
       // Send via Resend API endpoint
-      const response = await fetch('/api/send-agent-email', {
+      const response = await fetch('/api/notifications?action=agent-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -756,7 +756,7 @@ function SettingsPanel({ user, profile }) {
     }
     setTestStatus('sending')
     try {
-      const r = await fetch('/api/send-sms-notification', {
+      const r = await fetch('/api/notifications?action=sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: digits, carrier: smsCarrier, type: 'test' }),
