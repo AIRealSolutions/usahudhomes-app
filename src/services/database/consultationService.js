@@ -280,29 +280,22 @@ class ConsultationService {
    */
   async deleteConsultation(id) {
     try {
-      const { data, error } = await supabase
-        .from(TABLES.CONSULTATIONS)
-        .update({
-          is_deleted: true,
-          deleted_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-
-      if (error) {
-        console.error('Supabase soft delete error:', error)
-        return { success: false, error: error.message, data: null }
+      // Route through the serverless API so the service-role key is used,
+      // bypassing the anon-key RLS restriction on the consultations table.
+      const r = await fetch('/api/consultation-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      const result = await r.json()
+      if (!r.ok || !result.success) {
+        console.error('consultation-delete API error:', result)
+        return { success: false, error: result.error || 'Delete failed' }
       }
-
-      if (!data || data.length === 0) {
-        return { success: false, error: 'Consultation not found', data: null }
-      }
-
-      return { success: true, data: data[0] }
+      return { success: true, deleted: result.deleted }
     } catch (error) {
-      console.error('Error soft deleting consultation:', error)
-      return { success: false, error: error.message, data: null }
+      console.error('Error deleting consultation:', error)
+      return { success: false, error: error.message }
     }
   }
 

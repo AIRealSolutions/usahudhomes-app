@@ -14,7 +14,7 @@ import {
   ChevronLeft, ChevronRight, Menu, X, LogOut, Bell, RefreshCw,
   Phone, Mail, CheckCircle, Clock, AlertCircle,
   ArrowRight, Inbox, Share2, User, BarChart2, Shield,
-  ChevronDown, Search
+  ChevronDown, Search, Trash2, AlertTriangle, CheckSquare, Square
 } from 'lucide-react'
 
 // ── Lazy-loaded leaf components ───────────────────────────────────────────────
@@ -410,6 +410,36 @@ function FindPropertiesPanel({ agentId }) {
   )
 }
 
+// ── Delete Confirmation Modal ─────────────────────────────────────────────────
+function DeleteConfirmModal({ count, onConfirm, onCancel, deleting }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-5 h-5 text-red-600" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-gray-900">Remove {count > 1 ? `${count} leads` : 'this lead'}?</h3>
+            <p className="text-xs text-gray-500">This will soft-delete the record. Admins can restore it.</p>
+          </div>
+        </div>
+        <div className="flex gap-3 mt-5">
+          <button onClick={onCancel} disabled={deleting}
+            className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">
+            Cancel
+          </button>
+          <button onClick={onConfirm} disabled={deleting}
+            className="flex-1 px-4 py-2 bg-red-600 rounded-xl text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+            {deleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            {deleting ? 'Removing…' : 'Remove'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Active Leads Panel ────────────────────────────────────────────────────────
 function ActiveLeadsPanel({ agentId }) {
   const [consultations, setConsultations] = useState([])
@@ -417,6 +447,11 @@ function ActiveLeadsPanel({ agentId }) {
   const [search, setSearch]               = useState('')
   const [statusFilter, setStatusFilter]   = useState('all')
   const [refreshKey, setRefreshKey]       = useState(0)
+  const [selectMode, setSelectMode]       = useState(false)
+  const [selected, setSelected]           = useState(new Set())
+  const [confirmDelete, setConfirmDelete] = useState(null) // null | 'single' | 'bulk'
+  const [deletingId, setDeletingId]       = useState(null)
+  const [deleting, setDeleting]           = useState(false)
 
   useEffect(() => {
     if (!agentId) return
@@ -436,11 +471,116 @@ function ActiveLeadsPanel({ agentId }) {
     return matchSearch && matchStatus
   })
 
+  // Leads that look empty (no customer record and no meaningful name)
+  const emptyLeads = consultations.filter(c => {
+    const name = `${c.first_name || ''} ${c.last_name || ''}`.trim()
+    return !c.customer_id && !name
+  })
+
+  const toggleSelect = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    if (selected.size === filtered.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(filtered.map(c => c.id)))
+    }
+  }
+
+  const handleDeleteSingle = async (id) => {
+    setDeleting(true)
+    try {
+      await consultationService.deleteConsultation(id)
+      setConsultations(prev => prev.filter(c => c.id !== id))
+    } catch (e) {
+      console.error('Delete failed:', e)
+      alert('Failed to remove lead. Please try again.')
+    } finally {
+      setDeleting(false)
+      setConfirmDelete(null)
+      setDeletingId(null)
+    }
+  }
+
+  const handleDeleteSelected = async () => {
+    setDeleting(true)
+    try {
+      const ids = Array.from(selected)
+      await Promise.all(ids.map(id => consultationService.deleteConsultation(id)))
+      setConsultations(prev => prev.filter(c => !selected.has(c.id)))
+      setSelected(new Set())
+      setSelectMode(false)
+    } catch (e) {
+      console.error('Bulk delete failed:', e)
+      alert('Some leads could not be removed. Please try again.')
+    } finally {
+      setDeleting(false)
+      setConfirmDelete(null)
+    }
+  }
+
+  const handleCleanupEmpty = async () => {
+    setDeleting(true)
+    try {
+      await Promise.all(emptyLeads.map(c => consultationService.deleteConsultation(c.id)))
+      setConsultations(prev => prev.filter(c => {
+        const name = `${c.first_name || ''} ${c.last_name || ''}`.trim()
+        return c.customer_id || name
+      }))
+    } catch (e) {
+      console.error('Cleanup failed:', e)
+      alert('Cleanup failed. Please try again.')
+    } finally {
+      setDeleting(false)
+      setConfirmDelete(null)
+    }
+  }
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      {/* Confirm modal */}
+      {confirmDelete && (
+        <DeleteConfirmModal
+          count={confirmDelete === 'single' ? 1 : confirmDelete === 'bulk' ? selected.size : emptyLeads.length}
+          deleting={deleting}
+          onCancel={() => { setConfirmDelete(null); setDeletingId(null) }}
+          onConfirm={() => {
+            if (confirmDelete === 'single') handleDeleteSingle(deletingId)
+            else if (confirmDelete === 'bulk') handleDeleteSelected()
+            else handleCleanupEmpty()
+          }}
+        />
+      )}
+
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-bold text-gray-900">My Active Leads</h2>
         <div className="flex items-center gap-2">
+          {emptyLeads.length > 0 && !selectMode && (
+            <button
+              onClick={() => setConfirmDelete('cleanup')}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Clean up {emptyLeads.length} empty
+            </button>
+          )}
+          <button
+            onClick={() => { setSelectMode(s => !s); setSelected(new Set()) }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+              selectMode
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'text-gray-600 bg-white border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            <CheckSquare className="w-3.5 h-3.5" />
+            {selectMode ? 'Cancel' : 'Select'}
+          </button>
           <span className="text-sm text-gray-500">{consultations.length} total</span>
           <button onClick={() => setRefreshKey(k => k + 1)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400">
             <RefreshCw className="w-4 h-4" />
@@ -448,7 +588,30 @@ function ActiveLeadsPanel({ agentId }) {
         </div>
       </div>
 
+      {/* Bulk action bar */}
+      {selectMode && selected.size > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-between">
+          <p className="text-sm font-medium text-red-800">{selected.size} lead{selected.size !== 1 ? 's' : ''} selected</p>
+          <button
+            onClick={() => setConfirmDelete('bulk')}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            Remove Selected
+          </button>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col sm:flex-row gap-3">
+        {selectMode && (
+          <button onClick={toggleAll}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 flex-shrink-0">
+            {selected.size === filtered.length
+              ? <CheckSquare className="w-4 h-4 text-blue-600" />
+              : <Square className="w-4 h-4" />}
+            {selected.size === filtered.length ? 'Deselect all' : 'Select all'}
+          </button>
+        )}
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input value={search} onChange={e => setSearch(e.target.value)}
@@ -476,9 +639,40 @@ function ActiveLeadsPanel({ agentId }) {
       ) : (
         <Suspense fallback={<PanelFallback />}>
           <div className="space-y-4">
-            {filtered.map(c => (
-              <ConsultationCard key={c.id} consultation={c} onUpdate={() => setRefreshKey(k => k + 1)} />
-            ))}
+            {filtered.map(c => {
+              const isSelected = selected.has(c.id)
+              return (
+                <div key={c.id} className={`relative group rounded-xl transition-all ${
+                  isSelected ? 'ring-2 ring-red-400' : ''
+                }`}>
+                  {/* Select checkbox overlay */}
+                  {selectMode && (
+                    <button
+                      onClick={() => toggleSelect(c.id)}
+                      className="absolute top-3 left-3 z-10 w-6 h-6 flex items-center justify-center"
+                    >
+                      {isSelected
+                        ? <CheckSquare className="w-5 h-5 text-red-500" />
+                        : <Square className="w-5 h-5 text-gray-400" />}
+                    </button>
+                  )}
+                  {/* Delete button (shown on hover when not in select mode) */}
+                  {!selectMode && (
+                    <button
+                      onClick={() => { setDeletingId(c.id); setConfirmDelete('single') }}
+                      className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-300 transition-all opacity-0 group-hover:opacity-100"
+                      title="Remove this lead"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                  <ConsultationCard
+                    consultation={c}
+                    onUpdate={() => setRefreshKey(k => k + 1)}
+                  />
+                </div>
+              )
+            })}
           </div>
         </Suspense>
       )}
