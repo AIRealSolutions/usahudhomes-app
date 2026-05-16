@@ -21,6 +21,7 @@ import PropertyImportWizard from './components/admin/PropertyImportWizard'
 import BidResultsAdmin from './components/admin/BidResultsAdmin'
 import SuccessfulDeals from './components/SuccessfulDeals'
 import FullAdminDashboard from './components/AdminShell'
+import BrokerShell from './components/BrokerShell'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -1130,7 +1131,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/admin" element={<Dashboard />} />
-              <Route path="/broker-dashboard" element={<FullAdminDashboard initialTab="overview" />} />
+              <Route path="/broker-dashboard" element={<BrokerShell />} />
               <Route path="/lead/:id" element={<LeadDetail />} />
               <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />
               <Route path="/contact" element={<ContactForm />} />

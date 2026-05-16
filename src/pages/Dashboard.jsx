@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import UserDashboard from './UserDashboard'
-import BrokerDashboard from './BrokerDashboard'
+import BrokerShell from '../components/BrokerShell'
 import AdminShell from '../components/AdminShell'
 
 export default function Dashboard() {
@@ -74,7 +74,7 @@ export default function Dashboard() {
   }
 
   if (userRole === 'broker') {
-    return <BrokerDashboard user={user} showAdminAccess={hasAdminAccess} />
+    return <BrokerShell user={user} showAdminAccess={hasAdminAccess} />
   }
 
   if (userRole === 'admin') {

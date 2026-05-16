@@ -43,7 +43,7 @@ const PropertyAdmin       = lazy(() => import('./admin/PropertyAdmin'))
 const HUDScrapeManager    = lazy(() => import('./admin/HUDScrapeManager'))
 const PropertyImportWizard= lazy(() => import('./admin/PropertyImportWizard'))
 const PropertySearchTab   = lazy(() => import('./admin/PropertySearchTab'))
-const LeadAdmin           = lazy(() => import('./admin/LeadAdmin'))
+const LeadAdmin           = lazy(() => import('./admin/LeadsHub'))
 const CustomerAdmin       = lazy(() => import('./admin/CustomerAdmin'))
 const ReferralManagement  = lazy(() => import('./admin/ReferralManagement'))
 const ConsultationAdmin   = lazy(() => import('./admin/ConsultationAdmin'))
@@ -118,7 +118,7 @@ const COMPONENT_MAP = {
   'hud-scraper':       HUDScrapeManager,
   'property-import':   PropertyImportWizard,
   'property-search':   PropertySearchTab,
-  'leads':             LeadAdmin,
+  'leads':             LeadAdmin, // LeadManagement — queries leads table
   'customers':         CustomerAdmin,
   'referrals':         ReferralManagement,
   'consultations':     ConsultationAdmin,
