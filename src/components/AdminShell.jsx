@@ -6,7 +6,6 @@
  *   overview          → AdminControlPanel
  *   property-manage   → PropertyAdmin
  *   hud-scraper       → HUDScrapeManager
- *   property-import   → PropertyImportWizard
  *   property-search   → PropertySearchTab
  *   leads             → LeadAdmin
  *   customers         → CustomerAdmin
@@ -28,7 +27,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react'
 import { supabase } from '../config/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  LayoutDashboard, Home, Database, Upload as UploadIcon, Search,
+  LayoutDashboard, Home, Database, Search,
   MessageSquare, Users, GitMerge, PhoneCall,
   UserCog, FileText, DollarSign,
   Film, Zap, BookOpen, Layout,
@@ -41,7 +40,6 @@ import {
 const AdminControlPanel   = lazy(() => import('./admin/AdminControlPanel'))
 const PropertyAdmin       = lazy(() => import('./admin/PropertyAdmin'))
 const HUDScrapeManager    = lazy(() => import('./admin/HUDScrapeManager'))
-const PropertyImportWizard= lazy(() => import('./admin/PropertyImportWizard'))
 const PropertySearchTab   = lazy(() => import('./admin/PropertySearchTab'))
 const LeadAdmin           = lazy(() => import('./admin/LeadsHub'))
 const CustomerAdmin       = lazy(() => import('./admin/CustomerAdmin'))
@@ -72,7 +70,6 @@ const NAV = [
     items: [
       { id: 'property-manage',  label: 'Manage Listings',   icon: Home,          color: 'text-blue-500' },
       { id: 'hud-scraper',      label: 'HUD Scraper',       icon: Database,      color: 'text-blue-700', badge: 'LIVE' },
-      { id: 'property-import',  label: 'Import Wizard',     icon: UploadIcon,    color: 'text-teal-600' },
       { id: 'property-search',  label: 'Property Search',   icon: Search,        color: 'text-gray-500' },
     ]
   },
@@ -116,7 +113,6 @@ const COMPONENT_MAP = {
   'overview':          AdminControlPanel,
   'property-manage':   PropertyAdmin,
   'hud-scraper':       HUDScrapeManager,
-  'property-import':   PropertyImportWizard,
   'property-search':   PropertySearchTab,
   'leads':             LeadAdmin, // LeadManagement — queries leads table
   'customers':         CustomerAdmin,
