@@ -4,6 +4,8 @@
  * POST   /api/hud-schedules         — create a schedule
  * PATCH  /api/hud-schedules?id=...  — update a schedule
  * DELETE /api/hud-schedules?id=...  — delete a schedule
+ *
+ * Requires SUPABASE_SERVICE_KEY for write operations.
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -12,7 +14,7 @@ function getSupabase() {
   const url = process.env.VITE_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY
   if (!url || !key) throw new Error('Supabase credentials not configured')
-  return createClient(url, key)
+  return createClient(url, key, { auth: { persistSession: false } })
 }
 
 export default async function handler(req, res) {
@@ -23,7 +25,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
 
   try {
-    const supabase = getSupabase()
+    const supabase  = getSupabase()
     const scheduleId = req.query?.id
 
     // ── GET — list all schedules ───────────────────────────────────────────────
@@ -32,7 +34,15 @@ export default async function handler(req, res) {
         .from('hud_sync_schedules')
         .select('*')
         .order('created_at', { ascending: false })
-      if (error) throw error
+
+      if (error) {
+        // Table may not exist yet
+        return res.status(200).json({
+          success: true,
+          schedules: [],
+          warning: 'Run migration: database/migrations/add_hud_sync_tables.sql'
+        })
+      }
       return res.status(200).json({ success: true, schedules: data || [] })
     }
 
@@ -48,7 +58,7 @@ export default async function handler(req, res) {
         .insert({
           states,
           cron_expression: cron_expression || '0 6 * * *',
-          label:           label || `HUD Sync ${states.join(',')}`,
+          label:           label || `HUD Sync ${states.join(', ')}`,
           dry_run,
           enabled,
           created_at: now,
@@ -64,11 +74,10 @@ export default async function handler(req, res) {
     if (req.method === 'PATCH') {
       if (!scheduleId) return res.status(400).json({ success: false, error: 'id query param required' })
       const allowed = ['states', 'cron_expression', 'label', 'dry_run', 'enabled']
-      const updates = {}
+      const updates = { updated_at: new Date().toISOString() }
       for (const key of allowed) {
         if (req.body && key in req.body) updates[key] = req.body[key]
       }
-      updates.updated_at = new Date().toISOString()
       const { data, error } = await supabase
         .from('hud_sync_schedules')
         .update(updates)

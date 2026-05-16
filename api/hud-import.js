@@ -4,49 +4,74 @@
  * Body: { state: "NC", properties: [...], dry_run: false }
  *
  * Upserts scraped HUD properties into the Supabase `properties` table.
- * Marks any same-state properties NOT in the import as UNDER CONTRACT.
- * Optionally dry_run=true to simulate without making DB changes.
+ * Uses the service-role key (SUPABASE_SERVICE_KEY) for write access.
+ * Falls back to anon key with a clear error if service key is missing.
+ *
+ * Column mapping (matches actual DB schema):
+ *   list_price      → price
+ *   square_footage  → sq_ft
+ *   bid_open_date   → bids_open  (VARCHAR "MM/DD/YYYY")
+ *   bid_open_date   → bid_deadline (TIMESTAMP, converted)
+ *   listing_period  → listing_period + status (HUD status string)
  */
 
 import { createClient } from '@supabase/supabase-js'
 
 function getSupabase() {
   const url = process.env.VITE_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY
-  if (!url || !key) throw new Error('Supabase credentials not configured (VITE_SUPABASE_URL / SUPABASE_SERVICE_KEY)')
-  return createClient(url, key)
+  // Service key is required for writes (bypasses RLS)
+  const key = process.env.SUPABASE_SERVICE_KEY
+  if (!url) throw new Error('VITE_SUPABASE_URL environment variable is not set')
+  if (!key) throw new Error(
+    'SUPABASE_SERVICE_KEY is not set in Vercel environment variables. ' +
+    'Go to Vercel → Project Settings → Environment Variables and add your Supabase service-role key.'
+  )
+  return createClient(url, key, {
+    auth: { persistSession: false }
+  })
 }
 
 /**
- * Map a scraped HUD property object to the `properties` table schema.
+ * Convert a HUD property from the scraper format to the DB row format.
+ * Uses the exact column names from the `properties` table.
  */
 function mapToDbRow(p, now) {
+  // Convert bid_open_date "MM/DD/YYYY" → ISO timestamp for bid_deadline
+  let bidDeadline = null
+  const rawBid = p.bid_open_date || p.bidOpenDate || null
+  if (rawBid) {
+    try {
+      const parts = rawBid.split('/')
+      if (parts.length === 3) {
+        // MM/DD/YYYY → YYYY-MM-DD
+        bidDeadline = `${parts[2]}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}T00:00:00`
+      }
+    } catch (_) {}
+  }
+
+  // Use HUD's own status string (Exclusive, Price Reduced, New Listing, Extended, etc.)
+  const hudStatus = p.property_status || p.listing_period || 'AVAILABLE'
+
   return {
     case_number:    p.case_number,
     address:        p.address,
     city:           p.city,
     state:          p.state,
-    zip_code:       p.zip_code,
-    county:         p.county,
-    list_price:     p.list_price,
-    beds:           p.beds,
-    baths:          p.baths,
-    square_footage: p.square_footage,
-    year_built:     p.year_built,
-    property_type:  p.property_type,
-    fha_financing:  p.fha_financing,
-    listing_period: p.listing_period,
-    status:         'AVAILABLE',
-    bid_open_date:  p.bid_open_date  || null,
-    list_date:      p.list_date      || null,
-    main_image:     p.main_image     || null,
-    image_url:      p.main_image     || null,
-    hud_url:        p.hud_url        || null,
-    latitude:       p.latitude       || null,
-    longitude:      p.longitude      || null,
-    is_new_listing:   p.is_new_listing   || false,
-    is_price_reduced: p.is_price_reduced || false,
-    special_100_down: p.special_100_down || false,
+    zip_code:       p.zip_code         || null,
+    county:         p.county           || null,
+    price:          p.list_price       ?? p.price ?? null,   // DB column is "price"
+    beds:           p.beds             ?? null,
+    baths:          p.baths            ?? null,
+    sq_ft:          p.square_footage   ?? p.sq_ft ?? null,   // DB column is "sq_ft"
+    year_built:     p.year_built       ?? null,
+    property_type:  p.property_type    || 'Single Family',
+    status:         hudStatus,
+    bids_open:      rawBid             || null,              // VARCHAR "MM/DD/YYYY"
+    bid_deadline:   bidDeadline,                             // TIMESTAMP
+    listing_period: p.listing_period   || null,
+    main_image:     p.main_image       || null,
+    image_url:      p.main_image       || null,              // original Cloudinary URL
+    is_active:      true,
     updated_at:     now,
   }
 }
@@ -68,20 +93,32 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, error: 'Invalid state code' })
   }
   if (!Array.isArray(properties) || properties.length === 0) {
-    return res.status(400).json({ success: false, error: 'properties array is required' })
+    return res.status(400).json({ success: false, error: 'properties array is required and must not be empty' })
+  }
+
+  // Validate service key early so the error is clear
+  let supabase
+  try {
+    supabase = getSupabase()
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+      fix: 'Add SUPABASE_SERVICE_KEY to Vercel → Project Settings → Environment Variables'
+    })
   }
 
   const stats = {
-    total_scraped:          properties.length,
-    new_properties:         0,
-    updated_properties:     0,
-    restored_properties:    0,
-    marked_under_contract:  0,
-    errors:                 0,
+    total_scraped:         properties.length,
+    new_properties:        0,
+    updated_properties:    0,
+    restored_properties:   0,
+    marked_under_contract: 0,
+    errors:                0,
+    error_details:         [],
   }
 
   try {
-    const supabase = getSupabase()
     const now = new Date().toISOString()
 
     // ── Step 1: Fetch all existing properties for this state ──────────────────
@@ -90,25 +127,37 @@ export default async function handler(req, res) {
       .select('id, case_number, status')
       .eq('state', stateCode)
 
-    if (fetchErr) throw new Error(`Failed to fetch existing properties: ${fetchErr.message}`)
+    if (fetchErr) {
+      return res.status(500).json({
+        success: false,
+        error: `Failed to fetch existing properties: ${fetchErr.message}`,
+        hint: fetchErr.hint || null,
+      })
+    }
 
     const existingMap = {}
     for (const row of (existingRows || [])) {
       existingMap[row.case_number] = row
     }
 
-    const importCaseNumbers = new Set(properties.map(p => p.case_number).filter(Boolean))
+    const importCaseNumbers = new Set(
+      properties.map(p => p.case_number).filter(Boolean)
+    )
 
     // ── Step 2: Upsert each scraped property ──────────────────────────────────
     for (const prop of properties) {
-      if (!prop.case_number) { stats.errors++; continue }
+      if (!prop.case_number) {
+        stats.errors++
+        stats.error_details.push({ case_number: null, error: 'Missing case_number' })
+        continue
+      }
 
       try {
         const existing = existingMap[prop.case_number]
-        const dbRow = mapToDbRow(prop, now)
+        const dbRow    = mapToDbRow(prop, now)
 
         if (!existing) {
-          // New property
+          // New property — insert
           dbRow.listing_date = now
           dbRow.created_at   = now
           if (!dry_run) {
@@ -117,7 +166,7 @@ export default async function handler(req, res) {
           }
           stats.new_properties++
         } else {
-          // Existing property — update
+          // Existing — update
           const wasUnderContract = existing.status === 'UNDER CONTRACT'
           if (!dry_run) {
             const { error } = await supabase
@@ -135,10 +184,11 @@ export default async function handler(req, res) {
       } catch (err) {
         console.error(`[hud-import] Error on ${prop.case_number}:`, err.message)
         stats.errors++
+        stats.error_details.push({ case_number: prop.case_number, error: err.message })
       }
     }
 
-    // ── Step 3: Mark missing same-state properties as UNDER CONTRACT ──────────
+    // ── Step 3: Mark properties NOT in import as UNDER CONTRACT ───────────────
     for (const [caseNum, existing] of Object.entries(existingMap)) {
       if (!importCaseNumbers.has(caseNum) && existing.status !== 'UNDER CONTRACT') {
         if (!dry_run) {
@@ -151,28 +201,30 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── Step 4: Persist run record ────────────────────────────────────────────
+    // ── Step 4: Persist run record (non-fatal if table doesn't exist yet) ─────
     if (!dry_run) {
       try {
         await supabase.from('hud_sync_runs').insert({
-          job_id:                 `vercel_${stateCode}_${Date.now()}`,
-          state:                  stateCode,
-          dry_run:                false,
-          total_scraped:          stats.total_scraped,
-          new_properties:         stats.new_properties,
-          updated_properties:     stats.updated_properties,
-          restored_properties:    stats.restored_properties,
-          marked_under_contract:  stats.marked_under_contract,
-          errors:                 stats.errors,
-          ran_at:                 now,
+          job_id:                `vercel_${stateCode}_${Date.now()}`,
+          state:                 stateCode,
+          dry_run:               false,
+          total_scraped:         stats.total_scraped,
+          new_properties:        stats.new_properties,
+          updated_properties:    stats.updated_properties,
+          restored_properties:   stats.restored_properties,
+          marked_under_contract: stats.marked_under_contract,
+          errors:                stats.errors,
+          ran_at:                now,
         })
       } catch (_) {
-        // Non-fatal — hud_sync_runs table may not exist yet
-        console.warn('[hud-import] Could not write to hud_sync_runs (run migration first)')
+        console.warn('[hud-import] Could not write to hud_sync_runs — run the migration SQL first')
       }
     }
 
-    console.log(`[hud-import] ${stateCode} done:`, stats)
+    // Remove verbose error_details if empty
+    if (stats.error_details.length === 0) delete stats.error_details
+
+    console.log(`[hud-import] ${stateCode} complete:`, stats)
     return res.status(200).json({ success: true, state: stateCode, dry_run, stats })
 
   } catch (err) {
