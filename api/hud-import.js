@@ -73,6 +73,8 @@ function mapToDbRow(p, now) {
     image_url:      p.main_image       || null,              // original Cloudinary URL
     is_active:      true,
     updated_at:     now,
+    // Note: is_new_listing, is_price_reduced, special_100_down are NOT in the DB schema.
+    // Run database/migrations/add_hud_flags.sql to add them, or they are ignored here.
   }
 }
 
