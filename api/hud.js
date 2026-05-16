@@ -19,9 +19,10 @@ import { createClient } from '@supabase/supabase-js'
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 function getSupabase() {
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
+  // NOTE: VITE_ prefixed env vars are build-time only - use SUPABASE_URL in serverless functions
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://lpqjndfjbenolhneqzec.supabase.co'
   const key = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY
-  if (!url || !key) throw new Error('Supabase credentials not configured')
+  if (!key) throw new Error('SUPABASE_SERVICE_KEY not set in Vercel environment variables')
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
