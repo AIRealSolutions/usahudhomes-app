@@ -1,108 +1,540 @@
 /**
  * BrokerShell — Broker back office with persistent sidebar navigation.
- * Mirrors the AdminShell layout for consistency.
- *
- * Sidebar sections:
- *  Overview       → BrokerControlPanel
- *  My Leads       → Active consultations, pending referrals, referral inbox
- *  Properties     → AI property search, share analytics
- *  Communications → Email composer, SMS composer
- *  AI Tools       → AI agent assistant, AI properties
- *  Settings       → Profile
+ * All tools are fully wired: Email/SMS Composer, AI Assistant, Find Properties,
+ * Share Analytics, Referral Inbox, Active Leads, and Profile.
  */
 
 import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../config/supabase'
 import { consultationService } from '../services/database/consultationService'
 import { agentService } from '../services/database'
 import {
   LayoutDashboard, Users, Home, MessageSquare, Bot, Settings,
   ChevronLeft, ChevronRight, Menu, X, LogOut, Bell, RefreshCw,
-  Phone, Mail, CheckCircle, Clock, TrendingUp, AlertCircle,
-  ArrowRight, Inbox, Share2, Sparkles, User, MapPin,
-  DollarSign, Calendar, BarChart2, Shield
+  Phone, Mail, CheckCircle, Clock, AlertCircle,
+  ArrowRight, Inbox, Share2, User, BarChart2, Shield,
+  ChevronDown, Search
 } from 'lucide-react'
 
-// ── Lazy-loaded panels ────────────────────────────────────────────────────────
-const BrokerDashboardComp = lazy(() => import('./broker/BrokerDashboard'))
-const BrokerReferralInbox  = lazy(() => import('./broker/BrokerReferralInbox'))
-const ConsultationCard     = lazy(() => import('./broker/ConsultationCard'))
-const AIAgentAssistant     = lazy(() => import('./broker/AIAgentAssistant'))
-const AIPropertiesTab      = lazy(() => import('./broker/AIPropertiesTab'))
+// ── Lazy-loaded leaf components ───────────────────────────────────────────────
+const BrokerReferralInbox    = lazy(() => import('./broker/BrokerReferralInbox'))
+const ConsultationCard       = lazy(() => import('./broker/ConsultationCard'))
+const AIAgentAssistant       = lazy(() => import('./broker/AIAgentAssistant'))
+const AIPropertiesTab        = lazy(() => import('./broker/AIPropertiesTab'))
 const PropertyShareAnalytics = lazy(() => import('./broker/PropertyShareAnalytics'))
-const EmailComposer        = lazy(() => import('./broker/EmailComposer'))
-const SMSComposer          = lazy(() => import('./broker/SMSComposer'))
+const EmailComposer          = lazy(() => import('./broker/EmailComposer'))
+const SMSComposer            = lazy(() => import('./broker/SMSComposer'))
 
 // ── Navigation config ─────────────────────────────────────────────────────────
 const NAV_SECTIONS = [
   {
     label: 'Main',
     items: [
-      { id: 'overview',      label: 'Overview',         icon: LayoutDashboard, color: 'text-blue-500' },
+      { id: 'overview',        label: 'Overview',          icon: LayoutDashboard, color: 'text-blue-500' },
     ]
   },
   {
     label: 'My Leads',
     items: [
-      { id: 'active-leads',  label: 'Active Leads',     icon: Users,           color: 'text-green-500',  alertKey: 'activeLeads' },
-      { id: 'referrals',     label: 'Referral Inbox',   icon: Inbox,           color: 'text-orange-500', alertKey: 'pendingReferrals' },
+      { id: 'active-leads',    label: 'Active Leads',      icon: Users,           color: 'text-green-500',  alertKey: 'activeLeads' },
+      { id: 'referrals',       label: 'Referral Inbox',    icon: Inbox,           color: 'text-orange-500', alertKey: 'pendingReferrals' },
     ]
   },
   {
     label: 'Properties',
     items: [
-      { id: 'ai-properties', label: 'Find Properties',  icon: Home,            color: 'text-purple-500' },
-      { id: 'share-analytics', label: 'Share Analytics', icon: Share2,         color: 'text-pink-500' },
+      { id: 'ai-properties',   label: 'Find Properties',   icon: Home,            color: 'text-purple-500' },
+      { id: 'share-analytics', label: 'Share Analytics',   icon: Share2,          color: 'text-pink-500' },
     ]
   },
   {
     label: 'Communications',
     items: [
-      { id: 'email',         label: 'Email Composer',   icon: Mail,            color: 'text-blue-400' },
-      { id: 'sms',           label: 'SMS Composer',     icon: MessageSquare,   color: 'text-teal-500' },
+      { id: 'email',           label: 'Email Composer',    icon: Mail,            color: 'text-blue-400' },
+      { id: 'sms',             label: 'SMS Composer',      icon: MessageSquare,   color: 'text-teal-500' },
     ]
   },
   {
     label: 'AI Tools',
     items: [
-      { id: 'ai-assistant',  label: 'AI Assistant',     icon: Bot,             color: 'text-violet-500' },
+      { id: 'ai-assistant',    label: 'AI Assistant',      icon: Bot,             color: 'text-violet-500' },
     ]
   },
   {
     label: 'Account',
     items: [
-      { id: 'settings',      label: 'My Profile',       icon: Settings,        color: 'text-gray-500' },
+      { id: 'settings',        label: 'My Profile',        icon: Settings,        color: 'text-gray-500' },
     ]
   },
 ]
 
-// ── Stat Card ─────────────────────────────────────────────────────────────────
-const StatCard = ({ icon: Icon, label, value, sub, color, onClick }) => (
-  <button
-    onClick={onClick}
-    className={`bg-white rounded-xl border border-gray-200 p-5 text-left hover:shadow-md transition-all group w-full ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
-  >
-    <div className="flex items-center justify-between mb-3">
-      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color} bg-opacity-10`}
-           style={{ backgroundColor: 'rgba(0,0,0,0.04)' }}>
-        <Icon className={`w-5 h-5 ${color}`} />
-      </div>
-      {onClick && <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />}
-    </div>
-    <p className="text-2xl font-bold text-gray-900">{value ?? '—'}</p>
-    <p className="text-sm font-medium text-gray-700 mt-0.5">{label}</p>
-    {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-  </button>
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const PanelFallback = () => (
+  <div className="flex items-center justify-center h-64">
+    <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+  </div>
 )
+
+/** Normalise a consultation row into the shape that AI tools expect as 'lead' */
+function consultationToLead(c) {
+  if (!c) return null
+  const customer = c.customer || {}
+  const property = c.property || {}
+  return {
+    id:               c.id,
+    name:             `${customer.first_name || c.first_name || ''} ${customer.last_name || c.last_name || ''}`.trim(),
+    firstName:        customer.first_name || c.first_name || '',
+    lastName:         customer.last_name  || c.last_name  || '',
+    email:            customer.email      || c.email      || '',
+    phone:            customer.phone      || c.phone      || '',
+    customer_id:      c.customer_id,
+    customer_email:   customer.email      || c.email      || '',
+    customer_phone:   customer.phone      || c.phone      || '',
+    customer_name:    `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
+    customer:         customer,
+    message:          c.message           || '',
+    status:           c.status            || 'accepted',
+    city:             customer.city       || property.city || '',
+    state:            customer.state      || property.state || '',
+    bedrooms:         c.bedrooms          || '',
+    propertyType:     c.property_type     || '',
+    timeline:         c.timeline          || '',
+    createdAt:        c.created_at,
+    created_at:       c.created_at,
+    email_count:      c.email_count       || 0,
+    sms_count:        c.sms_count         || 0,
+    call_count:       c.call_count        || 0,
+    propertiesShared: c.properties_shared || 0,
+    property:         property,
+    // property fields normalised for EmailComposer/SMSComposer
+    case_number:      property.case_number || '',
+    address:          property.address     || '',
+    list_price:       property.price       || property.list_price || 0,
+    bid_open_date:    property.bid_deadline|| property.bid_open_date || '',
+    bedrooms_prop:    property.beds        || property.bedrooms || '',
+    bathrooms:        property.baths       || property.bathrooms || '',
+    sq_ft:            property.sq_ft       || property.square_footage || '',
+    year_built:       property.year_built  || '',
+  }
+}
+
+// ── Lead Picker — shared by Email, SMS, AI panels ────────────────────────────
+function LeadPicker({ agentId, onSelect, selectedId }) {
+  const [consultations, setConsultations] = useState([])
+  const [loading, setLoading]             = useState(true)
+  const [search, setSearch]               = useState('')
+  const [open, setOpen]                   = useState(false)
+
+  useEffect(() => {
+    if (!agentId) return
+    consultationService.getBrokerConsultations(agentId).then(r => {
+      setConsultations(r.data || [])
+      setLoading(false)
+    })
+  }, [agentId])
+
+  const filtered = consultations.filter(c => {
+    const name = `${c.customer?.first_name || c.first_name || ''} ${c.customer?.last_name || c.last_name || ''}`.toLowerCase()
+    const email = (c.customer?.email || c.email || '').toLowerCase()
+    const q = search.toLowerCase()
+    return !q || name.includes(q) || email.includes(q)
+  })
+
+  const selected = consultations.find(c => c.id === selectedId)
+  const selectedName = selected
+    ? `${selected.customer?.first_name || selected.first_name || ''} ${selected.customer?.last_name || selected.last_name || ''}`.trim()
+    : null
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-xl hover:border-blue-400 transition-colors text-sm"
+      >
+        <div className="flex items-center gap-2">
+          <User className="w-4 h-4 text-gray-400" />
+          <span className={selectedName ? 'text-gray-900 font-medium' : 'text-gray-400'}>
+            {selectedName || 'Select a lead to work with…'}
+          </span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+          <div className="p-2 border-b border-gray-100">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                autoFocus
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search leads…"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="w-5 h-5 text-blue-600 animate-spin" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-6 text-sm text-gray-400">No leads found</div>
+            ) : (
+              filtered.map(c => {
+                const name = `${c.customer?.first_name || c.first_name || ''} ${c.customer?.last_name || c.last_name || ''}`.trim()
+                const email = c.customer?.email || c.email || ''
+                const statusColors = {
+                  accepted: 'bg-green-100 text-green-700',
+                  new: 'bg-yellow-100 text-yellow-700',
+                  referred: 'bg-blue-100 text-blue-700',
+                  scheduled: 'bg-purple-100 text-purple-700',
+                  completed: 'bg-emerald-100 text-emerald-700',
+                }
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => { onSelect(c); setOpen(false); setSearch('') }}
+                    className={`w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left ${c.id === selectedId ? 'bg-blue-50' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <User className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{name || 'Unknown'}</p>
+                        <p className="text-xs text-gray-400">{email || 'No email'}</p>
+                      </div>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[c.status] || 'bg-gray-100 text-gray-600'}`}>
+                      {c.status}
+                    </span>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Email Composer Panel ──────────────────────────────────────────────────────
+function EmailComposerPanel({ agentId }) {
+  const [selectedConsultation, setSelectedConsultation] = useState(null)
+  const [sent, setSent] = useState(false)
+
+  const lead = selectedConsultation ? consultationToLead(selectedConsultation) : null
+  const customer = lead ? {
+    first_name: lead.firstName,
+    last_name:  lead.lastName,
+    email:      lead.email,
+    phone:      lead.phone,
+  } : null
+  const property = lead ? {
+    case_number:  lead.case_number,
+    address:      lead.address,
+    list_price:   lead.list_price,
+    bid_open_date:lead.bid_open_date,
+    bedrooms:     lead.bedrooms_prop,
+    bathrooms:    lead.bathrooms,
+    sq_ft:        lead.sq_ft,
+    year_built:   lead.year_built,
+  } : null
+
+  return (
+    <div className="space-y-5">
+      <h2 className="text-xl font-bold text-gray-900">Email Composer</h2>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Select Lead
+          </label>
+          <LeadPicker agentId={agentId} onSelect={c => { setSelectedConsultation(c); setSent(false) }} selectedId={selectedConsultation?.id} />
+        </div>
+
+        {!selectedConsultation && (
+          <div className="flex flex-col items-center justify-center py-10 text-gray-400 border-t border-gray-100">
+            <Mail className="w-10 h-10 mb-2" />
+            <p className="text-sm">Select a lead above to compose an email</p>
+          </div>
+        )}
+      </div>
+
+      {selectedConsultation && !sent && (
+        <Suspense fallback={<PanelFallback />}>
+          <EmailComposer
+            consultation={selectedConsultation}
+            customer={customer}
+            property={property}
+            onSend={() => setSent(true)}
+            onCancel={() => setSelectedConsultation(null)}
+          />
+        </Suspense>
+      )}
+
+      {sent && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-6 flex flex-col items-center gap-3">
+          <CheckCircle className="w-10 h-10 text-green-500" />
+          <p className="text-sm font-semibold text-green-800">Email opened in your mail client!</p>
+          <p className="text-xs text-green-600">The communication has been logged to this lead's record.</p>
+          <button
+            onClick={() => { setSelectedConsultation(null); setSent(false) }}
+            className="mt-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Compose Another
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── SMS Composer Panel ────────────────────────────────────────────────────────
+function SMSComposerPanel({ agentId }) {
+  const [selectedConsultation, setSelectedConsultation] = useState(null)
+  const [sent, setSent] = useState(false)
+
+  const lead = selectedConsultation ? consultationToLead(selectedConsultation) : null
+  const customer = lead ? {
+    first_name: lead.firstName,
+    last_name:  lead.lastName,
+    email:      lead.email,
+    phone:      lead.phone,
+  } : null
+  const property = lead ? {
+    case_number:  lead.case_number,
+    address:      lead.address,
+  } : null
+
+  return (
+    <div className="space-y-5">
+      <h2 className="text-xl font-bold text-gray-900">SMS Composer</h2>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Select Lead
+          </label>
+          <LeadPicker agentId={agentId} onSelect={c => { setSelectedConsultation(c); setSent(false) }} selectedId={selectedConsultation?.id} />
+        </div>
+
+        {!selectedConsultation && (
+          <div className="flex flex-col items-center justify-center py-10 text-gray-400 border-t border-gray-100">
+            <MessageSquare className="w-10 h-10 mb-2" />
+            <p className="text-sm">Select a lead above to compose an SMS</p>
+          </div>
+        )}
+      </div>
+
+      {selectedConsultation && !sent && (
+        <Suspense fallback={<PanelFallback />}>
+          <SMSComposer
+            consultation={selectedConsultation}
+            customer={customer}
+            property={property}
+            onSend={() => setSent(true)}
+            onCancel={() => setSelectedConsultation(null)}
+          />
+        </Suspense>
+      )}
+
+      {sent && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-6 flex flex-col items-center gap-3">
+          <CheckCircle className="w-10 h-10 text-green-500" />
+          <p className="text-sm font-semibold text-green-800">SMS opened in your messaging app!</p>
+          <p className="text-xs text-green-600">The communication has been logged to this lead's record.</p>
+          <button
+            onClick={() => { setSelectedConsultation(null); setSent(false) }}
+            className="mt-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Compose Another
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── AI Assistant Panel ────────────────────────────────────────────────────────
+function AIAssistantPanel({ agentId }) {
+  const [selectedConsultation, setSelectedConsultation] = useState(null)
+  const lead = selectedConsultation ? consultationToLead(selectedConsultation) : null
+
+  return (
+    <div className="space-y-5">
+      <h2 className="text-xl font-bold text-gray-900">AI Assistant</h2>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Select Lead (optional — AI works better with a lead selected)
+          </label>
+          <LeadPicker agentId={agentId} onSelect={setSelectedConsultation} selectedId={selectedConsultation?.id} />
+        </div>
+      </div>
+
+      <Suspense fallback={<PanelFallback />}>
+        <AIAgentAssistant lead={lead} onAction={() => {}} />
+      </Suspense>
+    </div>
+  )
+}
+
+// ── Find Properties Panel ─────────────────────────────────────────────────────
+function FindPropertiesPanel({ agentId }) {
+  const [selectedConsultation, setSelectedConsultation] = useState(null)
+  const lead = selectedConsultation ? consultationToLead(selectedConsultation) : null
+
+  return (
+    <div className="space-y-5">
+      <h2 className="text-xl font-bold text-gray-900">Find Properties</h2>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Select Lead (optional — AI matches properties to lead preferences)
+          </label>
+          <LeadPicker agentId={agentId} onSelect={setSelectedConsultation} selectedId={selectedConsultation?.id} />
+        </div>
+      </div>
+
+      <Suspense fallback={<PanelFallback />}>
+        <AIPropertiesTab lead={lead} />
+      </Suspense>
+    </div>
+  )
+}
+
+// ── Active Leads Panel ────────────────────────────────────────────────────────
+function ActiveLeadsPanel({ agentId }) {
+  const [consultations, setConsultations] = useState([])
+  const [loading, setLoading]             = useState(true)
+  const [search, setSearch]               = useState('')
+  const [statusFilter, setStatusFilter]   = useState('all')
+  const [refreshKey, setRefreshKey]       = useState(0)
+
+  useEffect(() => {
+    if (!agentId) return
+    setLoading(true)
+    consultationService.getBrokerConsultations(agentId).then(r => {
+      setConsultations(r.data || [])
+      setLoading(false)
+    })
+  }, [agentId, refreshKey])
+
+  const filtered = consultations.filter(c => {
+    const name = `${c.customer?.first_name || c.first_name || ''} ${c.customer?.last_name || c.last_name || ''}`.toLowerCase()
+    const email = (c.customer?.email || c.email || '').toLowerCase()
+    const q = search.toLowerCase()
+    const matchSearch = !q || name.includes(q) || email.includes(q)
+    const matchStatus = statusFilter === 'all' || c.status === statusFilter
+    return matchSearch && matchStatus
+  })
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-900">My Active Leads</h2>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-500">{consultations.length} total</span>
+          <button onClick={() => setRefreshKey(k => k + 1)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400">
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name or email…"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500">
+          <option value="all">All Status</option>
+          <option value="new">New</option>
+          <option value="accepted">Accepted</option>
+          <option value="referred">Referred</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="completed">Completed</option>
+        </select>
+      </div>
+
+      {loading ? (
+        <PanelFallback />
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 flex flex-col items-center justify-center py-16 text-gray-400">
+          <CheckCircle className="w-12 h-12 mb-3" />
+          <p className="text-sm font-medium">No leads match your filters</p>
+        </div>
+      ) : (
+        <Suspense fallback={<PanelFallback />}>
+          <div className="space-y-4">
+            {filtered.map(c => (
+              <ConsultationCard key={c.id} consultation={c} onUpdate={() => setRefreshKey(k => k + 1)} />
+            ))}
+          </div>
+        </Suspense>
+      )}
+    </div>
+  )
+}
+
+// ── Settings Panel ────────────────────────────────────────────────────────────
+function SettingsPanel({ user, profile }) {
+  return (
+    <div className="space-y-5">
+      <h2 className="text-xl font-bold text-gray-900">My Profile</h2>
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
+            <User className="w-8 h-8 text-blue-600" />
+          </div>
+          <div>
+            <p className="text-lg font-semibold text-gray-900">
+              {profile?.first_name} {profile?.last_name}
+            </p>
+            <p className="text-sm text-gray-500">{user?.email}</p>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 mt-1">
+              Broker
+            </span>
+          </div>
+        </div>
+        <div className="border-t border-gray-100 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {[
+            { label: 'Email',   value: user?.email },
+            { label: 'Phone',   value: profile?.phone || '—' },
+            { label: 'State',   value: profile?.state || '—' },
+            { label: 'License', value: profile?.license_number || '—' },
+          ].map(({ label, value }) => (
+            <div key={label}>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</p>
+              <p className="text-sm text-gray-700 mt-0.5">{value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+        <p className="text-sm text-blue-700">
+          To update your profile information, please contact your administrator.
+        </p>
+      </div>
+    </div>
+  )
+}
 
 // ── Broker Control Panel (Overview) ──────────────────────────────────────────
 function BrokerControlPanel({ agentId, agentName, onNavigate }) {
-  const [stats, setStats]           = useState(null)
+  const [stats, setStats]               = useState(null)
   const [consultations, setConsultations] = useState([])
   const [pendingReferrals, setPendingReferrals] = useState([])
-  const [loading, setLoading]       = useState(true)
+  const [loading, setLoading]           = useState(true)
 
   const load = useCallback(async () => {
     if (!agentId) return
@@ -112,16 +544,16 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
         consultationService.getBrokerConsultations(agentId),
         consultationService.getPendingReferrals(agentId),
       ])
-      const consults = consultRes.data || []
+      const consults  = consultRes.data  || []
       const referrals = referralRes.data || []
       setConsultations(consults)
       setPendingReferrals(referrals)
       setStats({
-        total:     consults.length,
-        active:    consults.filter(c => ['new','accepted','scheduled'].includes(c.status)).length,
-        pending:   referrals.length,
-        completed: consults.filter(c => c.status === 'completed').length,
-        acceptance: consults.length > 0
+        total:       consults.length,
+        active:      consults.filter(c => ['new','accepted','scheduled'].includes(c.status)).length,
+        pending:     referrals.length,
+        completed:   consults.filter(c => c.status === 'completed').length,
+        acceptance:  consults.length > 0
           ? Math.round((consults.filter(c => c.status !== 'declined').length / consults.length) * 100)
           : 0,
       })
@@ -134,15 +566,25 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
 
   useEffect(() => { load() }, [load])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
-      </div>
-    )
-  }
+  if (loading) return <PanelFallback />
 
   const recentConsults = consultations.slice(0, 5)
+
+  const StatCard = ({ icon: Icon, label, value, color, panel }) => (
+    <button
+      onClick={() => panel && onNavigate(panel)}
+      className={`bg-white rounded-xl border border-gray-200 p-5 text-left hover:shadow-md transition-all group w-full ${panel ? 'cursor-pointer' : 'cursor-default'}`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center">
+          <Icon className={`w-5 h-5 ${color}`} />
+        </div>
+        {panel && <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />}
+      </div>
+      <p className="text-2xl font-bold text-gray-900">{value ?? '—'}</p>
+      <p className="text-sm font-medium text-gray-700 mt-0.5">{label}</p>
+    </button>
+  )
 
   return (
     <div className="space-y-6">
@@ -184,10 +626,10 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Users}       label="Active Leads"       value={stats?.active}     color="text-green-600"  onClick={() => onNavigate('active-leads')} />
-        <StatCard icon={Inbox}       label="Pending Referrals"  value={stats?.pending}    color="text-orange-600" onClick={() => onNavigate('referrals')} />
-        <StatCard icon={CheckCircle} label="Completed"          value={stats?.completed}  color="text-blue-600" />
-        <StatCard icon={BarChart2}   label="Total Assigned"     value={stats?.total}      color="text-purple-600" />
+        <StatCard icon={Users}       label="Active Leads"      value={stats?.active}    color="text-green-600"  panel="active-leads" />
+        <StatCard icon={Inbox}       label="Pending Referrals" value={stats?.pending}   color="text-orange-600" panel="referrals" />
+        <StatCard icon={CheckCircle} label="Completed"         value={stats?.completed} color="text-blue-600" />
+        <StatCard icon={BarChart2}   label="Total Assigned"    value={stats?.total}     color="text-purple-600" />
       </div>
 
       {/* Quick actions */}
@@ -195,18 +637,15 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
         <h3 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Quick Actions</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {[
-            { label: 'View Active Leads',    icon: Users,       panel: 'active-leads',    color: 'bg-green-50 text-green-700 hover:bg-green-100' },
-            { label: 'Referral Inbox',       icon: Inbox,       panel: 'referrals',       color: 'bg-orange-50 text-orange-700 hover:bg-orange-100' },
-            { label: 'Find Properties',      icon: Home,        panel: 'ai-properties',   color: 'bg-purple-50 text-purple-700 hover:bg-purple-100' },
-            { label: 'Send Email',           icon: Mail,        panel: 'email',           color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
-            { label: 'Send SMS',             icon: MessageSquare, panel: 'sms',           color: 'bg-teal-50 text-teal-700 hover:bg-teal-100' },
-            { label: 'AI Assistant',         icon: Bot,         panel: 'ai-assistant',    color: 'bg-violet-50 text-violet-700 hover:bg-violet-100' },
+            { label: 'View Active Leads',  icon: Users,         panel: 'active-leads',    color: 'bg-green-50 text-green-700 hover:bg-green-100' },
+            { label: 'Referral Inbox',     icon: Inbox,         panel: 'referrals',       color: 'bg-orange-50 text-orange-700 hover:bg-orange-100' },
+            { label: 'Find Properties',    icon: Home,          panel: 'ai-properties',   color: 'bg-purple-50 text-purple-700 hover:bg-purple-100' },
+            { label: 'Send Email',         icon: Mail,          panel: 'email',           color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
+            { label: 'Send SMS',           icon: MessageSquare, panel: 'sms',             color: 'bg-teal-50 text-teal-700 hover:bg-teal-100' },
+            { label: 'AI Assistant',       icon: Bot,           panel: 'ai-assistant',    color: 'bg-violet-50 text-violet-700 hover:bg-violet-100' },
           ].map(({ label, icon: Icon, panel, color }) => (
-            <button
-              key={panel}
-              onClick={() => onNavigate(panel)}
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all ${color}`}
-            >
+            <button key={panel} onClick={() => onNavigate(panel)}
+              className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all ${color}`}>
               <Icon className="w-4 h-4 flex-shrink-0" />
               <span className="text-left leading-tight">{label}</span>
             </button>
@@ -226,12 +665,13 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
           <div className="flex flex-col items-center justify-center py-10 text-gray-400">
             <Users className="w-10 h-10 mb-2" />
             <p className="text-sm">No active leads yet</p>
-            <p className="text-xs mt-1">New referrals will appear here</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
             {recentConsults.map(c => {
-              const customer = c.customer || { first_name: c.first_name, last_name: c.last_name, email: c.email, phone: c.phone }
+              const customer = c.customer || {}
+              const name = `${customer.first_name || c.first_name || ''} ${customer.last_name || c.last_name || ''}`.trim()
+              const email = customer.email || c.email || ''
               const statusColors = {
                 new: 'bg-yellow-100 text-yellow-700',
                 accepted: 'bg-green-100 text-green-700',
@@ -240,18 +680,15 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
                 completed: 'bg-emerald-100 text-emerald-700',
               }
               return (
-                <Link
-                  key={c.id}
-                  to={`/lead/${c.id}`}
-                  className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors"
-                >
+                <Link key={c.id} to={`/lead/${c.id}`}
+                  className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                       <User className="w-4 h-4 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{customer.first_name} {customer.last_name}</p>
-                      <p className="text-xs text-gray-400">{customer.email || customer.phone || 'No contact info'}</p>
+                      <p className="text-sm font-medium text-gray-900">{name || 'Unknown'}</p>
+                      <p className="text-xs text-gray-400">{email || 'No email'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -270,138 +707,16 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
   )
 }
 
-// ── Active Leads Panel ────────────────────────────────────────────────────────
-function ActiveLeadsPanel({ agentId }) {
-  const [consultations, setConsultations] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-
-  useEffect(() => {
-    const load = async () => {
-      if (!agentId) return
-      setLoading(true)
-      const result = await consultationService.getBrokerConsultations(agentId)
-      setConsultations(result.data || [])
-      setLoading(false)
-    }
-    load()
-  }, [agentId])
-
-  const filtered = consultations.filter(c => {
-    const name = c.customer ? `${c.customer.first_name} ${c.customer.last_name}` : `${c.first_name || ''} ${c.last_name || ''}`
-    const q = search.toLowerCase()
-    const matchSearch = !search || name.toLowerCase().includes(q) ||
-      (c.customer?.email || c.email || '').toLowerCase().includes(q)
-    const matchStatus = statusFilter === 'all' || c.status === statusFilter
-    return matchSearch && matchStatus
-  })
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">My Active Leads</h2>
-        <span className="text-sm text-gray-500">{consultations.length} total</span>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <MessageSquare className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name or email…"
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500" />
-        </div>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500">
-          <option value="all">All Status</option>
-          <option value="new">New</option>
-          <option value="accepted">Accepted</option>
-          <option value="referred">Referred</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="completed">Completed</option>
-        </select>
-      </div>
-
-      {/* List */}
-      {loading ? (
-        <div className="flex items-center justify-center h-40">
-          <RefreshCw className="w-6 h-6 text-blue-600 animate-spin" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 flex flex-col items-center justify-center py-16 text-gray-400">
-          <CheckCircle className="w-12 h-12 mb-3" />
-          <p className="text-sm font-medium">No leads match your filters</p>
-        </div>
-      ) : (
-        <Suspense fallback={<div className="text-center py-8 text-gray-400">Loading…</div>}>
-          <div className="space-y-4">
-            {filtered.map(c => (
-              <ConsultationCard key={c.id} consultation={c} onUpdate={() => {}} />
-            ))}
-          </div>
-        </Suspense>
-      )}
-    </div>
-  )
-}
-
-// ── Settings Panel ────────────────────────────────────────────────────────────
-function SettingsPanel({ user, profile }) {
-  return (
-    <div className="space-y-5">
-      <h2 className="text-xl font-bold text-gray-900">My Profile</h2>
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
-            <User className="w-8 h-8 text-blue-600" />
-          </div>
-          <div>
-            <p className="text-lg font-semibold text-gray-900">{profile?.first_name} {profile?.last_name}</p>
-            <p className="text-sm text-gray-500">{user?.email}</p>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 mt-1">
-              Broker
-            </span>
-          </div>
-        </div>
-        <div className="border-t border-gray-100 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[
-            { label: 'Email', value: user?.email },
-            { label: 'Phone', value: profile?.phone || '—' },
-            { label: 'State', value: profile?.state || '—' },
-            { label: 'License', value: profile?.license_number || '—' },
-          ].map(({ label, value }) => (
-            <div key={label}>
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</p>
-              <p className="text-sm text-gray-700 mt-0.5">{value}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <p className="text-sm text-blue-700">To update your profile information, please contact your administrator.</p>
-      </div>
-    </div>
-  )
-}
-
-// ── Loading fallback ──────────────────────────────────────────────────────────
-const PanelFallback = () => (
-  <div className="flex items-center justify-center h-64">
-    <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
-  </div>
-)
-
 // ── Main BrokerShell ──────────────────────────────────────────────────────────
 export default function BrokerShell({ user, showAdminAccess }) {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
-  const [activePanel, setActivePanel] = useState('overview')
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [collapsed, setCollapsed] = useState(false)
-  const [agentId, setAgentId] = useState(null)
-  const [agentName, setAgentName] = useState('')
-  const [alerts, setAlerts] = useState({ activeLeads: 0, pendingReferrals: 0 })
+  const [activePanel, setActivePanel]   = useState('overview')
+  const [sidebarOpen, setSidebarOpen]   = useState(true)
+  const [collapsed, setCollapsed]       = useState(false)
+  const [agentId, setAgentId]           = useState(null)
+  const [agentName, setAgentName]       = useState('')
+  const [alerts, setAlerts]             = useState({ activeLeads: 0, pendingReferrals: 0 })
   const [loadingAgent, setLoadingAgent] = useState(true)
 
   // Resolve agent from user email
@@ -424,7 +739,7 @@ export default function BrokerShell({ user, showAdminAccess }) {
     resolveAgent()
   }, [user, profile])
 
-  // Load alert counts
+  // Load alert badge counts
   useEffect(() => {
     if (!agentId) return
     const loadAlerts = async () => {
@@ -433,7 +748,7 @@ export default function BrokerShell({ user, showAdminAccess }) {
         consultationService.getPendingReferrals(agentId),
       ])
       setAlerts({
-        activeLeads:      (consultRes.data || []).filter(c => ['new','accepted'].includes(c.status)).length,
+        activeLeads:      (consultRes.data  || []).filter(c => ['new','accepted'].includes(c.status)).length,
         pendingReferrals: (referralRes.data || []).length,
       })
     }
@@ -460,11 +775,7 @@ export default function BrokerShell({ user, showAdminAccess }) {
           </Suspense>
         )
       case 'ai-properties':
-        return (
-          <Suspense fallback={<PanelFallback />}>
-            <AIPropertiesTab />
-          </Suspense>
-        )
+        return <FindPropertiesPanel agentId={agentId} />
       case 'share-analytics':
         return (
           <Suspense fallback={<PanelFallback />}>
@@ -472,23 +783,11 @@ export default function BrokerShell({ user, showAdminAccess }) {
           </Suspense>
         )
       case 'email':
-        return (
-          <Suspense fallback={<PanelFallback />}>
-            <EmailComposer agentId={agentId} />
-          </Suspense>
-        )
+        return <EmailComposerPanel agentId={agentId} />
       case 'sms':
-        return (
-          <Suspense fallback={<PanelFallback />}>
-            <SMSComposer agentId={agentId} />
-          </Suspense>
-        )
+        return <SMSComposerPanel agentId={agentId} />
       case 'ai-assistant':
-        return (
-          <Suspense fallback={<PanelFallback />}>
-            <AIAgentAssistant agentId={agentId} />
-          </Suspense>
-        )
+        return <AIAssistantPanel agentId={agentId} />
       case 'settings':
         return <SettingsPanel user={user} profile={profile} />
       default:
@@ -500,12 +799,9 @@ export default function BrokerShell({ user, showAdminAccess }) {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* ── Mobile overlay ─────────────────────────────────────────────────── */}
+      {/* Mobile overlay */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 z-20 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/30 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* ── Sidebar ────────────────────────────────────────────────────────── */}
@@ -515,7 +811,7 @@ export default function BrokerShell({ user, showAdminAccess }) {
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         ${collapsed ? 'w-16' : 'w-64'}
       `}>
-        {/* Logo / header */}
+        {/* Logo */}
         <div className={`flex items-center h-16 px-4 border-b border-gray-200 flex-shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>
           {!collapsed && (
             <div className="flex items-center gap-2">
@@ -528,16 +824,12 @@ export default function BrokerShell({ user, showAdminAccess }) {
               </div>
             </div>
           )}
-          <button
-            onClick={() => setCollapsed(c => !c)}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors hidden lg:flex"
-          >
+          <button onClick={() => setCollapsed(c => !c)}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors hidden lg:flex">
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 lg:hidden"
-          >
+          <button onClick={() => setSidebarOpen(false)}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 lg:hidden">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -557,17 +849,13 @@ export default function BrokerShell({ user, showAdminAccess }) {
                   const isActive = activePanel === item.id
                   const alertCount = item.alertKey ? alerts[item.alertKey] : 0
                   return (
-                    <button
-                      key={item.id}
+                    <button key={item.id}
                       onClick={() => { setActivePanel(item.id); setSidebarOpen(false) }}
                       title={collapsed ? item.label : undefined}
                       className={`
                         w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium
                         transition-all duration-150
-                        ${isActive
-                          ? 'bg-blue-50 text-blue-700 shadow-sm'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                        }
+                        ${isActive ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
                         ${collapsed ? 'justify-center' : ''}
                       `}
                     >
@@ -582,9 +870,6 @@ export default function BrokerShell({ user, showAdminAccess }) {
                           )}
                         </>
                       )}
-                      {collapsed && alertCount > 0 && (
-                        <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-orange-500" />
-                      )}
                     </button>
                   )
                 })}
@@ -596,20 +881,16 @@ export default function BrokerShell({ user, showAdminAccess }) {
         {/* Footer */}
         <div className={`border-t border-gray-200 p-3 flex-shrink-0 space-y-1 ${collapsed ? 'items-center' : ''}`}>
           {showAdminAccess && (
-            <Link
-              to="/admin"
+            <Link to="/admin"
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-indigo-600 hover:bg-indigo-50 transition-colors ${collapsed ? 'justify-center' : ''}`}
-              title={collapsed ? 'Admin Panel' : undefined}
-            >
+              title={collapsed ? 'Admin Panel' : undefined}>
               <Shield className="w-4 h-4 flex-shrink-0" />
               {!collapsed && <span>Admin Panel</span>}
             </Link>
           )}
-          <button
-            onClick={handleSignOut}
+          <button onClick={handleSignOut}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors ${collapsed ? 'justify-center' : ''}`}
-            title={collapsed ? 'Sign Out' : undefined}
-          >
+            title={collapsed ? 'Sign Out' : undefined}>
             <LogOut className="w-4 h-4 flex-shrink-0" />
             {!collapsed && <span>Sign Out</span>}
           </button>
@@ -621,10 +902,8 @@ export default function BrokerShell({ user, showAdminAccess }) {
         {/* Top bar */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSidebarOpen(s => !s)}
-              className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 lg:hidden"
-            >
+            <button onClick={() => setSidebarOpen(s => !s)}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 lg:hidden">
               <Menu className="w-5 h-5" />
             </button>
             <div>
@@ -634,10 +913,8 @@ export default function BrokerShell({ user, showAdminAccess }) {
           </div>
           <div className="flex items-center gap-2">
             {alerts.pendingReferrals > 0 && (
-              <button
-                onClick={() => setActivePanel('referrals')}
-                className="relative p-2 rounded-lg hover:bg-gray-100 text-gray-400"
-              >
+              <button onClick={() => setActivePanel('referrals')}
+                className="relative p-2 rounded-lg hover:bg-gray-100 text-gray-400">
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center">
                   {alerts.pendingReferrals}
