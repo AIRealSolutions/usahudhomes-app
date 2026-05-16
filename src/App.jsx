@@ -12,12 +12,6 @@ import LeadDetailsPage from './pages/LeadDetailsPage'
 import ContactForm from './pages/ContactForm'
 import ContactThankYou from './pages/ContactThankYou'
 import AgentRegistration from './components/agent/AgentRegistration'
-import ReferralManagement from './components/admin/ReferralManagement'
-import LeadManagement from './components/admin/LeadManagement'
-import BrokerReferralInbox from './components/broker/BrokerReferralInbox'
-import PropertyManagement from './components/admin/PropertyManagement'
-import AdminPropertyDetails from './pages/AdminPropertyDetails'
-import BidResultsAdmin from './components/admin/BidResultsAdmin'
 import SuccessfulDeals from './components/SuccessfulDeals'
 import FullAdminDashboard from './components/AdminShell'
 import BrokerShell from './components/BrokerShell'
@@ -1136,13 +1130,7 @@ export default function App() {
               <Route path="/contact" element={<ContactForm />} />
               <Route path="/contact/thank-you" element={<ContactThankYou />} />
               <Route path="/broker/register" element={<AgentRegistration />} />
-              <Route path="/admin/referrals" element={<ReferralManagement />} />
-              <Route path="/admin/leads" element={<LeadManagement />} />
               <Route path="/admin/leads/:id" element={<LeadDetailsPage />} />
-              <Route path="/broker/referrals" element={<BrokerReferralInbox />} />
-              <Route path="/admin/properties" element={<PropertyManagement />} />
-              <Route path="/admin/properties/:caseNumber" element={<AdminPropertyDetails />} />
-              <Route path="/admin/bid-results" element={<BidResultsAdmin />} />
               <Route path="/deals" element={<SuccessfulDeals />} />
             </Routes>
           </main>

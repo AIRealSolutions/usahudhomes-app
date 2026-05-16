@@ -6,6 +6,8 @@
 import { supabase, TABLES, formatSupabaseResponse } from '../../config/supabase'
 import { sendConsultationNotification } from '../notificationService'
 import { autoAssignService } from './autoAssignService'
+import { agentService } from './agentService'
+import { referralService } from './referralService'
 
 class ConsultationService {
   /**
@@ -240,7 +242,6 @@ class ConsultationService {
         
         // Log agent assignment
         if (existing.agent_id !== updated.agent_id && updated.agent_id) {
-          const { agentService } = await import('./agentService')
           const agentResult = await agentService.getAgentById(updated.agent_id)
           const agentName = agentResult.success && agentResult.data 
             ? `${agentResult.data.first_name} ${agentResult.data.last_name}`
@@ -647,9 +648,6 @@ class ConsultationService {
    */
   async acceptReferral(consultationId, brokerId, notes = null) {
     try {
-      // Import referralService
-      const { referralService } = await import('./referralService')
-      
       // Use referralService.acceptReferral which directly updates the status
       const result = await referralService.acceptReferral(consultationId, brokerId)
       
