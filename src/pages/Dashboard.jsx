@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { Navigate, Link, useLocation } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import UserDashboard from './UserDashboard'
 import BrokerDashboard from './BrokerDashboard'
-import AdminDashboard from '../components/AdminDashboard'
+import AdminShell from '../components/AdminShell'
 
 export default function Dashboard() {
   const location = useLocation()
@@ -63,9 +63,9 @@ export default function Dashboard() {
   const hasAdminAccess = user?.email === 'marcspencer28461@gmail.com'
   const isAdminRoute = location.pathname === '/admin'
 
-  // If accessing /admin route and has admin access, show admin dashboard with Video Studio
+  // If accessing /admin route and has admin access, show new AdminShell
   if (isAdminRoute && hasAdminAccess) {
-    return <AdminDashboard user={user} showBrokerLink={true} showVideoStudio={true} />
+    return <AdminShell initialTab="overview" />
   }
 
   // Route to appropriate dashboard based on role
@@ -78,7 +78,7 @@ export default function Dashboard() {
   }
 
   if (userRole === 'admin') {
-    return <AdminDashboard user={user} showVideoStudio={true} />
+    return <AdminShell initialTab="overview" />
   }
 
   // Default fallback
