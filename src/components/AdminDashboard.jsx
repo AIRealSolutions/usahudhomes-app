@@ -9,7 +9,8 @@ import {
   LogOut,
   ArrowLeft,
   Upload,
-  Film
+  Film,
+  Database
 } from 'lucide-react'
 import PropertyAdmin from './admin/PropertyAdmin'
 import CustomerAdmin from './admin/CustomerAdmin'
@@ -18,6 +19,7 @@ import AgentAdmin from './admin/AgentAdmin'
 import AgentApplicationsAdmin from './admin/AgentApplicationsAdmin'
 import FacebookLeadsImport from './admin/FacebookLeadsImport'
 import VideoStudio from './admin/VideoStudio'
+import HUDScrapeManager from './admin/HUDScrapeManager'
 
 const AdminDashboard = ({ showVideoStudio = false }) => {
   const { user, profile, logout } = useAuth()
@@ -33,7 +35,11 @@ const AdminDashboard = ({ showVideoStudio = false }) => {
   ]
 
   const tabs = showVideoStudio
-    ? [...baseTabs, { id: 'video-studio', label: 'Video Studio', icon: Film, component: VideoStudio }]
+    ? [
+        ...baseTabs,
+        { id: 'hud-scraper',  label: 'HUD Scraper',  icon: Database, component: HUDScrapeManager },
+        { id: 'video-studio', label: 'Video Studio', icon: Film,     component: VideoStudio },
+      ]
     : baseTabs
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component
@@ -93,6 +99,8 @@ const AdminDashboard = ({ showVideoStudio = false }) => {
                       ${isActive
                         ? tab.id === 'video-studio'
                           ? 'border-purple-600 text-purple-600'
+                          : tab.id === 'hud-scraper'
+                          ? 'border-blue-700 text-blue-700'
                           : 'border-blue-600 text-blue-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                       }
@@ -102,6 +110,9 @@ const AdminDashboard = ({ showVideoStudio = false }) => {
                     {tab.label}
                     {tab.id === 'video-studio' && (
                       <span className="ml-1 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-semibold">NEW</span>
+                    )}
+                    {tab.id === 'hud-scraper' && (
+                      <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-semibold">LIVE</span>
                     )}
                   </button>
                 )
