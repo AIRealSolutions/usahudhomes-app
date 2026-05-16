@@ -1,20 +1,27 @@
 /**
  * Vercel Serverless Function: /api/notifications
  *
- * Consolidated notifications API — replaces:
- *   send-notification.js, send-sms-notification.js, send-agent-email.js
+ * Sends email + SMS notifications using Gmail SMTP (Nodemailer).
+ * SMS is delivered via carrier email-to-SMS gateways — free, no Twilio needed.
  *
  * Routes via ?action= query param:
  *   POST ?action=lead        — notify all admin agents of a new lead (email + SMS)
- *   POST ?action=sms         — send SMS to a specific agent via carrier gateway
+ *   POST ?action=sms         — send a direct SMS to a specific phone/carrier
  *   POST ?action=agent-email — send agent onboarding email (verification/approval/rejection)
+ *
+ * Required Vercel Environment Variables:
+ *   GMAIL_USER      — your Gmail address (marcspencer28461@gmail.com)
+ *   GMAIL_APP_PASS  — 16-char Gmail App Password (no spaces)
+ *   SUPABASE_URL    — Supabase project URL
+ *   SUPABASE_SERVICE_KEY — Supabase service-role key
  */
 
-const SUPABASE_URL         = process.env.SUPABASE_URL         || process.env.VITE_SUPABASE_URL
+import nodemailer from 'nodemailer'
+
+const SUPABASE_URL         = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
-const RESEND_API_KEY       = process.env.RESEND_API_KEY
-const FROM_EMAIL           = 'notifications@usahudhomes.com'
-const NOREPLY_EMAIL        = 'noreply@usahudhomes.com'
+const GMAIL_USER           = process.env.GMAIL_USER
+const GMAIL_APP_PASS       = process.env.GMAIL_APP_PASS
 const SITE_URL             = 'https://usahudhomes.com'
 
 // ─── Carrier SMS gateways ─────────────────────────────────────────────────────
@@ -34,41 +41,51 @@ const CARRIER_GATEWAYS = {
   other:        ()  => null,
 }
 
-export const CARRIER_OPTIONS = [
-  { value: 'verizon',      label: 'Verizon' },
-  { value: 'att',          label: 'AT&T' },
-  { value: 'tmobile',      label: 'T-Mobile' },
-  { value: 'sprint',       label: 'Sprint' },
-  { value: 'boost',        label: 'Boost Mobile' },
-  { value: 'cricket',      label: 'Cricket Wireless' },
-  { value: 'metro',        label: 'Metro by T-Mobile' },
-  { value: 'uscellular',   label: 'US Cellular' },
-  { value: 'virgin',       label: 'Virgin Mobile' },
-  { value: 'tracfone',     label: 'Tracfone' },
-  { value: 'straighttalk', label: 'Straight Talk' },
-  { value: 'consumer',     label: 'Consumer Cellular' },
-  { value: 'other',        label: 'Other / Unknown' },
-]
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-async function sendEmail({ to, subject, html, text, replyTo }) {
-  if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured')
-  const body = {
-    from: FROM_EMAIL,
-    to: Array.isArray(to) ? to : [to],
-    subject,
-    html,
-    text: text || html.replace(/<[^>]*>/g, ''),
+// ─── Gmail transporter ────────────────────────────────────────────────────────
+function getTransporter() {
+  if (!GMAIL_USER || !GMAIL_APP_PASS) {
+    throw new Error('Gmail not configured — set GMAIL_USER and GMAIL_APP_PASS in Vercel environment variables')
   }
-  if (replyTo) body.reply_to = replyTo
-  const r = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: GMAIL_USER,
+      pass: GMAIL_APP_PASS.replace(/\s/g, ''), // strip any spaces from app password
+    },
   })
-  const data = await r.json()
-  if (!r.ok) throw new Error(`Resend error: ${JSON.stringify(data)}`)
-  return data
+}
+
+// ─── Send email helper ────────────────────────────────────────────────────────
+async function sendEmail({ to, subject, html, text }) {
+  const transporter = getTransporter()
+  const recipients = Array.isArray(to) ? to.join(',') : to
+  await transporter.sendMail({
+    from: `USAHUDHomes <${GMAIL_USER}>`,
+    to: recipients,
+    subject: subject || '',
+    text: text || (html ? html.replace(/<[^>]*>/g, '') : ''),
+    html: html || undefined,
+  })
+}
+
+// ─── SMS helper ───────────────────────────────────────────────────────────────
+async function sendSmsToAgent(agent, smsText) {
+  if (!agent?.sms_notifications_enabled) return
+  const phone = (agent.notification_phone || '').replace(/\D/g, '').slice(-10)
+  if (phone.length !== 10) {
+    console.warn(`SMS skipped for ${agent.email}: invalid phone length (${phone.length})`)
+    return
+  }
+  const gatewayFn = CARRIER_GATEWAYS[agent.sms_carrier || 'verizon']
+  if (!gatewayFn) return
+  const gateway = gatewayFn(phone)
+  if (!gateway) return
+  try {
+    await sendEmail({ to: gateway, subject: '', text: smsText })
+    console.log(`SMS sent to ${agent.first_name} ${agent.last_name} at ${gateway}`)
+  } catch (e) {
+    console.error(`SMS failed for ${agent.email} (${gateway}):`, e.message)
+  }
 }
 
 function buildSmsText(type, lead) {
@@ -84,56 +101,56 @@ function buildSmsText(type, lead) {
   return `USAHUDHomes: New lead!\n${name}${phone ? '\n' + phone : ''}${state ? '\nState: ' + state : ''}\nLogin: ${site}/admin`
 }
 
-async function sendSmsToAgent(agent, type, lead) {
-  if (!agent.sms_notifications_enabled || !agent.notification_phone || !agent.sms_carrier) return
-  const gatewayFn = CARRIER_GATEWAYS[agent.sms_carrier]
-  if (!gatewayFn) return
-  const gateway = gatewayFn(agent.notification_phone.replace(/\D/g, ''))
-  if (!gateway) return
-  const smsText = buildSmsText(type, lead)
-  await sendEmail({ to: gateway, subject: '', text: smsText })
-  console.log(`SMS sent to ${agent.first_name} ${agent.last_name} at ${gateway}`)
+// ─── Supabase fetch helper ────────────────────────────────────────────────────
+async function supabaseFetch(path, opts = {}) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return null
+  const url = `${SUPABASE_URL}/rest/v1/${path}`
+  const r = await fetch(url, {
+    ...opts,
+    headers: {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+    },
+  })
+  if (!r.ok) return null
+  return r.json()
 }
 
 // ─── Action: lead notification ────────────────────────────────────────────────
 async function handleLeadNotification(req, res) {
   const { consultation, customer, property } = req.body || {}
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    // Fallback: just send to hardcoded admin
-    const name  = customer?.name  || consultation?.name  || 'New Lead'
-    const email = customer?.email || consultation?.email || ''
-    const state = consultation?.state || property?.state || ''
-    const html = `<h2>New Lead: ${name}</h2><p>Email: ${email}</p><p>State: ${state}</p><p><a href="${SITE_URL}/admin">View in Admin</a></p>`
-    await sendEmail({ to: 'marcspencer28461@gmail.com', subject: `New Lead: ${name}`, html })
-    return res.status(200).json({ success: true, notified: ['email-fallback'] })
-  }
 
-  const { createClient } = await import('@supabase/supabase-js')
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } })
-
-  // Get all admin agents with SMS enabled
-  const { data: admins } = await supabase
-    .from('agents').select('*').eq('is_admin', true).eq('is_active', true)
-
-  const name  = customer?.name  || consultation?.name  || 'New Lead'
-  const email = customer?.email || consultation?.email || ''
-  const phone = customer?.phone || consultation?.phone || ''
+  const name  = customer?.name  || consultation?.customer_name  || consultation?.name  || 'New Lead'
+  const email = customer?.email || consultation?.customer_email || consultation?.email || ''
+  const phone = customer?.phone || consultation?.customer_phone || consultation?.phone || ''
   const state = consultation?.state || property?.state || ''
 
+  // Get all admin agents
+  const admins = await supabaseFetch(
+    'agents?is_admin=eq.true&is_active=eq.true&select=id,first_name,last_name,email,notification_phone,sms_carrier,sms_notifications_enabled'
+  ) || []
+
+  // Build email HTML
   const html = `
-    <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-      <h2 style="color:#1e40af">🏠 New Lead — USAHUDhomes.com</h2>
-      <table style="width:100%;border-collapse:collapse">
-        <tr><td style="padding:8px;font-weight:bold">Name</td><td style="padding:8px">${name}</td></tr>
-        <tr><td style="padding:8px;font-weight:bold">Email</td><td style="padding:8px">${email}</td></tr>
-        <tr><td style="padding:8px;font-weight:bold">Phone</td><td style="padding:8px">${phone}</td></tr>
-        <tr><td style="padding:8px;font-weight:bold">State</td><td style="padding:8px">${state}</td></tr>
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
+      <h2 style="color:#1e40af;margin-bottom:16px">🏠 New Lead — USAHUDhomes.com</h2>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+        <tr style="background:#f9fafb"><td style="padding:10px 16px;font-weight:bold;color:#374151;width:120px">Name</td><td style="padding:10px 16px;color:#111827">${name}</td></tr>
+        <tr><td style="padding:10px 16px;font-weight:bold;color:#374151">Email</td><td style="padding:10px 16px;color:#111827">${email}</td></tr>
+        <tr style="background:#f9fafb"><td style="padding:10px 16px;font-weight:bold;color:#374151">Phone</td><td style="padding:10px 16px;color:#111827">${phone || '—'}</td></tr>
+        <tr><td style="padding:10px 16px;font-weight:bold;color:#374151">State</td><td style="padding:10px 16px;color:#111827">${state || '—'}</td></tr>
       </table>
-      <p><a href="${SITE_URL}/admin" style="background:#1e40af;color:white;padding:10px 20px;border-radius:6px;text-decoration:none">View in Admin</a></p>
+      <p style="margin-top:20px">
+        <a href="${SITE_URL}/admin" style="background:#1e40af;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold">View in Admin Dashboard</a>
+      </p>
     </div>`
 
   const notified = []
-  for (const admin of (admins || [])) {
+
+  // Notify all admins
+  for (const admin of admins) {
     if (admin.email) {
       try {
         await sendEmail({ to: admin.email, subject: `New Lead: ${name}`, html })
@@ -141,9 +158,19 @@ async function handleLeadNotification(req, res) {
       } catch (e) { console.error('Email failed:', e.message) }
     }
     try {
-      await sendSmsToAgent(admin, 'new_lead', { name, phone, email, state })
-      if (admin.sms_notifications_enabled) notified.push(`sms:${admin.notification_phone}`)
+      await sendSmsToAgent(admin, buildSmsText('new_lead', { name, phone, email, state }))
+      if (admin.sms_notifications_enabled && admin.notification_phone) {
+        notified.push(`sms:${admin.notification_phone}`)
+      }
     } catch (e) { console.error('SMS failed:', e.message) }
+  }
+
+  // If no admins found, fallback to hardcoded email
+  if (admins.length === 0) {
+    try {
+      await sendEmail({ to: GMAIL_USER || 'marcspencer28461@gmail.com', subject: `New Lead: ${name}`, html })
+      notified.push('email:fallback')
+    } catch (e) { console.error('Fallback email failed:', e.message) }
   }
 
   return res.status(200).json({ success: true, notified })
@@ -152,31 +179,48 @@ async function handleLeadNotification(req, res) {
 // ─── Action: direct SMS ───────────────────────────────────────────────────────
 async function handleSms(req, res) {
   const { phone, carrier, message, type, lead } = req.body || {}
+
   if (!phone || !carrier) {
     return res.status(400).json({ success: false, error: 'phone and carrier are required' })
   }
+
   const gatewayFn = CARRIER_GATEWAYS[carrier]
-  if (!gatewayFn) return res.status(400).json({ success: false, error: `Unknown carrier: ${carrier}` })
-  const digits  = phone.replace(/\D/g, '')
+  if (!gatewayFn) {
+    return res.status(400).json({ success: false, error: `Unknown carrier: ${carrier}` })
+  }
+
+  const digits  = phone.replace(/\D/g, '').slice(-10)
+  if (digits.length !== 10) {
+    return res.status(400).json({ success: false, error: `Invalid phone number: must be 10 digits, got ${digits.length}` })
+  }
+
   const gateway = gatewayFn(digits)
-  if (!gateway) return res.status(400).json({ success: false, error: 'Cannot send SMS to unknown carrier' })
+  if (!gateway) {
+    return res.status(400).json({ success: false, error: 'Cannot determine SMS gateway for this carrier' })
+  }
+
   const smsText = message || buildSmsText(type || 'test', lead)
+
   await sendEmail({ to: gateway, subject: '', text: smsText })
+
   return res.status(200).json({ success: true, gateway, message: smsText })
 }
 
 // ─── Action: agent email ──────────────────────────────────────────────────────
 async function handleAgentEmail(req, res) {
   const { type, to, subject, html, text } = req.body || {}
+
   if (!type || !to || !subject || !html) {
     return res.status(400).json({ error: 'Missing required fields: type, to, subject, html' })
   }
+
   const validTypes = ['verification', 'approval', 'rejection', 'resend']
   if (!validTypes.includes(type)) {
     return res.status(400).json({ error: `Invalid type. Must be one of: ${validTypes.join(', ')}` })
   }
-  const data = await sendEmail({ to, subject, html, text, replyTo: 'marcspencer28461@gmail.com' })
-  return res.status(200).json({ success: true, messageId: data.id, type })
+
+  await sendEmail({ to, subject, html, text })
+  return res.status(200).json({ success: true, type })
 }
 
 // ─── Main router ──────────────────────────────────────────────────────────────
@@ -200,7 +244,7 @@ export default async function handler(req, res) {
       valid_actions: ['lead', 'sms', 'agent-email'],
     })
   } catch (err) {
-    console.error(`[notifications/${action}] Error:`, err)
+    console.error(`[notifications/${action}] Error:`, err.message)
     return res.status(500).json({ success: false, error: err.message || 'Unknown error' })
   }
 }
