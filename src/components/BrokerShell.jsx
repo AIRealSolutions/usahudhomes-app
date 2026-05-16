@@ -681,10 +681,110 @@ function ActiveLeadsPanel({ agentId }) {
 }
 
 // ── Settings Panel ────────────────────────────────────────────────────────────
+const CARRIER_OPTIONS = [
+  { value: 'verizon',      label: 'Verizon' },
+  { value: 'att',          label: 'AT&T' },
+  { value: 'tmobile',      label: 'T-Mobile' },
+  { value: 'boost',        label: 'Boost Mobile' },
+  { value: 'cricket',      label: 'Cricket Wireless' },
+  { value: 'metro',        label: 'Metro by T-Mobile' },
+  { value: 'sprint',       label: 'Sprint' },
+  { value: 'uscellular',   label: 'US Cellular' },
+  { value: 'virgin',       label: 'Virgin Mobile' },
+  { value: 'tracfone',     label: 'Tracfone' },
+  { value: 'straighttalk', label: 'Straight Talk' },
+  { value: 'consumer',     label: 'Consumer Cellular' },
+  { value: 'other',        label: 'Other / Unknown' },
+]
+
 function SettingsPanel({ user, profile }) {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://lpqjndfjbenolhneqzec.supabase.co'
+  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+  // SMS notification state
+  const [smsEnabled,  setSmsEnabled]  = useState(profile?.sms_notifications_enabled || false)
+  const [smsPhone,    setSmsPhone]    = useState(profile?.notification_phone || profile?.phone || '')
+  const [smsCarrier,  setSmsCarrier]  = useState(profile?.sms_carrier || 'verizon')
+  const [saving,      setSaving]      = useState(false)
+  const [saveStatus,  setSaveStatus]  = useState(null) // null | 'saved' | 'error'
+  const [testStatus,  setTestStatus]  = useState(null) // null | 'sending' | 'sent' | 'error'
+
+  const handleSaveSms = async () => {
+    if (!profile?.id) return
+    setSaving(true)
+    setSaveStatus(null)
+    try {
+      const r = await fetch(
+        `${supabaseUrl}/rest/v1/agents?id=eq.${profile.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({
+            notification_phone:        smsPhone.replace(/\D/g, '').slice(-10) || null,
+            sms_carrier:               smsCarrier,
+            sms_notifications_enabled: smsEnabled,
+            updated_at:                new Date().toISOString(),
+          }),
+        }
+      )
+      if (r.ok) {
+        setSaveStatus('saved')
+        setTimeout(() => setSaveStatus(null), 3000)
+      } else {
+        const err = await r.json()
+        console.error('Save SMS settings error:', err)
+        setSaveStatus('error')
+      }
+    } catch (e) {
+      console.error('Save SMS settings:', e)
+      setSaveStatus('error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleTestSms = async () => {
+    const digits = smsPhone.replace(/\D/g, '').slice(-10)
+    if (digits.length !== 10) {
+      alert('Please enter a valid 10-digit US phone number first.')
+      return
+    }
+    setTestStatus('sending')
+    try {
+      const r = await fetch('/api/send-sms-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: digits, carrier: smsCarrier, type: 'test' }),
+      })
+      const data = await r.json()
+      if (r.ok && data.success) {
+        setTestStatus('sent')
+        setTimeout(() => setTestStatus(null), 4000)
+      } else if (data.skipped) {
+        alert('SMS skipped: carrier gateway not available for "Other". Please select your actual carrier.')
+        setTestStatus(null)
+      } else {
+        console.error('Test SMS error:', data)
+        setTestStatus('error')
+        setTimeout(() => setTestStatus(null), 4000)
+      }
+    } catch (e) {
+      console.error('Test SMS:', e)
+      setTestStatus('error')
+      setTimeout(() => setTestStatus(null), 4000)
+    }
+  }
+
   return (
     <div className="space-y-5">
-      <h2 className="text-xl font-bold text-gray-900">My Profile</h2>
+      <h2 className="text-xl font-bold text-gray-900">My Profile & Notifications</h2>
+
+      {/* Profile card */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
@@ -704,7 +804,7 @@ function SettingsPanel({ user, profile }) {
           {[
             { label: 'Email',   value: user?.email },
             { label: 'Phone',   value: profile?.phone || '—' },
-            { label: 'State',   value: profile?.state || '—' },
+            { label: 'State',   value: profile?.license_state || profile?.state || '—' },
             { label: 'License', value: profile?.license_number || '—' },
           ].map(({ label, value }) => (
             <div key={label}>
@@ -713,11 +813,109 @@ function SettingsPanel({ user, profile }) {
             </div>
           ))}
         </div>
+        <div className="border-t border-gray-100 pt-3">
+          <p className="text-xs text-gray-400">To update your name, email, or license info, contact your administrator.</p>
+        </div>
       </div>
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <p className="text-sm text-blue-700">
-          To update your profile information, please contact your administrator.
-        </p>
+
+      {/* SMS Notifications card */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-gray-900">SMS Lead Notifications</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Receive a text message whenever a new lead is assigned to you</p>
+          </div>
+          {/* Toggle */}
+          <button
+            onClick={() => setSmsEnabled(v => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+              smsEnabled ? 'bg-blue-600' : 'bg-gray-200'
+            }`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+              smsEnabled ? 'translate-x-6' : 'translate-x-1'
+            }`} />
+          </button>
+        </div>
+
+        {/* Phone number */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+            Notification Phone Number
+          </label>
+          <input
+            type="tel"
+            value={smsPhone}
+            onChange={e => setSmsPhone(e.target.value)}
+            placeholder="(910) 363-6147"
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          <p className="text-xs text-gray-400 mt-1">Enter the 10-digit US number where you want to receive texts</p>
+        </div>
+
+        {/* Carrier selector */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+            Mobile Carrier
+          </label>
+          <select
+            value={smsCarrier}
+            onChange={e => setSmsCarrier(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
+          >
+            {CARRIER_OPTIONS.map(c => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-400 mt-1">Select your carrier so we can route the text correctly</p>
+        </div>
+
+        {/* What you'll receive */}
+        <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+          <p className="text-xs font-semibold text-gray-600">You will receive a text when:</p>
+          <ul className="text-xs text-gray-500 space-y-0.5 list-disc list-inside">
+            <li>A new lead is assigned to you by an admin</li>
+            <li>A new consultation request comes in with your name</li>
+          </ul>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            onClick={handleSaveSms}
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
+            {saving ? 'Saving…' : 'Save Settings'}
+          </button>
+
+          <button
+            onClick={handleTestSms}
+            disabled={testStatus === 'sending'}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            {testStatus === 'sending' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
+            {testStatus === 'sending' ? 'Sending…' : 'Send Test Text'}
+          </button>
+
+          {saveStatus === 'saved' && (
+            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+              <CheckCircle className="w-4 h-4" /> Saved!
+            </span>
+          )}
+          {saveStatus === 'error' && (
+            <span className="text-xs text-red-500 font-medium">Save failed — try again</span>
+          )}
+          {testStatus === 'sent' && (
+            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+              <CheckCircle className="w-4 h-4" /> Test text sent!
+            </span>
+          )}
+          {testStatus === 'error' && (
+            <span className="text-xs text-red-500 font-medium">Test failed — check phone &amp; carrier</span>
+          )}
+        </div>
       </div>
     </div>
   )
