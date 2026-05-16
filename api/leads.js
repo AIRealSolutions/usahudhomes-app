@@ -137,6 +137,68 @@ async function handleGetReferrals(req, res) {
   return res.status(200).json({ success: true, data: data || [] })
 }
 
+// ─── Action: purge-under-contract ───────────────────────────────────────────
+/**
+ * Removes (hard-deletes) properties that have been UNDER CONTRACT for more
+ * than `days` days (default 60). Supports dry_run=true for a safe preview.
+ */
+async function handlePurgeUnderContract(req, res) {
+  const { dry_run = false, days = 60 } = req.body || {}
+  const supabase = getSupabase()
+
+  // Calculate the cutoff timestamp
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+
+  // Find all properties that are UNDER CONTRACT and haven't been updated since cutoff
+  const { data: stale, error: fetchErr } = await supabase
+    .from('properties')
+    .select('id, case_number, address, city, state, price, updated_at')
+    .eq('status', 'UNDER CONTRACT')
+    .lt('updated_at', cutoff)
+    .order('updated_at', { ascending: true })
+
+  if (fetchErr) throw fetchErr
+
+  const count = stale ? stale.length : 0
+
+  if (dry_run) {
+    // Preview only — do not delete
+    return res.status(200).json({
+      success: true,
+      dry_run: true,
+      count,
+      cutoff_date: cutoff,
+      days_threshold: days,
+      properties: stale || [],
+    })
+  }
+
+  if (count === 0) {
+    return res.status(200).json({
+      success: true,
+      deleted: 0,
+      message: `No properties have been UNDER CONTRACT for more than ${days} days.`,
+    })
+  }
+
+  // Hard-delete the stale properties
+  const ids = stale.map(p => p.id)
+  const { error: deleteErr } = await supabase
+    .from('properties')
+    .delete()
+    .in('id', ids)
+
+  if (deleteErr) throw deleteErr
+
+  return res.status(200).json({
+    success: true,
+    deleted: count,
+    days_threshold: days,
+    cutoff_date: cutoff,
+    message: `Removed ${count} properties that were UNDER CONTRACT for more than ${days} days.`,
+  })
+}
+
 // ─── Action: process-expired ──────────────────────────────────────────────────
 async function handleProcessExpired(req, res) {
   const supabase = getSupabase()
@@ -173,12 +235,13 @@ export default async function handler(req, res) {
     if (action === 'decline')          return await handleDecline(req, res)
     if (action === 'outcome')          return await handleOutcome(req, res)
     if (action === 'referrals')        return await handleGetReferrals(req, res)
-    if (action === 'process-expired')  return await handleProcessExpired(req, res)
+    if (action === 'process-expired')       return await handleProcessExpired(req, res)
+    if (action === 'purge-under-contract')  return await handlePurgeUnderContract(req, res)
 
     return res.status(400).json({
       success: false,
       error: 'Missing or unknown ?action= parameter',
-      valid_actions: ['delete', 'assign', 'accept', 'decline', 'outcome', 'referrals', 'process-expired'],
+      valid_actions: ['delete', 'assign', 'accept', 'decline', 'outcome', 'referrals', 'process-expired', 'purge-under-contract'],
     })
   } catch (err) {
     console.error(`[leads/${action}] Error:`, err)

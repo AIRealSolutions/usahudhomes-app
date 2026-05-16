@@ -31,7 +31,7 @@ import {
   MessageSquare, Users, GitMerge, PhoneCall,
   UserCog, FileText, DollarSign,
   Film, Zap, BookOpen, Layout,
-  Facebook, Bot, HardDrive,
+  Facebook, Bot, HardDrive, Trash2,
   LogOut, ChevronLeft, ChevronRight, Menu, X,
   ChevronDown, ChevronUp, Bell
 } from 'lucide-react'
@@ -54,7 +54,8 @@ const VideoLibrary        = lazy(() => import('./admin/VideoLibrary'))
 const VideoTemplateBuilder= lazy(() => import('./admin/VideoTemplateBuilder'))
 const FacebookLeadsImport = lazy(() => import('./admin/FacebookLeadsImport'))
 const AIMarketingAssistant= lazy(() => import('./admin/AIMarketingAssistant'))
-const DatabaseReset       = lazy(() => import('./admin/DatabaseReset'))
+const DatabaseReset        = lazy(() => import('./admin/DatabaseReset'))
+const PurgeUnderContract   = lazy(() => import('./admin/PurgeUnderContract'))
 
 // ── Navigation structure ────────────────────────────────────────────────────
 const NAV = [
@@ -71,6 +72,7 @@ const NAV = [
       { id: 'property-manage',  label: 'Manage Listings',   icon: Home,          color: 'text-blue-500' },
       { id: 'hud-scraper',      label: 'HUD Scraper',       icon: Database,      color: 'text-blue-700', badge: 'LIVE' },
       { id: 'property-search',  label: 'Property Search',   icon: Search,        color: 'text-gray-500' },
+      { id: 'purge-contracts',  label: 'Purge Under Contract', icon: Trash2,     color: 'text-red-500' },
     ]
   },
   {
@@ -128,6 +130,7 @@ const COMPONENT_MAP = {
   'facebook-import':   FacebookLeadsImport,
   'ai-assistant':      AIMarketingAssistant,
   'database':          DatabaseReset,
+  'purge-contracts':   PurgeUnderContract,
 }
 
 // ── Sidebar ─────────────────────────────────────────────────────────────────
