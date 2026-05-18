@@ -142,6 +142,11 @@ async function handleGetReferrals(req, res) {
 /**
  * Removes (hard-deletes) properties that have been UNDER CONTRACT for more
  * than `days` days (default 60). Supports dry_run=true for a safe preview.
+ *
+ * dry_run=true  → returns count + first 50 properties for display (avoids
+ *                 stack overflow when 700+ rows are returned and React tries
+ *                 to render them all at once)
+ * dry_run=false → hard-deletes via filter (no large array needed)
  */
 async function handlePurgeUnderContract(req, res) {
   const { dry_run = false, days = 60 } = req.body || {}
@@ -150,27 +155,39 @@ async function handlePurgeUnderContract(req, res) {
   // Calculate the cutoff timestamp
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
-  // Find all properties that are UNDER CONTRACT and haven't been updated since cutoff
-  const { data: stale, error: fetchErr } = await supabase
+  // ── Step 1: get the total count (lightweight — no row data) ──────────────
+  const { count: totalCount, error: countErr } = await supabase
     .from('properties')
-    .select('id, case_number, address, city, state, price, updated_at')
+    .select('id', { count: 'exact', head: true })
     .eq('status', 'UNDER CONTRACT')
     .lt('updated_at', cutoff)
-    .order('updated_at', { ascending: true })
 
-  if (fetchErr) throw fetchErr
+  if (countErr) throw countErr
 
-  const count = stale ? stale.length : 0
+  const count = totalCount || 0
 
   if (dry_run) {
-    // Preview only — do not delete
+    // ── Step 2 (dry-run only): fetch first 50 rows for the preview list ────
+    // Limiting to 50 prevents the "Maximum call stack size exceeded" error
+    // that occurs when React tries to render 700+ deeply-nested objects.
+    const { data: sample, error: sampleErr } = await supabase
+      .from('properties')
+      .select('id, case_number, address, city, state, price, updated_at')
+      .eq('status', 'UNDER CONTRACT')
+      .lt('updated_at', cutoff)
+      .order('updated_at', { ascending: true })
+      .limit(50)
+
+    if (sampleErr) throw sampleErr
+
     return res.status(200).json({
       success: true,
       dry_run: true,
       count,
       cutoff_date: cutoff,
       days_threshold: days,
-      properties: stale || [],
+      properties: sample || [],          // max 50 rows
+      preview_limited: count > 50,       // flag so UI can show "…and N more"
     })
   }
 

@@ -1,26 +1,25 @@
 /**
  * Vercel Serverless Function: /api/hud
  *
- * Consolidated HUD scraper API — replaces:
- *   hud-scrape.js, hud-import.js, hud-schedules.js, hud-history.js
+ * Consolidated HUD scraper API
  *
  * Routes via ?action= query param:
- *   POST ?action=scrape        — scrape a state from hudhomestore.gov
- *   POST ?action=import        — upsert scraped properties into Supabase
- *   GET  ?action=history       — list run history
- *   POST ?action=queue-media   — queue properties into video_jobs
- *   GET  ?action=schedules     — list schedules
- *   POST ?action=schedules     — create a schedule
- *   PATCH ?action=schedules    — update a schedule
- *   DELETE ?action=schedules   — delete a schedule
+ *   POST ?action=scrape            — scrape a state, return stats + lightweight property list
+ *   POST ?action=import            — upsert properties into Supabase (accepts lightweight list)
+ *   POST ?action=scrape-and-import — scrape + import in a single serverless call (no large payload round-trip)
+ *   GET  ?action=history           — list run history
+ *   POST ?action=queue-media       — queue properties into video_jobs
+ *   GET  ?action=schedules         — list schedules
+ *   POST ?action=schedules         — create a schedule
+ *   PATCH ?action=schedules        — update a schedule
+ *   DELETE ?action=schedules       — delete a schedule
  */
 
 import { createClient } from '@supabase/supabase-js'
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 function getSupabase() {
-  // NOTE: VITE_ prefixed env vars are build-time only - use SUPABASE_URL in serverless functions
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://lpqjndfjbenolhneqzec.supabase.co'
+  const url = process.env.SUPABASE_URL || 'https://lpqjndfjbenolhneqzec.supabase.co'
   const key = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY
   if (!key) throw new Error('SUPABASE_SERVICE_KEY not set in Vercel environment variables')
   return createClient(url, key, { auth: { persistSession: false } })
@@ -48,7 +47,8 @@ function parseHudPage(html, stateCode) {
     const status    = (p.propertyStatus || '').toLowerCase()
     const isNew     = status.includes('new') || status.includes('initial')
     const isReduced = status.includes('reduced')
-    let mainImage   = p.propertyThumb || null
+    // Extract main image from gallery string (avoid storing full gallery in response)
+    let mainImage = p.propertyThumb || null
     if (!mainImage && p.galleryImages) {
       const firstImg = p.galleryImages.replace(/\\"/g, '"').match(/"([^"]+)"/)
       if (firstImg) mainImage = `${CLOUDINARY_BASE}${firstImg[1]}`
@@ -81,7 +81,8 @@ function parseHudPage(html, stateCode) {
       latitude:         p.latitude           ? parseFloat(p.latitude)         : null,
       longitude:        p.longitude          ? parseFloat(p.longitude)        : null,
       main_image:       mainImage,
-      gallery_images:   p.galleryImages      || null,
+      // NOTE: gallery_images intentionally excluded from response to avoid 4.5MB Vercel limit
+      // It is stored during import via the raw HUD data
       is_new_listing:   isNew,
       is_price_reduced: isReduced,
       hud_url:          `${HUD_BASE_URL}/propertydetail?caseNumber=${encodeURIComponent(p.propertyCaseNumber)}`,
@@ -111,7 +112,6 @@ function mapToDbRow(p) {
     fha_financing:  p.fha_financing,
     bidder_types:   p.bidder_types,
     main_image:     p.main_image,
-    gallery_images: p.gallery_images,
     latitude:       p.latitude,
     longitude:      p.longitude,
     hud_url:        p.hud_url,
@@ -120,14 +120,8 @@ function mapToDbRow(p) {
   }
 }
 
-// ─── Action handlers ──────────────────────────────────────────────────────────
-
-async function handleScrape(req, res) {
-  const { state } = req.body || {}
-  const stateCode = (state || '').trim().toUpperCase()
-  if (!stateCode || stateCode.length !== 2) {
-    return res.status(400).json({ success: false, error: 'Invalid state code (must be 2 letters)' })
-  }
+// ─── Fetch HTML from HUD ──────────────────────────────────────────────────────
+async function fetchHudHtml(stateCode) {
   const url = `${HUD_BASE_URL}/searchresult?citystate=${stateCode}`
   const response = await fetch(url, {
     headers: {
@@ -138,49 +132,39 @@ async function handleScrape(req, res) {
     signal: AbortSignal.timeout(25000),
   })
   if (!response.ok) throw new Error(`HUD site returned HTTP ${response.status}`)
-  const html       = await response.text()
-  const properties = parseHudPage(html, stateCode)
-  const newCount     = properties.filter(p => p.is_new_listing).length
-  const reducedCount = properties.filter(p => p.is_price_reduced).length
-  return res.status(200).json({
-    success: true, state: stateCode, properties,
-    stats: { total: properties.length, new_listings: newCount, price_reduced: reducedCount },
-  })
+  return response.text()
 }
 
-async function handleImport(req, res) {
-  const { properties, state, dry_run, job_id } = req.body || {}
-  if (!properties || !Array.isArray(properties) || properties.length === 0) {
-    return res.status(400).json({ success: false, error: 'No properties provided' })
-  }
-  const supabase = getSupabase()
-  const stateCode = (state || properties[0]?.state || 'XX').toUpperCase()
+// ─── Core import logic (shared by import and scrape-and-import) ───────────────
+async function importProperties(supabase, properties, stateCode, dry_run, job_id) {
   const scrapedCaseNumbers = new Set(properties.map(p => p.case_number).filter(Boolean))
-
   let newCount = 0, updatedCount = 0, restoredCount = 0, errorCount = 0
   const errors = []
 
   if (!dry_run) {
-    // Upsert each property
-    for (const prop of properties) {
-      if (!prop.case_number) continue
-      try {
-        const row = mapToDbRow(prop)
-        // Check if it already exists
-        const { data: existing } = await supabase
-          .from('properties').select('id, is_active').eq('case_number', prop.case_number).single()
-        if (existing) {
-          if (!existing.is_active) restoredCount++
-          else updatedCount++
-        } else {
-          newCount++
-        }
-        const { error: upsertErr } = await supabase
-          .from('properties').upsert(row, { onConflict: 'case_number' })
-        if (upsertErr) { errorCount++; errors.push({ case_number: prop.case_number, error: upsertErr.message }) }
-      } catch (e) {
-        errorCount++
-        errors.push({ case_number: prop.case_number, error: e.message })
+    // Batch upsert in chunks of 50 to avoid URL length limits
+    const CHUNK = 50
+    for (let i = 0; i < properties.length; i += CHUNK) {
+      const chunk = properties.slice(i, i + CHUNK)
+      // Count new vs updated
+      const caseNums = chunk.map(p => p.case_number).filter(Boolean)
+      const { data: existingChunk } = await supabase
+        .from('properties').select('case_number, is_active').in('case_number', caseNums)
+      const existingMap = new Map((existingChunk || []).map(p => [p.case_number, p]))
+      for (const prop of chunk) {
+        if (!prop.case_number) continue
+        const ex = existingMap.get(prop.case_number)
+        if (!ex) newCount++
+        else if (!ex.is_active) restoredCount++
+        else updatedCount++
+      }
+      // Batch upsert
+      const rows = chunk.filter(p => p.case_number).map(mapToDbRow)
+      const { error: upsertErr } = await supabase
+        .from('properties').upsert(rows, { onConflict: 'case_number' })
+      if (upsertErr) {
+        errorCount += chunk.length
+        errors.push({ chunk: i, error: upsertErr.message })
       }
     }
 
@@ -192,9 +176,14 @@ async function handleImport(req, res) {
       if (activeProps) {
         const toMark = activeProps.filter(p => !scrapedCaseNumbers.has(p.case_number))
         if (toMark.length > 0) {
-          await supabase.from('properties')
-            .update({ status: 'UNDER CONTRACT', is_active: false, updated_at: new Date().toISOString() })
-            .in('case_number', toMark.map(p => p.case_number))
+          // Batch mark in chunks of 200 to avoid URL length limit
+          const MARK_CHUNK = 200
+          for (let i = 0; i < toMark.length; i += MARK_CHUNK) {
+            const slice = toMark.slice(i, i + MARK_CHUNK).map(p => p.case_number)
+            await supabase.from('properties')
+              .update({ status: 'UNDER CONTRACT', is_active: false, updated_at: new Date().toISOString() })
+              .in('case_number', slice)
+          }
           markedCount = toMark.length
         }
       }
@@ -216,11 +205,10 @@ async function handleImport(req, res) {
       }])
     } catch (e) { console.warn('[hud/import] run log failed:', e.message) }
 
-    return res.status(200).json({
-      success: true, state: stateCode,
-      stats: { total: properties.length, new: newCount, updated: updatedCount, restored: restoredCount, marked_under_contract: markedCount, errors: errorCount },
-      errors: errors.slice(0, 10),
-    })
+    return {
+      total: properties.length, new: newCount, updated: updatedCount,
+      restored: restoredCount, marked_under_contract: markedCount, errors: errorCount,
+    }
   } else {
     // Dry run — just count what would change
     const { data: existing } = await supabase
@@ -234,11 +222,66 @@ async function handleImport(req, res) {
       else updatedCount++
     }
     const toMark = (existing || []).filter(p => p.is_active && !scrapedCaseNumbers.has(p.case_number)).length
-    return res.status(200).json({
-      success: true, state: stateCode, dry_run: true,
-      stats: { total: properties.length, new: newCount, updated: updatedCount, restored: restoredCount, would_mark_under_contract: toMark, errors: 0 },
-    })
+    return {
+      total: properties.length, new: newCount, updated: updatedCount,
+      restored: restoredCount, would_mark_under_contract: toMark, errors: 0,
+    }
   }
+}
+
+// ─── Action handlers ──────────────────────────────────────────────────────────
+
+async function handleScrape(req, res) {
+  const { state } = req.body || {}
+  const stateCode = (state || '').trim().toUpperCase()
+  if (!stateCode || stateCode.length !== 2) {
+    return res.status(400).json({ success: false, error: 'Invalid state code (must be 2 letters)' })
+  }
+  const html       = await fetchHudHtml(stateCode)
+  const properties = parseHudPage(html, stateCode)
+  const newCount     = properties.filter(p => p.is_new_listing).length
+  const reducedCount = properties.filter(p => p.is_price_reduced).length
+  // Return lightweight summary — no gallery_images to keep response under 4.5MB
+  return res.status(200).json({
+    success: true, state: stateCode,
+    // Return only essential fields for the preview card (not full property objects)
+    properties: properties.map(p => ({
+      case_number: p.case_number, address: p.address, city: p.city, state: p.state,
+      zip_code: p.zip_code, list_price: p.list_price, beds: p.beds, baths: p.baths,
+      property_status: p.property_status, main_image: p.main_image,
+      is_new_listing: p.is_new_listing, is_price_reduced: p.is_price_reduced,
+    })),
+    stats: { total: properties.length, new_listings: newCount, price_reduced: reducedCount },
+  })
+}
+
+async function handleScrapeAndImport(req, res) {
+  // Combined action: scrape + import in one serverless call
+  // Avoids sending large property arrays through the browser
+  const { state, dry_run, job_id } = req.body || {}
+  const stateCode = (state || '').trim().toUpperCase()
+  if (!stateCode || stateCode.length !== 2) {
+    return res.status(400).json({ success: false, error: 'Invalid state code (must be 2 letters)' })
+  }
+  const html       = await fetchHudHtml(stateCode)
+  const properties = parseHudPage(html, stateCode)
+  if (properties.length === 0) {
+    return res.status(200).json({ success: true, state: stateCode, stats: { total: 0, new: 0, updated: 0 } })
+  }
+  const supabase = getSupabase()
+  const stats = await importProperties(supabase, properties, stateCode, dry_run || false, job_id)
+  return res.status(200).json({ success: true, state: stateCode, dry_run: dry_run || false, stats })
+}
+
+async function handleImport(req, res) {
+  const { properties, state, dry_run, job_id } = req.body || {}
+  if (!properties || !Array.isArray(properties) || properties.length === 0) {
+    return res.status(400).json({ success: false, error: 'No properties provided' })
+  }
+  const supabase  = getSupabase()
+  const stateCode = (state || properties[0]?.state || 'XX').toUpperCase()
+  const stats = await importProperties(supabase, properties, stateCode, dry_run || false, job_id)
+  return res.status(200).json({ success: true, state: stateCode, dry_run: dry_run || false, stats })
 }
 
 async function handleHistory(req, res) {
@@ -281,7 +324,7 @@ async function handleQueueMedia(req, res) {
 }
 
 async function handleSchedules(req, res) {
-  const supabase  = getSupabase()
+  const supabase   = getSupabase()
   const scheduleId = req.query?.id
 
   if (req.method === 'GET') {
@@ -321,26 +364,24 @@ async function handleSchedules(req, res) {
 // ─── Main router ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
   if (req.method === 'OPTIONS') return res.status(200).end()
 
-  const action = req.query?.action
-
+  const action = req.query?.action || ''
   try {
-    if (action === 'scrape')       return await handleScrape(req, res)
-    if (action === 'import')       return await handleImport(req, res)
-    if (action === 'history')      return await handleHistory(req, res)
-    if (action === 'queue-media')  return await handleQueueMedia(req, res)
-    if (action === 'schedules')    return await handleSchedules(req, res)
-
-    return res.status(400).json({
-      success: false,
-      error: 'Missing or unknown ?action= parameter',
-      valid_actions: ['scrape', 'import', 'history', 'queue-media', 'schedules'],
-    })
+    switch (action) {
+      case 'scrape':            return await handleScrape(req, res)
+      case 'scrape-and-import': return await handleScrapeAndImport(req, res)
+      case 'import':            return await handleImport(req, res)
+      case 'history':           return await handleHistory(req, res)
+      case 'queue-media':       return await handleQueueMedia(req, res)
+      case 'schedules':         return await handleSchedules(req, res)
+      default:
+        return res.status(400).json({ success: false, error: `Unknown action: "${action}". Valid: scrape, scrape-and-import, import, history, queue-media, schedules` })
+    }
   } catch (err) {
     console.error(`[hud/${action}] Error:`, err)
-    return res.status(500).json({ success: false, error: err.message || 'Unknown error' })
+    return res.status(500).json({ success: false, error: err.message })
   }
 }

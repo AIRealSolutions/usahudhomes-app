@@ -241,13 +241,18 @@ export default function PurgeUnderContract() {
           {/* Property list */}
           {preview.count > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   Properties to be removed ({preview.count})
                 </p>
+                {preview.preview_limited && (
+                  <span className="text-xs text-amber-600 font-medium">
+                    Showing first 50 of {preview.count} — all {preview.count} will be deleted
+                  </span>
+                )}
               </div>
               <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
-                {preview.properties.map(p => (
+                {(preview.properties || []).map(p => (
                   <div key={p.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
                     <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                       <Home className="w-4 h-4 text-red-500" />
