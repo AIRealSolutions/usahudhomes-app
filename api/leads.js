@@ -10,8 +10,9 @@
  *   POST ?action=accept          — broker accepts a referral
  *   POST ?action=decline         — broker declines a referral
  *   POST ?action=outcome         — update consultation outcome
- *   GET  ?action=referrals       — get all referrals for an agent
- *   POST ?action=process-expired — expire overdue referrals
+ *   GET  ?action=referrals            — get all referrals for an agent
+ *   POST ?action=process-expired      — expire overdue referrals
+ *   POST ?action=purge-under-contract — hard-delete stale UNDER CONTRACT properties
  */
 
 import { createClient } from '@supabase/supabase-js'
