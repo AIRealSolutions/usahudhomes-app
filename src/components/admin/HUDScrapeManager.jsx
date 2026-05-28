@@ -10,9 +10,9 @@ import {
 // ─── All API calls go to Vercel serverless functions (same origin) ────────────
 // No separate Flask server needed — works in production on Vercel.
 const api = {
-  scrape:    (state)         => fetch('/api/hud?action=scrape',      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state }) }),
-  importDb:  (body)          => fetch('/api/hud?action=import',      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-  history:   (limit = 50)    => fetch(`/api/hud?action=history&limit=${limit}`),
+  scrape:          (state)        => fetch('/api/hud?action=scrape',            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state }) }),
+  scrapeAndImport: (state, opts)  => fetch('/api/hud?action=scrape-and-import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state, ...opts }) }),
+  history:         (limit = 50)   => fetch(`/api/hud?action=history&limit=${limit}`),
   queueMedia:(body)          => fetch('/api/hud?action=queue-media',  { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   schedules: {
     list:   ()       => fetch('/api/hud?action=schedules'),
@@ -146,7 +146,7 @@ function ScrapeTab() {
         status: 'scraping', stats: null, error: null,
         startedAt: new Date().toISOString(), finishedAt: null,
         importStatus: null, importStats: null, importError: null,
-        properties: [], expanded: false,
+        expanded: false,
       }, ...prev])
 
       // Fire scrape in background
@@ -157,10 +157,9 @@ function ScrapeTab() {
           if (data.success) {
             setJobs(prev => prev.map(j => j.jobId === jobId ? {
               ...j,
-              status:      'scraped',
-              stats:       data.stats,
-              properties:  data.properties,
-              finishedAt:  new Date().toISOString(),
+              status:     'scraped',
+              stats:      data.stats,
+              finishedAt: new Date().toISOString(),
             } : j))
           } else {
             setJobs(prev => prev.map(j => j.jobId === jobId ? {
@@ -181,7 +180,9 @@ function ScrapeTab() {
     if (!job) return
     setJobs(prev => prev.map(j => j.jobId === jobId ? { ...j, importStatus: 'importing', importError: null } : j))
     try {
-      const res  = await api.importDb({ state: job.state, properties: job.properties, dry_run: dryRun })
+      // Use scrape-and-import: the server re-scrapes and imports in one call,
+      // avoiding sending a large property array from the browser to the server.
+      const res  = await api.scrapeAndImport(job.state, { dry_run: dryRun })
       const data = await res.json()
       if (data.success) {
         setJobs(prev => prev.map(j => j.jobId === jobId ? {

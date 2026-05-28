@@ -206,8 +206,12 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
     } catch (e) { console.warn('[hud/import] run log failed:', e.message) }
 
     return {
-      total: properties.length, new: newCount, updated: updatedCount,
-      restored: restoredCount, marked_under_contract: markedCount, errors: errorCount,
+      total:                properties.length,
+      new_properties:       newCount,
+      updated_properties:   updatedCount,
+      restored_properties:  restoredCount,
+      marked_under_contract: markedCount,
+      errors:               errorCount,
     }
   } else {
     // Dry run — just count what would change
@@ -223,8 +227,12 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
     }
     const toMark = (existing || []).filter(p => p.is_active && !scrapedCaseNumbers.has(p.case_number)).length
     return {
-      total: properties.length, new: newCount, updated: updatedCount,
-      restored: restoredCount, would_mark_under_contract: toMark, errors: 0,
+      total:                properties.length,
+      new_properties:       newCount,
+      updated_properties:   updatedCount,
+      restored_properties:  restoredCount,
+      marked_under_contract: toMark,
+      errors:               0,
     }
   }
 }
