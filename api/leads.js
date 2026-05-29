@@ -144,16 +144,14 @@ async function handleGetReferrals(req, res) {
  * Removes (hard-deletes) properties that have been UNDER CONTRACT for more
  * than `days` days (default 60). Supports dry_run=true for a safe preview.
  *
- * dry_run=true  → returns count + first 50 properties for display (avoids
- *                 stack overflow when 700+ rows are returned and React tries
- *                 to render them all at once)
- * dry_run=false → hard-deletes via filter (no large array needed)
+ * dry_run=true  → returns count + first 50 properties for display
+ * dry_run=false → fetches IDs, then deletes in chunks of 25 to avoid
+ *                 PostgreSQL "stack depth limit exceeded" on large deletes
  */
 async function handlePurgeUnderContract(req, res) {
   const { dry_run = false, days = 60 } = req.body || {}
   const supabase = getSupabase()
 
-  // Calculate the cutoff timestamp
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
   // ── Step 1: get the total count (lightweight — no row data) ──────────────
@@ -168,9 +166,6 @@ async function handlePurgeUnderContract(req, res) {
   const count = totalCount || 0
 
   if (dry_run) {
-    // ── Step 2 (dry-run only): fetch first 50 rows for the preview list ────
-    // Limiting to 50 prevents the "Maximum call stack size exceeded" error
-    // that occurs when React tries to render 700+ deeply-nested objects.
     const { data: sample, error: sampleErr } = await supabase
       .from('properties')
       .select('id, case_number, address, city, state, price, updated_at')
@@ -187,8 +182,8 @@ async function handlePurgeUnderContract(req, res) {
       count,
       cutoff_date: cutoff,
       days_threshold: days,
-      properties: sample || [],          // max 50 rows
-      preview_limited: count > 50,       // flag so UI can show "…and N more"
+      properties: sample || [],
+      preview_limited: count > 50,
     })
   }
 
@@ -202,21 +197,40 @@ async function handlePurgeUnderContract(req, res) {
     })
   }
 
-  // Hard-delete using filter conditions directly (avoids URL length limit with .in() on large arrays)
-  const { error: deleteErr } = await supabase
+  // ── Step 2: fetch just the IDs matching the filter ────────────────────────
+  // Fetching only `id` (not full rows) keeps this response tiny even for
+  // hundreds of properties.
+  const { data: rows, error: idErr } = await supabase
     .from('properties')
-    .delete()
+    .select('id')
     .eq('status', 'UNDER CONTRACT')
     .lt('updated_at', cutoff)
 
-  if (deleteErr) throw deleteErr
+  if (idErr) throw idErr
+
+  // ── Step 3: delete in chunks of 25 ───────────────────────────────────────
+  // A single DELETE of 170 rows can trigger PostgreSQL's "stack depth limit
+  // exceeded" if the table has complex triggers or cascades.  Chunking into
+  // batches of 25 keeps each statement small enough to avoid that limit while
+  // staying well within PostgREST's URL length budget (~1 KB per batch).
+  const CHUNK = 25
+  let deleted = 0
+  for (let i = 0; i < (rows || []).length; i += CHUNK) {
+    const ids = rows.slice(i, i + CHUNK).map(r => r.id)
+    const { error: delErr } = await supabase
+      .from('properties')
+      .delete()
+      .in('id', ids)
+    if (delErr) throw delErr
+    deleted += ids.length
+  }
 
   return res.status(200).json({
     success: true,
-    deleted: count,
+    deleted,
     days_threshold: days,
     cutoff_date: cutoff,
-    message: `Removed ${count} properties that were UNDER CONTRACT for more than ${days} days.`,
+    message: `Removed ${deleted} properties that were UNDER CONTRACT for more than ${days} days.`,
   })
 }
 
