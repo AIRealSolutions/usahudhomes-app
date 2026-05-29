@@ -208,12 +208,12 @@ async function handlePurgeUnderContract(req, res) {
 
   if (idErr) throw idErr
 
-  // ── Step 3: delete in chunks of 25 ───────────────────────────────────────
+  // ── Step 3: delete in chunks of 10 ───────────────────────────────────────
   // A single DELETE of 170 rows can trigger PostgreSQL's "stack depth limit
   // exceeded" if the table has complex triggers or cascades.  Chunking into
-  // batches of 25 keeps each statement small enough to avoid that limit while
+  // batches of 10 keeps each statement small enough to avoid that limit while
   // staying well within PostgREST's URL length budget (~1 KB per batch).
-  const CHUNK = 25
+  const CHUNK = 10
   let deleted = 0
   for (let i = 0; i < (rows || []).length; i += CHUNK) {
     const ids = rows.slice(i, i + CHUNK).map(r => r.id)
