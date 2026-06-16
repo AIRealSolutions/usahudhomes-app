@@ -97,7 +97,7 @@ function mapToDbRow(p) {
     address:        p.address,
     city:           p.city,
     state:          p.state,
-    zip:            p.zip_code,
+    zip_code:       p.zip_code,        // FIX: was 'zip' — column is 'zip_code'
     county:         p.county,
     price:          p.list_price,
     beds:           p.beds,
@@ -106,17 +106,19 @@ function mapToDbRow(p) {
     year_built:     p.year_built,
     property_type:  p.property_type,
     status:         p.property_status || 'Active',
-    bids_open:      p.bid_open_date   ? new Date(p.bid_open_date).toISOString()   : null,
+    bids_open:      p.bid_open_date   || null,  // stored as varchar in DB, no Date conversion needed
     bid_deadline:   p.period_deadline ? new Date(p.period_deadline).toISOString() : null,
     listing_period: p.listing_period,
-    fha_financing:  p.fha_financing,
-    bidder_types:   p.bidder_types,
     main_image:     p.main_image,
-    latitude:       p.latitude,
-    longitude:      p.longitude,
-    hud_url:        p.hud_url,
+    image_url:      p.main_image,      // also populate image_url column
     is_active:      true,
     updated_at:     new Date().toISOString(),
+    // Extended HUD fields (added via migration add_hud_extended_fields.sql)
+    latitude:       p.latitude       || null,
+    longitude:      p.longitude      || null,
+    hud_url:        p.hud_url        || null,
+    fha_financing:  p.fha_financing  || null,
+    bidder_types:   p.bidder_types   || null,
   }
 }
 
