@@ -23,18 +23,12 @@ import { useNavigate } from 'react-router-dom'
 import { propertyService } from '../../services/database'
 import { supabase } from '../../config/supabase'
 import { getImageUrl, getImageUrlFromCaseNumber } from '../../utils/imageUtils'
-import PropertyImportAgent from './PropertyImportAgent'
-import HUDSyncAdmin from './HUDSyncAdmin'
-import HUDImport from './HUDImport'
 
 function PropertyAdmin() {
   const navigate = useNavigate()
   const [properties, setProperties] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
-  const [showImportAgent, setShowImportAgent] = useState(false)
-  const [showHUDSync, setShowHUDSync] = useState(false)
-  const [showHUDImport, setShowHUDImport] = useState(false)
   const [editingProperty, setEditingProperty] = useState(null)
   const [formData, setFormData] = useState(getEmptyFormData())
   const [stats, setStats] = useState({ total: 0, averagePrice: 0, bidsOpen: 0, priceReduced: 0 })
@@ -178,24 +172,19 @@ function PropertyAdmin() {
       setUploading(true)
       setUploadProgress(0)
 
-      // Generate unique filename using case number
       const fileExt = file.name.split('.').pop()
       const fileName = `${caseNumber}.${fileExt}`
       const filePath = fileName
 
-      // Upload to Supabase Storage bucket "USAHUDhomes"
       const { data, error } = await supabase.storage
         .from('USAHUDhomes')
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: true // Replace if exists
+          upsert: true
         })
 
-      if (error) {
-        throw error
-      }
+      if (error) throw error
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('USAHUDhomes')
         .getPublicUrl(filePath)
@@ -203,24 +192,17 @@ function PropertyAdmin() {
       setUploadProgress(100)
       setUploading(false)
 
-      return {
-        success: true,
-        url: urlData.publicUrl
-      }
+      return { success: true, url: urlData.publicUrl }
     } catch (error) {
       console.error('Error uploading image:', error)
       setUploading(false)
-      return {
-        success: false,
-        error: error.message
-      }
+      return { success: false, error: error.message }
     }
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
 
-    // Validate required fields
     if (!formData.case_number || !formData.address || !formData.city || !formData.price) {
       alert('Please fill in all required fields (Case Number, Address, City, Price)')
       return
@@ -228,7 +210,6 @@ function PropertyAdmin() {
 
     let imageUrl = formData.main_image
 
-    // Upload image if new file selected
     if (imageFile) {
       const uploadResult = await uploadImageToSupabase(imageFile, formData.case_number)
       if (uploadResult.success) {
@@ -239,7 +220,6 @@ function PropertyAdmin() {
       }
     }
 
-    // Prepare property data
     const propertyData = {
       case_number: formData.case_number,
       address: formData.address,
@@ -265,14 +245,10 @@ function PropertyAdmin() {
     let result
     if (editingProperty) {
       result = await propertyService.updateProperty(editingProperty.id, propertyData)
-      if (result.success) {
-        alert('Property updated successfully!')
-      }
+      if (result.success) alert('Property updated successfully!')
     } else {
       result = await propertyService.addProperty(propertyData)
-      if (result.success) {
-        alert('Property added successfully!')
-      }
+      if (result.success) alert('Property added successfully!')
     }
 
     if (result.success) {
@@ -309,131 +285,18 @@ function PropertyAdmin() {
     }
   }
 
-  async function handleImport(e) {
-    const file = e.target.files[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = async (event) => {
-        try {
-          const data = JSON.parse(event.target.result)
-          let successCount = 0
-          for (const property of data) {
-            const result = await propertyService.addProperty(property)
-            if (result.success) successCount++
-          }
-          loadProperties()
-          loadStats()
-          alert(`Imported ${successCount} of ${data.length} properties successfully!`)
-        } catch (error) {
-          alert('Error importing properties: ' + error.message)
-        }
-      }
-      reader.readAsText(file)
-    }
-  }
-
   return (
     <div className="space-y-6">
-      {/* Property Import Agent Modal */}
-      {showImportAgent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-              <h2 className="text-xl font-bold">AI Property Import</h2>
-              <button
-                onClick={() => setShowImportAgent(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6">
-              <PropertyImportAgent
-                onPropertyAdded={(property) => {
-                  setShowImportAgent(false);
-                  loadProperties();
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* HUD Sync Modal */}
-      {showHUDSync && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-              <h2 className="text-xl font-bold">HUD Property Sync</h2>
-              <button
-                onClick={() => setShowHUDSync(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6">
-              <HUDSyncAdmin
-                onImportComplete={() => {
-                  loadProperties();
-                  loadStats();
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* HUD Import Modal */}
-      {showHUDImport && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-              <h2 className="text-xl font-bold">HUD Property Import</h2>
-              <button
-                onClick={() => setShowHUDImport(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6">
-              <HUDImport
-                onImportComplete={() => {
-                  setShowHUDImport(false);
-                  loadProperties();
-                  loadStats();
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Property Management</h2>
-          <p className="text-gray-600">Add, edit, and manage HUD properties</p>
+          <p className="text-gray-600">View, edit, and manage HUD properties. Use <strong>HUD Scraper</strong> in the sidebar to import new listings.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <label>
-            <Button variant="outline" as="span">
-              <Upload className="h-4 w-4 mr-2" />
-              Import
-            </Button>
-            <input type="file" accept=".json" onChange={handleImport} className="hidden" />
-          </label>
-          <Button onClick={() => setShowImportAgent(true)} className="mr-2">
-            <Upload className="h-4 w-4 mr-2" />
-            AI Import
-          </Button>
-          <Button onClick={() => setShowHUDImport(true)} className="mr-2" variant="default">
-            <Upload className="h-4 w-4 mr-2" />
-            HUD Import
+            Export JSON
           </Button>
           <Button onClick={handleAdd}>
             <Plus className="h-4 w-4 mr-2" />
@@ -473,30 +336,30 @@ function PropertyAdmin() {
       {/* Search */}
       <div className="flex gap-2">
         <Input
-          placeholder="Search by address, city, county, or case number..."
+          placeholder="Search properties..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-          className="flex-1"
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          className="max-w-md"
         />
-        <Button onClick={handleSearch}>
+        <Button variant="outline" onClick={handleSearch}>
           <Search className="h-4 w-4 mr-2" />
           Search
         </Button>
         {searchQuery && (
-          <Button variant="outline" onClick={() => { setSearchQuery(''); loadProperties(); }}>
+          <Button variant="ghost" onClick={() => { setSearchQuery(''); loadProperties() }}>
             Clear
           </Button>
         )}
       </div>
 
-      {/* Property Form Modal */}
+      {/* Add / Edit Form */}
       {showForm && (
-        <Card className="border-2 border-blue-500">
+        <Card>
           <CardHeader>
             <CardTitle>{editingProperty ? 'Edit Property' : 'Add New Property'}</CardTitle>
             <CardDescription>
-              {editingProperty ? 'Update property information' : 'Enter property details'}
+              {editingProperty ? 'Update property details' : 'Manually add a single HUD property'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -618,11 +481,19 @@ function PropertyAdmin() {
                     onChange={(e) => setFormData({...formData, state: e.target.value})}
                     className="w-full p-2 border rounded"
                   >
-                    <option>NC</option>
-                    <option>TN</option>
-                    <option>SC</option>
-                    <option>VA</option>
-                    <option>GA</option>
+                    <option>AL</option><option>AK</option><option>AZ</option><option>AR</option>
+                    <option>CA</option><option>CO</option><option>CT</option><option>DE</option>
+                    <option>FL</option><option>GA</option><option>HI</option><option>ID</option>
+                    <option>IL</option><option>IN</option><option>IA</option><option>KS</option>
+                    <option>KY</option><option>LA</option><option>ME</option><option>MD</option>
+                    <option>MA</option><option>MI</option><option>MN</option><option>MS</option>
+                    <option>MO</option><option>MT</option><option>NE</option><option>NV</option>
+                    <option>NH</option><option>NJ</option><option>NM</option><option>NY</option>
+                    <option>NC</option><option>ND</option><option>OH</option><option>OK</option>
+                    <option>OR</option><option>PA</option><option>RI</option><option>SC</option>
+                    <option>SD</option><option>TN</option><option>TX</option><option>UT</option>
+                    <option>VT</option><option>VA</option><option>WA</option><option>WV</option>
+                    <option>WI</option><option>WY</option>
                   </select>
                 </div>
                 <div>
@@ -831,9 +702,10 @@ function PropertyAdmin() {
           <CardContent className="py-12 text-center">
             <Home className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">No properties found</p>
+            <p className="text-sm text-gray-400 mt-1">Use the <strong>HUD Scraper</strong> in the sidebar to import listings from hudhomestore.gov</p>
             <Button onClick={handleAdd} className="mt-4">
               <Plus className="h-4 w-4 mr-2" />
-              Add Your First Property
+              Add Property Manually
             </Button>
           </CardContent>
         </Card>

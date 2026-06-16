@@ -343,12 +343,13 @@ async function handleSchedules(req, res) {
     return res.status(200).json({ success: true, schedules: data || [] })
   }
   if (req.method === 'POST') {
-    const { title, states, cron_expression, dry_run, enabled } = req.body || {}
-    if (!title || !states || !cron_expression) {
-      return res.status(400).json({ success: false, error: 'title, states, and cron_expression are required' })
+    const { label, title, states, cron_expression, dry_run, enabled } = req.body || {}
+    const scheduleLabel = label || title  // accept either field name
+    if (!scheduleLabel || !states || !cron_expression) {
+      return res.status(400).json({ success: false, error: 'label, states, and cron_expression are required' })
     }
     const { data, error } = await supabase.from('hud_sync_schedules')
-      .insert([{ title, states, cron_expression, dry_run: dry_run || false, enabled: enabled !== false }])
+      .insert([{ label: scheduleLabel, states, cron_expression, dry_run: dry_run || false, enabled: enabled !== false }])
       .select().single()
     if (error) throw error
     return res.status(201).json({ success: true, schedule: data })

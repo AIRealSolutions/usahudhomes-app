@@ -134,6 +134,45 @@ function ScrapeTab() {
   const toggleState = (code) =>
     setSelectedStates(prev => prev.includes(code) ? prev.filter(s => s !== code) : [...prev, code])
 
+  const startScrapeAndImport = async () => {
+    if (selectedStates.length === 0) { setGlobalError('Select at least one state'); return }
+    setGlobalError(null)
+
+    for (const state of selectedStates) {
+      const jobId = `${state}_${Date.now()}`
+      setJobs(prev => [{
+        jobId, state,
+        status: 'importing', stats: null, error: null,
+        startedAt: new Date().toISOString(), finishedAt: null,
+        importStatus: 'importing', importStats: null, importError: null,
+        expanded: false,
+      }, ...prev])
+      ;(async () => {
+        try {
+          const res  = await api.scrapeAndImport(state, { dry_run: false })
+          const data = await res.json()
+          if (data.success) {
+            setJobs(prev => prev.map(j => j.jobId === jobId ? {
+              ...j, status: 'done', importStatus: 'done',
+              stats: { total: data.stats?.total || 0, new_listings: data.stats?.new_properties || 0, price_reduced: 0 },
+              importStats: data.stats, finishedAt: new Date().toISOString(),
+            } : j))
+          } else {
+            setJobs(prev => prev.map(j => j.jobId === jobId ? {
+              ...j, status: 'error', importStatus: 'error',
+              error: data.error, importError: data.error, finishedAt: new Date().toISOString(),
+            } : j))
+          }
+        } catch (e) {
+          setJobs(prev => prev.map(j => j.jobId === jobId ? {
+            ...j, status: 'error', importStatus: 'error',
+            error: `Network error — ${e.message}`, importError: e.message, finishedAt: new Date().toISOString(),
+          } : j))
+        }
+      })()
+    }
+  }
+
   const startScrape = async () => {
     if (selectedStates.length === 0) { setGlobalError('Select at least one state'); return }
     setGlobalError(null)
@@ -244,12 +283,20 @@ function ScrapeTab() {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <button
+            onClick={startScrapeAndImport}
+            disabled={selectedStates.length === 0}
+            className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Upload className="w-4 h-4" />
+            Scrape & Import {selectedStates.length > 0 ? `${selectedStates.length} State${selectedStates.length > 1 ? 's' : ''}` : ''}
+          </button>
+          <button
             onClick={startScrape}
             disabled={selectedStates.length === 0}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 border border-blue-600 text-blue-700 rounded-lg font-semibold hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Download className="w-4 h-4" />
-            Scrape {selectedStates.length > 0 ? `${selectedStates.length} State${selectedStates.length > 1 ? 's' : ''}` : 'Selected States'}
+            Preview Only
           </button>
           <button onClick={() => setSelectedStates([])} className="text-sm text-gray-500 hover:text-gray-700">Clear all</button>
           <button onClick={() => setSelectedStates([...US_STATES])} className="text-sm text-blue-600 hover:text-blue-700">Select all</button>
