@@ -88,13 +88,14 @@ async function fetchImageAsDataUri(url) {
 
 // ── OG image layout builder ──────────────────────────────────────────────────
 
-function buildElement({ address, city, state, price, beds, baths, sqft, imageDataUri, caseNumber }) {
+function buildElement({ city, state, county, price, beds, baths, sqft, imageDataUri, caseNumber }) {
   const displayPrice    = formatPrice(price);
-  const displayAddress  = truncate(address || 'HUD Property', 45);
-  const displayLocation = [city, state].filter(Boolean).join(', ');
+  const displayCity     = truncate(city || 'HUD Property', 28);
+  const displayState    = state || '';
+  const displayCounty   = county ? truncate(county, 30) : null;
   const displayBeds     = beds  != null ? String(beds)  : '—';
   const displayBaths    = baths != null ? String(baths) : '—';
-  const displaySqft     = sqft  ? Number(sqft).toLocaleString() + ' sq ft' : null;
+  const displaySqft     = sqft  ? Number(sqft).toLocaleString() : null;
 
   return {
     type: 'div',
@@ -174,7 +175,7 @@ function buildElement({ address, city, state, price, beds, baths, sqft, imageDat
               width: '460px', height: '630px',
               background: 'linear-gradient(180deg, #0f2744 0%, #1a3a6b 100%)',
               display: 'flex', flexDirection: 'column',
-              padding: '36px 36px 28px 36px',
+              padding: '32px 36px 28px 36px',
               boxSizing: 'border-box',
             },
             children: [
@@ -183,13 +184,13 @@ function buildElement({ address, city, state, price, beds, baths, sqft, imageDat
               {
                 type: 'div',
                 props: {
-                  style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '28px' },
+                  style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' },
                   children: [
                     appIconBase64 ? {
                       type: 'img',
                       props: {
                         src: appIconBase64,
-                        style: { width: '52px', height: '52px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.25)' },
+                        style: { width: '48px', height: '48px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.25)' },
                       },
                     } : null,
                     {
@@ -200,7 +201,7 @@ function buildElement({ address, city, state, price, beds, baths, sqft, imageDat
                           {
                             type: 'div',
                             props: {
-                              style: { color: '#ffffff', fontSize: '20px', fontWeight: 700, letterSpacing: '-0.3px', display: 'flex' },
+                              style: { color: '#ffffff', fontSize: '19px', fontWeight: 700, letterSpacing: '-0.3px', display: 'flex' },
                               children: 'USAHUDhomes.com',
                             },
                           },
@@ -222,26 +223,32 @@ function buildElement({ address, city, state, price, beds, baths, sqft, imageDat
               {
                 type: 'div',
                 props: {
-                  style: { color: '#4ade80', fontSize: '46px', fontWeight: 700, letterSpacing: '-1px', lineHeight: 1.1, marginBottom: '16px', display: 'flex' },
+                  style: { color: '#4ade80', fontSize: '44px', fontWeight: 700, letterSpacing: '-1px', lineHeight: 1.1, marginBottom: '14px', display: 'flex' },
                   children: displayPrice,
                 },
               },
 
-              // Address
+              // City + State — hero headline (replaces address)
               {
                 type: 'div',
                 props: {
-                  style: { color: '#ffffff', fontSize: '22px', fontWeight: 700, lineHeight: 1.25, marginBottom: '6px', display: 'flex' },
-                  children: displayAddress,
-                },
-              },
-
-              // City, State
-              {
-                type: 'div',
-                props: {
-                  style: { color: 'rgba(255,255,255,0.65)', fontSize: '17px', fontWeight: 400, marginBottom: '28px', display: 'flex' },
-                  children: displayLocation,
+                  style: { display: 'flex', flexDirection: 'column', marginBottom: '6px' },
+                  children: [
+                    {
+                      type: 'div',
+                      props: {
+                        style: { color: '#ffffff', fontSize: '28px', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.5px', display: 'flex' },
+                        children: displayCity + ', ' + displayState,
+                      },
+                    },
+                    displayCounty ? {
+                      type: 'div',
+                      props: {
+                        style: { color: 'rgba(255,255,255,0.55)', fontSize: '14px', fontWeight: 400, marginTop: '4px', display: 'flex' },
+                        children: displayCounty + ' County',
+                      },
+                    } : null,
+                  ].filter(Boolean),
                 },
               },
 
@@ -249,7 +256,7 @@ function buildElement({ address, city, state, price, beds, baths, sqft, imageDat
               {
                 type: 'div',
                 props: {
-                  style: { width: '100%', height: '1px', background: 'rgba(255,255,255,0.15)', marginBottom: '24px', display: 'flex' },
+                  style: { width: '100%', height: '1px', background: 'rgba(255,255,255,0.15)', margin: '18px 0', display: 'flex' },
                 },
               },
 
@@ -257,13 +264,13 @@ function buildElement({ address, city, state, price, beds, baths, sqft, imageDat
               {
                 type: 'div',
                 props: {
-                  style: { display: 'flex', gap: '16px', marginBottom: '28px' },
+                  style: { display: 'flex', gap: '12px', marginBottom: '18px' },
                   children: [
                     // Beds
                     {
                       type: 'div',
                       props: {
-                        style: { display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,0.08)', borderRadius: '10px', padding: '10px 16px', flex: 1 },
+                        style: { display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,0.08)', borderRadius: '10px', padding: '10px 14px', flex: 1 },
                         children: [
                           { type: 'div', props: { style: { color: '#ffffff', fontSize: '26px', fontWeight: 700, lineHeight: 1, display: 'flex' }, children: displayBeds } },
                           { type: 'div', props: { style: { color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px', display: 'flex' }, children: 'Beds' } },
@@ -274,7 +281,7 @@ function buildElement({ address, city, state, price, beds, baths, sqft, imageDat
                     {
                       type: 'div',
                       props: {
-                        style: { display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,0.08)', borderRadius: '10px', padding: '10px 16px', flex: 1 },
+                        style: { display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,0.08)', borderRadius: '10px', padding: '10px 14px', flex: 1 },
                         children: [
                           { type: 'div', props: { style: { color: '#ffffff', fontSize: '26px', fontWeight: 700, lineHeight: 1, display: 'flex' }, children: displayBaths } },
                           { type: 'div', props: { style: { color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px', display: 'flex' }, children: 'Baths' } },
@@ -285,7 +292,7 @@ function buildElement({ address, city, state, price, beds, baths, sqft, imageDat
                     displaySqft ? {
                       type: 'div',
                       props: {
-                        style: { display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,0.08)', borderRadius: '10px', padding: '10px 12px', flex: 1 },
+                        style: { display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,0.08)', borderRadius: '10px', padding: '10px 10px', flex: 1 },
                         children: [
                           { type: 'div', props: { style: { color: '#ffffff', fontSize: '18px', fontWeight: 700, lineHeight: 1, display: 'flex' }, children: displaySqft } },
                           { type: 'div', props: { style: { color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px', display: 'flex' }, children: 'Sq Ft' } },
@@ -299,31 +306,63 @@ function buildElement({ address, city, state, price, beds, baths, sqft, imageDat
               // Spacer
               { type: 'div', props: { style: { flex: 1, display: 'flex' } } },
 
-              // CTA banner
+              // ── Primary CTA button ──────────────────────────────────────────
               {
                 type: 'div',
                 props: {
                   style: {
-                    background: 'linear-gradient(90deg, #1d4ed8 0%, #2563eb 100%)',
+                    background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)',
                     borderRadius: '10px',
-                    padding: '14px 18px',
+                    padding: '16px 20px',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '5px',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '10px',
                   },
                   children: [
                     {
                       type: 'div',
                       props: {
-                        style: { color: '#ffffff', fontSize: '13px', fontWeight: 700, letterSpacing: '0.2px', display: 'flex' },
-                        children: 'Owner Occupant Incentives  |  $100 Down FHA Loans',
+                        style: { color: '#ffffff', fontSize: '17px', fontWeight: 700, letterSpacing: '-0.2px', display: 'flex' },
+                        children: 'View This Property',
                       },
                     },
                     {
                       type: 'div',
                       props: {
-                        style: { color: 'rgba(255,255,255,0.85)', fontSize: '12px', fontWeight: 400, display: 'flex' },
-                        children: '3% Closing Cost Allowance  |  Owner-Occupant Bidding Priority  |  (910) 363-6147',
+                        style: { color: 'rgba(255,255,255,0.9)', fontSize: '20px', fontWeight: 700, display: 'flex' },
+                        children: '→',
+                      },
+                    },
+                  ],
+                },
+              },
+
+              // ── Incentives strip ────────────────────────────────────────────
+              {
+                type: 'div',
+                props: {
+                  style: {
+                    background: 'rgba(255,255,255,0.07)',
+                    borderRadius: '8px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '3px',
+                  },
+                  children: [
+                    {
+                      type: 'div',
+                      props: {
+                        style: { color: '#93c5fd', fontSize: '12px', fontWeight: 700, letterSpacing: '0.2px', display: 'flex' },
+                        children: '$100 Down FHA  ·  3% Closing Cost Allowance',
+                      },
+                    },
+                    {
+                      type: 'div',
+                      props: {
+                        style: { color: 'rgba(255,255,255,0.55)', fontSize: '11px', fontWeight: 400, display: 'flex' },
+                        children: 'Owner-Occupant Bidding Priority  ·  (910) 363-6147',
                       },
                     },
                   ],
@@ -352,22 +391,23 @@ function buildElement({ address, city, state, price, beds, baths, sqft, imageDat
           },
         },
 
-        // ── Case number badge (bottom-left of photo) ─────────────────────────
-        caseNumber ? {
+        // ── "FREE to Search" badge (bottom-left of photo) ───────────────────
+        {
           type: 'div',
           props: {
             style: {
               position: 'absolute',
               bottom: '24px', left: '24px',
-              background: 'rgba(0,0,0,0.55)',
-              color: 'rgba(255,255,255,0.75)',
-              fontSize: '11px', fontWeight: 400,
-              padding: '4px 10px', borderRadius: '4px',
+              background: 'rgba(0,0,0,0.6)',
+              color: 'rgba(255,255,255,0.85)',
+              fontSize: '12px', fontWeight: 600,
+              padding: '5px 12px', borderRadius: '5px',
               display: 'flex',
+              letterSpacing: '0.2px',
             },
-            children: `Case #${caseNumber}`,
+            children: 'USAHUDhomes.com  ·  Free to Search',
           },
-        } : null,
+        },
 
       ].filter(Boolean),
     },
@@ -387,7 +427,7 @@ export default async function handler(req, res) {
     // Fetch property from Supabase
     const { data: property, error } = await supabase
       .from('properties')
-      .select('case_number, address, city, state, price, beds, baths, sq_ft, main_image')
+      .select('case_number, city, state, county, price, beds, baths, sq_ft, main_image')
       .eq('case_number', caseNumber)
       .single();
 
@@ -401,9 +441,9 @@ export default async function handler(req, res) {
 
     // Build the layout element tree
     const element = buildElement({
-      address:      property.address,
       city:         property.city,
       state:        property.state,
+      county:       property.county,
       price:        property.price,
       beds:         property.beds,
       baths:        property.baths,
