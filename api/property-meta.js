@@ -93,18 +93,26 @@ export default async function handler(req, res) {
 
     // Build meta tag values
     const propertyUrl = `https://usahudhomes.com/property/${property.case_number}`;
-    const propertyTitle = escapeHtml(`${property.address} - ${property.city}, ${property.state}`);
+    const location = [property.city, property.state].filter(Boolean).join(', ');
+    const priceStr = property.price ? '$' + Number(property.price).toLocaleString() : 'Price Available';
+    const bedsStr  = property.beds  != null ? `${property.beds} bed` + (property.beds !== 1 ? 's' : '') : null;
+    const bathsStr = property.baths != null ? `${property.baths} bath` + (property.baths !== 1 ? 's' : '') : null;
+    const sqftStr  = property.sq_ft ? `${Number(property.sq_ft).toLocaleString()} sq ft` : null;
+    const features = [bedsStr, bathsStr, sqftStr].filter(Boolean).join(' · ');
+
+    // Title: Price — City, State | HUD Home (no street address)
+    const propertyTitle = escapeHtml(`${priceStr} — ${location} | HUD Home`);
+
+    // Description: features + location + incentives (no street address)
     const propertyDescription = escapeHtml(
-      `${property.price ? '$' + Number(property.price).toLocaleString() : 'Price Available'} | ` +
-      `${property.beds || 0} beds | ${property.baths || 0} baths | ` +
-      `HUD Home in ${property.city}, ${property.state}. ` +
+      `${features ? features + ' · ' : ''}HUD Home in ${location}. ` +
       `$100 Down FHA Loans, 3% Closing Cost Allowance, Owner-Occupant Bidding Priority. ` +
       `Contact Lightkeeper Realty at (910) 363-6147.`
     );
 
     // ── Dynamic OG image URL ──────────────────────────────────────────────────
     // Points to /api/og-image which generates a branded 1200×630 PNG with the
-    // property photo, price, address, beds/baths, and USAHUDhomes.com branding.
+    // property photo, price, city/state, beds/baths, and USAHUDhomes.com branding.
     const ogImageUrl = `https://usahudhomes.com/api/og-image?caseNumber=${encodeURIComponent(property.case_number)}`;
 
     // Read and strip the generic meta tags from index.html
