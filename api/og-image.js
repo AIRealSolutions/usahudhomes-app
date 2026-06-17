@@ -27,10 +27,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ── Supabase client ─────────────────────────────────────────────────────────
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL,
-  process.env.VITE_SUPABASE_ANON_KEY
-);
+// NOTE: VITE_ prefixed env vars are build-time only — use SUPABASE_URL / SUPABASE_SERVICE_KEY in serverless functions.
+// The anon key below is the public read-only key (safe to embed).
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://lpqjndfjbenolhneqzec.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
+  || process.env.SUPABASE_ANON_KEY
+  || process.env.VITE_SUPABASE_ANON_KEY
+  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwcWpuZGZqYmVub2xobmVxemVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxODQ2MzgsImV4cCI6MjA3Nzc2MDYzOH0.sbnMYVgcVobQm0ZDnPJBeXHqL0p29SmNVTPsfHM2-aE';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── Load fonts once at module level (cached across warm invocations) ─────────
 let fontRegular, fontBold;
