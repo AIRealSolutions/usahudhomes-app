@@ -14,7 +14,8 @@ import ContactThankYou from './pages/ContactThankYou'
 import AgentRegistration from './components/agent/AgentRegistration'
 import SuccessfulDeals from './components/SuccessfulDeals'
 import FullAdminDashboard from './components/AdminShell'
-import BrokerShell from './components/BrokerShell'\nimport HudHomesLanding from './pages/HudHomesLanding'
+import BrokerShell from './components/BrokerShell'
+import HudHomesLanding from './pages/HudHomesLanding'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -1132,7 +1133,9 @@ export default function App() {
               <Route path="/admin" element={<Dashboard />} />
               <Route path="/broker-dashboard" element={<BrokerShell />} />
               <Route path="/lead/:id" element={<LeadDetail />} />
-              <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />\n              <Route path="/hud-homes/:stateSlug" element={<HudHomesLanding />} />\n              <Route path="/hud-homes/:stateSlug/:citySlug" element={<HudHomesLanding />} />
+              <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />
+              <Route path="/hud-homes/:stateSlug" element={<HudHomesLanding />} />
+              <Route path="/hud-homes/:stateSlug/:citySlug" element={<HudHomesLanding />} />
               <Route path="/contact" element={<ContactForm />} />
               <Route path="/contact/thank-you" element={<ContactThankYou />} />
               <Route path="/broker/register" element={<AgentRegistration />} />
