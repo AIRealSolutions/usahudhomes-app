@@ -14,4 +14,4 @@ Disallow: /admin/bid-results
 Disallow: /admin/referrals
 
 # Sitemap
-Sitemap: https://usahudhomes.com/sitemap.xml
+Sitemap: https://www.usahudhomes.com/sitemap.xml

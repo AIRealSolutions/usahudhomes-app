@@ -26,12 +26,12 @@ function SEOHead({
   canonical
 }) {
   // Ensure absolute URLs
-  const absoluteUrl = url?.startsWith('http') ? url : `https://usahudhomes.com${url || ''}`
-  const absoluteImage = image?.startsWith('http') ? image : image ? `https://usahudhomes.com${image}` : 'https://usahudhomes.com/images/og-default.jpg'
+  const absoluteUrl = url?.startsWith('http') ? url : `https://www.usahudhomes.com${url || ''}`
+  const absoluteImage = image?.startsWith('http') ? image : image ? `https://www.usahudhomes.com${image}` : 'https://www.usahudhomes.com/images/og-default.jpg'
   const canonicalUrl = canonical || absoluteUrl
 
   // Default fallback image if none provided
-  const ogImage = absoluteImage || 'https://usahudhomes.com/images/og-default.jpg'
+  const ogImage = absoluteImage || 'https://www.usahudhomes.com/images/og-default.jpg'
 
   return (
     <Helmet>
