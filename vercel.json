@@ -1,5 +1,22 @@
 {
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "usahudhomes.com"
+        }
+      ],
+      "destination": "https://www.usahudhomes.com/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
     {
       "source": "/property/:caseNumber",
       "destination": "/api/property-meta?caseNumber=:caseNumber"
