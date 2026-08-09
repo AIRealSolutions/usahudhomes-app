@@ -14,7 +14,7 @@ import ContactThankYou from './pages/ContactThankYou'
 import AgentRegistration from './components/agent/AgentRegistration'
 import SuccessfulDeals from './components/SuccessfulDeals'
 import FullAdminDashboard from './components/AdminShell'
-import BrokerShell from './components/BrokerShell'
+import BrokerShell from './components/BrokerShell'\nimport HudHomesLanding from './pages/HudHomesLanding'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -225,7 +225,7 @@ function HeroSection() {
             Find Your Dream HUD Home
           </h1>
           <p className="text-xl md:text-2xl mb-8 text-blue-100">
-            $100 Down FHA Loans • 3% Closing Cost Paid • Repair Escrows up to $35,000
+            Eligible buyers may qualify for special FHA financing and closing-cost assistance
           </p>
           
           <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-4">
@@ -256,7 +256,7 @@ function BenefitsSection() {
     {
       icon: <DollarSign className="h-12 w-12 text-blue-600" />,
       title: "$100 Down Payment",
-      description: "FHA loans available with as little as $100 down for owner-occupants"
+      description: "Eligible owner-occupants may qualify for FHA financing with as little as $100 down"
     },
     {
       icon: <Key className="h-12 w-12 text-blue-600" />,
@@ -266,7 +266,7 @@ function BenefitsSection() {
     {
       icon: <CheckCircle className="h-12 w-12 text-blue-600" />,
       title: "Repair Escrows",
-      description: "Up to $35,000 available with 203k loans for repairs and improvements"
+      description: "Eligible properties may support FHA repair escrow or renovation financing options"
     }
   ]
 
@@ -373,14 +373,14 @@ function HomePage() {
         <title>USAHUDhomes.com - Find HUD Homes & Government Foreclosures</title>
         <meta name="description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://usahudhomes.com/" />
+        <meta property="og:url" content="https://www.usahudhomes.com/" />
         <meta property="og:title" content="USAHUDhomes.com - Find HUD Homes & Government Foreclosures" />
         <meta property="og:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
-        <meta property="og:image" content="https://usahudhomes.com/main-marketing-optimized.png" />
+        <meta property="og:image" content="https://www.usahudhomes.com/main-marketing-optimized.png" />
         <meta property="twitter:card" content="summary_large_image" />
         <meta property="twitter:title" content="USAHUDhomes.com - Find HUD Homes & Government Foreclosures" />
         <meta property="twitter:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
-        <meta property="twitter:image" content="https://usahudhomes.com/main-marketing-optimized.png" />
+        <meta property="twitter:image" content="https://www.usahudhomes.com/main-marketing-optimized.png" />
       </Helmet>
       <HeroSection />
       <BenefitsSection />
@@ -879,10 +879,10 @@ function PropertyDetailPage() {
     loadProperty()
   }, [caseNumber])
 
-  const propertyUrl = property ? `https://usahudhomes.com/property/${property.case_number}` : ''
+  const propertyUrl = property ? `https://www.usahudhomes.com/property/${property.case_number}` : ''
   const propertyTitle = property ? `${property.address} - ${property.city}, ${property.state}` : 'Property Details'
   const propertyDescription = property ? `$${property.list_price?.toLocaleString() || 'Price Available'} | ${property.beds || 0} beds | ${property.baths || 0} baths | HUD Home in ${property.city}, ${property.state}. Contact Lightkeeper Realty at 910-363-6147 for more information.` : ''
-  const propertyImage = property?.main_image || 'https://usahudhomes.com/us-map.png'
+  const propertyImage = property?.main_image || 'https://www.usahudhomes.com/us-map.png'
 
   if (loading) {
     return (
@@ -1126,7 +1126,7 @@ export default function App() {
               <Route path="/admin" element={<Dashboard />} />
               <Route path="/broker-dashboard" element={<BrokerShell />} />
               <Route path="/lead/:id" element={<LeadDetail />} />
-              <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />
+              <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />\n              <Route path="/hud-homes/:stateSlug" element={<HudHomesLanding />} />\n              <Route path="/hud-homes/:stateSlug/:citySlug" element={<HudHomesLanding />} />
               <Route path="/contact" element={<ContactForm />} />
               <Route path="/contact/thank-you" element={<ContactThankYou />} />
               <Route path="/broker/register" element={<AgentRegistration />} />
