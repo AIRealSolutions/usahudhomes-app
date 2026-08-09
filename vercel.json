@@ -1,14 +1,14 @@
 {
   "redirects": [
     {
-      "source": "/:path*",
+      "source": "/(.*)",
       "has": [
         {
           "type": "host",
           "value": "usahudhomes.com"
         }
       ],
-      "destination": "https://www.usahudhomes.com/:path*",
+      "destination": "https://www.usahudhomes.com/$1",
       "permanent": true
     }
   ],
