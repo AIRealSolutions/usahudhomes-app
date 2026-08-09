@@ -204,6 +204,12 @@ function Footer() {
             <p className="text-gray-400">
               Your trusted partner in HUD home purchases
             </p>
+            <Link
+              to="/hud-homes/north-carolina"
+              className="mt-3 inline-block text-blue-300 hover:text-white"
+            >
+              North Carolina HUD Homes
+            </Link>
           </div>
         </div>
         
