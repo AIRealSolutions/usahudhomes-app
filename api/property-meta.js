@@ -25,7 +25,14 @@ const CRAWLER_USER_AGENTS = [
   'Slackbot',
   'TelegramBot',
   'Discordbot',
-  'SkypeUriPreview'
+  'SkypeUriPreview',
+  // Search engine crawlers must receive listing-specific metadata too.
+  'Googlebot',
+  'bingbot',
+  'DuckDuckBot',
+  'Applebot',
+  'Baiduspider',
+  'YandexBot'
 ];
 
 function isCrawler(userAgent) {
@@ -106,7 +113,7 @@ export default async function handler(req, res) {
     // Description: features + location + incentives (no street address)
     const propertyDescription = escapeHtml(
       `${features ? features + ' · ' : ''}HUD Home in ${location}. ` +
-      `$100 Down FHA Loans, 3% Closing Cost Allowance, Owner-Occupant Bidding Priority. ` +
+      `Eligible buyers may qualify for $100-down FHA financing and closing-cost assistance. ` +
       `Contact Lightkeeper Realty at (910) 363-6147.`
     );
 
@@ -114,6 +121,76 @@ export default async function handler(req, res) {
     // Points to /api/og-image which generates a branded 1200×630 PNG with the
     // property photo, price, city/state, beds/baths, and USAHUDhomes.com branding.
     const ogImageUrl = `https://usahudhomes.com/api/og-image?caseNumber=${encodeURIComponent(property.case_number)}`;
+
+    // Give search engines structured listing facts without requiring JavaScript rendering.
+    const structuredData = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'WebPage',
+          '@id': propertyUrl,
+          url: propertyUrl,
+          name: propertyTitle,
+          description: propertyDescription,
+          primaryImageOfPage: ogImageUrl,
+          isPartOf: {
+            '@type': 'WebSite',
+            name: 'USAHUDhomes.com',
+            url: 'https://usahudhomes.com/'
+          },
+          breadcrumb: {
+            '@id': `${propertyUrl}#breadcrumb`
+          }
+        },
+        {
+          '@type': 'SingleFamilyResidence',
+          name: propertyTitle,
+          image: ogImageUrl,
+          address: {
+            '@type': 'PostalAddress',
+            streetAddress: property.address || undefined,
+            addressLocality: property.city || undefined,
+            addressRegion: property.state || undefined,
+            postalCode: property.zip_code || undefined,
+            addressCountry: 'US'
+          },
+          numberOfBedrooms: property.beds ?? undefined,
+          numberOfBathroomsTotal: property.baths ?? undefined,
+          floorSize: property.sq_ft ? {
+            '@type': 'QuantitativeValue',
+            value: Number(property.sq_ft),
+            unitCode: 'FTK'
+          } : undefined,
+          offers: property.price ? {
+            '@type': 'Offer',
+            url: propertyUrl,
+            price: Number(property.price),
+            priceCurrency: 'USD',
+            availability: property.is_active === false
+              ? 'https://schema.org/OutOfStock'
+              : 'https://schema.org/InStock'
+          } : undefined
+        },
+        {
+          '@type': 'BreadcrumbList',
+          '@id': `${propertyUrl}#breadcrumb`,
+          itemListElement: [
+            {
+              '@type': 'ListItem',
+              position: 1,
+              name: 'HUD Homes',
+              item: 'https://usahudhomes.com/'
+            },
+            {
+              '@type': 'ListItem',
+              position: 2,
+              name: location || 'Property',
+              item: propertyUrl
+            }
+          ]
+        }
+      ]
+    }).replace(/</g, '\\u003c');
 
     // Read and strip the generic meta tags from index.html
     const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
@@ -124,6 +201,9 @@ export default async function handler(req, res) {
     const metaTags = `
     <title>${propertyTitle} | USAHUDhomes.com</title>
     <meta name="description" content="${propertyDescription}">
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+    <link rel="canonical" href="${propertyUrl}">
+    <script type="application/ld+json">${structuredData}</script>
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
