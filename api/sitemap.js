@@ -1,6 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
 
 const SITE_URL = 'https://www.usahudhomes.com'
+const STATE_NAMES = {
+  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
+  CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', FL: 'Florida', GA: 'Georgia',
+  HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa',
+  KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland',
+  MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi',
+  MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire',
+  NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina',
+  ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania',
+  RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee',
+  TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington',
+  WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming'
+}
+
 const STATIC_ROUTES = [
   { path: '/', priority: '1.0', changefreq: 'daily' },
   { path: '/search', priority: '0.9', changefreq: 'daily' },
@@ -9,6 +23,14 @@ const STATIC_ROUTES = [
   { path: '/contact', priority: '0.5', changefreq: 'yearly' },
   { path: '/broker/register', priority: '0.5', changefreq: 'monthly' }
 ]
+
+function slugify(value = '') {
+  return String(value)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
 
 function escapeXml(value) {
   return String(value)
@@ -33,7 +55,7 @@ async function fetchActiveProperties(supabase) {
   for (let start = 0; ; start += pageSize) {
     const { data, error } = await supabase
       .from('properties')
-      .select('case_number, updated_at')
+      .select('case_number, city, state, updated_at')
       .eq('is_active', true)
       .neq('status', 'UNDER CONTRACT')
       .not('case_number', 'is', null)
@@ -86,8 +108,37 @@ export default async function handler(req, res) {
     <priority>0.8</priority>
   </url>`).join('')
 
+    const geoPages = new Map()
+    for (const property of properties) {
+      const stateName = STATE_NAMES[property.state]
+      if (!stateName) continue
+
+      const statePath = `/hud-homes/${slugify(stateName)}`
+      const updated = formatDate(property.updated_at)
+      if (!geoPages.has(statePath) || updated > geoPages.get(statePath)) {
+        geoPages.set(statePath, updated)
+      }
+
+      if (property.city) {
+        const cityPath = `${statePath}/${slugify(property.city)}`
+        if (!geoPages.has(cityPath) || updated > geoPages.get(cityPath)) {
+          geoPages.set(cityPath, updated)
+        }
+      }
+    }
+
+    const geoUrls = [...geoPages.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([path, lastmod]) => `
+  <url>
+    <loc>${escapeXml(`${SITE_URL}${path}`)}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>${path.split('/').length === 3 ? '0.9' : '0.7'}</priority>
+  </url>`).join('')
+
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${staticUrls}${propertyUrls}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${staticUrls}${geoUrls}${propertyUrls}
 </urlset>
 `
 
