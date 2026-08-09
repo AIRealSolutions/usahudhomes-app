@@ -18,6 +18,14 @@
       "destination": "/api/sitemap"
     },
     {
+      "source": "/hud-homes/:stateSlug/:citySlug",
+      "destination": "/api/geo-meta?stateSlug=:stateSlug&citySlug=:citySlug"
+    },
+    {
+      "source": "/hud-homes/:stateSlug",
+      "destination": "/api/geo-meta?stateSlug=:stateSlug"
+    },
+    {
       "source": "/property/:caseNumber",
       "destination": "/api/property-meta?caseNumber=:caseNumber"
     },
