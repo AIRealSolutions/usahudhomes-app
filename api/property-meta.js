@@ -99,7 +99,7 @@ export default async function handler(req, res) {
     }
 
     // Build meta tag values
-    const propertyUrl = `https://usahudhomes.com/property/${property.case_number}`;
+    const propertyUrl = `https://www.usahudhomes.com/property/${property.case_number}`;
     const location = [property.city, property.state].filter(Boolean).join(', ');
     const priceStr = property.price ? '$' + Number(property.price).toLocaleString() : 'Price Available';
     const bedsStr  = property.beds  != null ? `${property.beds} bed` + (property.beds !== 1 ? 's' : '') : null;
@@ -120,7 +120,7 @@ export default async function handler(req, res) {
     // ── Dynamic OG image URL ──────────────────────────────────────────────────
     // Points to /api/og-image which generates a branded 1200×630 PNG with the
     // property photo, price, city/state, beds/baths, and USAHUDhomes.com branding.
-    const ogImageUrl = `https://usahudhomes.com/api/og-image?caseNumber=${encodeURIComponent(property.case_number)}`;
+    const ogImageUrl = `https://www.usahudhomes.com/api/og-image?caseNumber=${encodeURIComponent(property.case_number)}`;
 
     // Give search engines structured listing facts without requiring JavaScript rendering.
     const structuredData = JSON.stringify({
@@ -136,7 +136,7 @@ export default async function handler(req, res) {
           isPartOf: {
             '@type': 'WebSite',
             name: 'USAHUDhomes.com',
-            url: 'https://usahudhomes.com/'
+            url: 'https://www.usahudhomes.com/'
           },
           breadcrumb: {
             '@id': `${propertyUrl}#breadcrumb`
@@ -179,7 +179,7 @@ export default async function handler(req, res) {
               '@type': 'ListItem',
               position: 1,
               name: 'HUD Homes',
-              item: 'https://usahudhomes.com/'
+              item: 'https://www.usahudhomes.com/'
             },
             {
               '@type': 'ListItem',
