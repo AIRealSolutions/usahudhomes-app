@@ -16,6 +16,7 @@ import SuccessfulDeals from './components/SuccessfulDeals'
 import FullAdminDashboard from './components/AdminShell'
 import BrokerShell from './components/BrokerShell'
 import HudHomesLanding from './pages/HudHomesLanding'
+import HowItWorksGuide from './pages/HowItWorks'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -64,6 +65,7 @@ function Header() {
           <nav className="hidden md:flex space-x-8 items-center">
             <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Home</Link>
             <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Properties</Link>
+            <Link to="/how-it-works" className="text-gray-700 hover:text-blue-600 font-medium">How It Works</Link>
             <Link to="/deals" className="text-gray-700 hover:text-blue-600 font-medium">Successful Deals</Link>
             <Link to="/broker/register" className="text-gray-700 hover:text-blue-600 font-medium">Become a Partner</Link>
             <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>
@@ -120,6 +122,13 @@ function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Search Properties
+              </Link>
+              <Link
+                to="/how-it-works"
+                className="text-gray-700 hover:text-blue-600 font-medium"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                How It Works
               </Link>
               <Link 
                 to="/broker/register" 
@@ -1127,7 +1136,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/search" element={<SearchPage />} />
-              <Route path="/how-it-works" element={<HowItWorksPage />} />
+              <Route path="/how-it-works" element={<HowItWorksGuide />} />
               <Route path="/login" element={<Login />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/admin" element={<Dashboard />} />
