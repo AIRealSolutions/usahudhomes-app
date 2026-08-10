@@ -17,6 +17,7 @@ import FullAdminDashboard from './components/AdminShell'
 import BrokerShell from './components/BrokerShell'
 import HudHomesLanding from './pages/HudHomesLanding'
 import HowItWorksGuide from './pages/HowItWorks'
+import BuyerAlerts from './pages/BuyerAlerts'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -66,6 +67,7 @@ function Header() {
             <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Home</Link>
             <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Properties</Link>
             <Link to="/how-it-works" className="text-gray-700 hover:text-blue-600 font-medium">How It Works</Link>
+            <Link to="/alerts" className="text-gray-700 hover:text-blue-600 font-medium">Home Alerts</Link>
             <Link to="/deals" className="text-gray-700 hover:text-blue-600 font-medium">Successful Deals</Link>
             <Link to="/broker/register" className="text-gray-700 hover:text-blue-600 font-medium">Become a Partner</Link>
             <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>
@@ -129,6 +131,13 @@ function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 How It Works
+              </Link>
+              <Link
+                to="/alerts"
+                className="text-gray-700 hover:text-blue-600 font-medium"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Home Alerts
               </Link>
               <Link 
                 to="/broker/register" 
@@ -1071,6 +1080,13 @@ function PropertyDetailPage() {
             >
               Request Information
             </button>
+
+            <Link
+              to="/alerts"
+              className="mb-3 block w-full rounded-lg bg-orange-500 py-3 text-center font-semibold text-white hover:bg-orange-600"
+            >
+              Get HUD Home Alerts
+            </Link>
             
             <a
               href="tel:9103636147"
@@ -1137,6 +1153,7 @@ export default function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/how-it-works" element={<HowItWorksGuide />} />
+              <Route path="/alerts" element={<BuyerAlerts />} />
               <Route path="/login" element={<Login />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/admin" element={<Dashboard />} />
