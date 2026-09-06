@@ -18,6 +18,9 @@ import BrokerShell from './components/BrokerShell'
 import HudHomesLanding from './pages/HudHomesLanding'
 import HowItWorksGuide from './pages/HowItWorks'
 import BuyerAlerts from './pages/BuyerAlerts'
+import SearchHeroSection from './components/SearchHeroSection'
+import BuyerProgramsSection from './components/BuyerProgramsSection'
+import HowItWorksPreview from './components/HowItWorksPreview'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -409,12 +412,14 @@ function HomePage() {
         <meta property="twitter:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
         <meta property="twitter:image" content="https://www.usahudhomes.com/main-marketing-optimized.png" />
       </Helmet>
-      <HeroSection />
-      <BenefitsSection />
-      
+
+      {/* NEW: Phase 2 Homepage Design */}
+      <SearchHeroSection />
+
+      {/* Recently Added Properties Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h2 className="text-3xl font-bold mb-8">Featured HUD Homes</h2>
-        
+        <h2 className="text-3xl font-bold mb-8">Recently Added HUD Homes</h2>
+
         {loading ? (
           <div className="text-center py-12">
             <p className="text-gray-600">Loading properties...</p>
@@ -430,7 +435,7 @@ function HomePage() {
             ))}
           </div>
         )}
-        
+
         <div className="text-center mt-12">
           <Link
             to="/search"
@@ -440,6 +445,15 @@ function HomePage() {
           </Link>
         </div>
       </div>
+
+      {/* Why HUD Homes Section */}
+      <BenefitsSection />
+
+      {/* How It Works Preview Section */}
+      <HowItWorksPreview />
+
+      {/* Buyer Programs Section */}
+      <BuyerProgramsSection />
     </div>
   )
 }
