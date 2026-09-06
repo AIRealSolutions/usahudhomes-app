@@ -33,5 +33,12 @@
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/check-closures",
+      "schedule": "0 2 * * *",
+      "description": "Nightly check for properties missing from HUD data for 90+ days. Auto-closes only if no active CRM engagement."
+    }
   ]
 }
