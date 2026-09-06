@@ -23,6 +23,7 @@ import BuyerProgramsSection from './components/BuyerProgramsSection'
 import HowItWorksPreview from './components/HowItWorksPreview'
 import AddressRevealGate from './components/AddressRevealGate'
 import PropertyRequestForm from './components/PropertyRequestForm'
+import AgentRequestForm from './components/AgentRequestForm'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -903,6 +904,7 @@ function PropertyDetailPage() {
   const [loading, setLoading] = useState(true)
   const [showInquiryForm, setShowInquiryForm] = useState(false)
   const [showAddressGate, setShowAddressGate] = useState(false)
+  const [sidebarTab, setSidebarTab] = useState('agent') // 'agent' or 'property'
 
   useEffect(() => {
     async function loadProperty() {
@@ -1109,9 +1111,39 @@ function PropertyDetailPage() {
 
         {/* Sidebar */}
         <div className="lg:col-span-1">
-          {/* Property Request Form (for authenticated users) */}
+          {/* Authenticated Users: Tab Interface */}
           {user ? (
-            <PropertyRequestForm property={property} />
+            <>
+              {/* Tabs */}
+              <div className="flex gap-2 mb-6 border-b border-gray-200">
+                <button
+                  onClick={() => setSidebarTab('agent')}
+                  className={`px-4 py-2 font-semibold border-b-2 transition-colors ${
+                    sidebarTab === 'agent'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Connect with Agent
+                </button>
+                <button
+                  onClick={() => setSidebarTab('property')}
+                  className={`px-4 py-2 font-semibold border-b-2 transition-colors ${
+                    sidebarTab === 'property'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  This Property
+                </button>
+              </div>
+
+              {/* Agent Request Form Tab */}
+              {sidebarTab === 'agent' && <AgentRequestForm property={property} />}
+
+              {/* Property Request Form Tab */}
+              {sidebarTab === 'property' && <PropertyRequestForm property={property} />}
+            </>
           ) : (
             /* Contact Card (for unauthenticated users) */
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 sticky top-24">
