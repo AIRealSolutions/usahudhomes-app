@@ -369,19 +369,21 @@ function HomePage() {
   useEffect(() => {
     async function loadProperties() {
       try {
-        // Get all available properties first
+        // Get all active properties
+        // Database has: Active, New Listing, Price Reduced, Extended, etc. (not just AVAILABLE)
         const { data: allProps, error } = await supabase
           .from('properties')
           .select('*')
-          .or('status.eq.AVAILABLE,status.eq.BIDS OPEN')
+          .eq('is_active', true)
+          .order('listing_date', { ascending: false })
           .limit(100)
-        
+
         if (error) throw error
-        
-        // Shuffle and take 6 random properties
+
+        // Shuffle and take 6 random properties for featured section
         const shuffled = (allProps || []).sort(() => Math.random() - 0.5)
         const randomSix = shuffled.slice(0, 6)
-        
+
         setProperties(randomSix)
       } catch (err) {
         console.error('Error loading properties:', err)
