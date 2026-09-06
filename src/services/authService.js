@@ -11,7 +11,7 @@ class AuthService {
    * @param {Object} userData - User registration data
    * @returns {Promise<Object>} Result with user and profile
    */
-  async signUp({ email, password, firstName, lastName, role = 'end_user', phone, state }) {
+  async signUp({ email, password, firstName, lastName, role = 'end_user', phone, state, address }) {
     try {
       // Safety check
       if (!supabase || !supabase.auth) {
@@ -50,6 +50,7 @@ class AuthService {
           last_name: lastName,
           phone,
           state,
+          address,
           is_active: true
         })
         .select()
@@ -278,6 +279,7 @@ class AuthService {
       if (updates.lastName) updateData.last_name = updates.lastName
       if (updates.phone) updateData.phone = updates.phone
       if (updates.state) updateData.state = updates.state
+      if (updates.address) updateData.address = updates.address
       if (updates.companyName) updateData.company_name = updates.companyName
       if (updates.licenseNumber) updateData.license_number = updates.licenseNumber
 
