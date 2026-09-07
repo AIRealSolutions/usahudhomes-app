@@ -24,9 +24,6 @@ import HowItWorksPreview from './components/HowItWorksPreview'
 import AddressRevealGate from './components/AddressRevealGate'
 import PropertyRequestForm from './components/PropertyRequestForm'
 import AgentRequestForm from './components/AgentRequestForm'
-import UserDashboard from './components/UserDashboard'
-import UserProfileSettings from './components/UserProfileSettings'
-import AdminReferralManager from './components/AdminReferralManager'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -82,9 +79,9 @@ function Header() {
             <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>
             {user ? (
               <>
-                <Link to="/my-dashboard" className="text-gray-700 hover:text-blue-600 font-medium flex items-center">
+                <Link to="/dashboard" className="text-gray-700 hover:text-blue-600 font-medium flex items-center">
                   <User className="h-4 w-4 mr-1" />
-                  My Dashboard
+                  Dashboard
                 </Link>
                 <button
                   onClick={handleSignOut}
@@ -164,13 +161,13 @@ function Header() {
               </Link>
               {user ? (
                 <>
-                  <Link
-                    to="/my-dashboard"
+                  <Link 
+                    to="/dashboard" 
                     className="text-gray-700 hover:text-blue-600 font-medium flex items-center"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <User className="h-4 w-4 mr-1" />
-                    My Dashboard
+                    Dashboard
                   </Link>
                   <button
                     onClick={() => {
@@ -1249,9 +1246,6 @@ export default function App() {
               <Route path="/alerts" element={<BuyerAlerts />} />
               <Route path="/login" element={<Login />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/my-dashboard" element={<UserDashboard />} />
-              <Route path="/profile" element={<UserProfileSettings />} />
-              <Route path="/admin/referrals" element={<AdminReferralManager />} />
               <Route path="/admin" element={<Dashboard />} />
               <Route path="/broker-dashboard" element={<BrokerShell />} />
               <Route path="/lead/:id" element={<LeadDetail />} />
