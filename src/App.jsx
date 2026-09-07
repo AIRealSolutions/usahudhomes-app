@@ -21,6 +21,9 @@ import BuyerAlerts from './pages/BuyerAlerts'
 import SearchHeroSection from './components/SearchHeroSection'
 import BuyerProgramsSection from './components/BuyerProgramsSection'
 import HowItWorksPreview from './components/HowItWorksPreview'
+import AddressRevealGate from './components/AddressRevealGate'
+import PropertyRequestForm from './components/PropertyRequestForm'
+import AgentRequestForm from './components/AgentRequestForm'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -896,9 +899,12 @@ function InquiryFormModal({ property, onClose }) {
 // Property Detail Page
 function PropertyDetailPage() {
   const { caseNumber } = useParams()
+  const { user } = useAuth()
   const [property, setProperty] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showInquiryForm, setShowInquiryForm] = useState(false)
+  const [showAddressGate, setShowAddressGate] = useState(false)
+  const [sidebarTab, setSidebarTab] = useState('agent') // 'agent' or 'property'
 
   useEffect(() => {
     async function loadProperty() {
@@ -908,7 +914,7 @@ function PropertyDetailPage() {
           .select('*')
           .eq('case_number', caseNumber)
           .single()
-        
+
         if (error) throw error
         setProperty(data)
       } catch (err) {
@@ -920,6 +926,8 @@ function PropertyDetailPage() {
     loadProperty()
   }, [caseNumber])
 
+  // Mask address for unauthenticated users
+  const displayAddress = user ? property?.address : `HUD Home in ${property?.city}, ${property?.state}`
   const propertyUrl = property ? `https://www.usahudhomes.com/property/${property.case_number}` : ''
   const propertyTitle = property ? `${property.address} - ${property.city}, ${property.state}` : 'Property Details'
   const propertyDescription = property ? `$${property.list_price?.toLocaleString() || 'Price Available'} | ${property.beds || 0} beds | ${property.baths || 0} baths | HUD Home in ${property.city}, ${property.state}. Contact Lightkeeper Realty at 910-363-6147 for more information.` : ''
@@ -972,7 +980,17 @@ function PropertyDetailPage() {
         <span className="mx-2">/</span>
         <Link to="/search" className="hover:text-blue-600">Search</Link>
         <span className="mx-2">/</span>
-        <span className="text-gray-900">{property.address}</span>
+        <span className="text-gray-900 flex items-center">
+          {displayAddress}
+          {!user && (
+            <button
+              onClick={() => setShowAddressGate(true)}
+              className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200 transition-colors"
+            >
+              Unlock
+            </button>
+          )}
+        </span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1003,7 +1021,17 @@ function PropertyDetailPage() {
           </div>
 
           {/* Property Title */}
-          <h1 className="text-3xl font-bold mb-2">{property.address}</h1>
+          <div className="mb-2 flex items-start justify-between">
+            <h1 className="text-3xl font-bold">{displayAddress}</h1>
+            {!user && (
+              <button
+                onClick={() => setShowAddressGate(true)}
+                className="ml-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors whitespace-nowrap"
+              >
+                Unlock Address
+              </button>
+            )}
+          </div>
           <p className="text-xl text-gray-600 mb-6 flex items-center">
             <MapPin className="h-5 w-5 mr-2" />
             {property.city}, {property.state} {property.zip}
@@ -1083,41 +1111,76 @@ function PropertyDetailPage() {
 
         {/* Sidebar */}
         <div className="lg:col-span-1">
-          {/* Contact Card */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 sticky top-24">
-            <h3 className="text-xl font-bold mb-4">Interested in this property?</h3>
-            <p className="text-gray-700 mb-6">
-              Contact us today to schedule a viewing or get more information about this HUD home.
-            </p>
-            
-            <button
-              onClick={() => setShowInquiryForm(true)}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 mb-3"
-            >
-              Request Information
-            </button>
+          {/* Authenticated Users: Tab Interface */}
+          {user ? (
+            <>
+              {/* Tabs */}
+              <div className="flex gap-2 mb-6 border-b border-gray-200">
+                <button
+                  onClick={() => setSidebarTab('agent')}
+                  className={`px-4 py-2 font-semibold border-b-2 transition-colors ${
+                    sidebarTab === 'agent'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Connect with Agent
+                </button>
+                <button
+                  onClick={() => setSidebarTab('property')}
+                  className={`px-4 py-2 font-semibold border-b-2 transition-colors ${
+                    sidebarTab === 'property'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  This Property
+                </button>
+              </div>
 
-            <Link
-              to="/alerts"
-              className="mb-3 block w-full rounded-lg bg-orange-500 py-3 text-center font-semibold text-white hover:bg-orange-600"
-            >
-              Get HUD Home Alerts
-            </Link>
-            
-            <a
-              href="tel:9103636147"
-              className="w-full bg-white border-2 border-blue-600 text-blue-600 py-3 rounded-lg font-semibold hover:bg-blue-50 flex items-center justify-center"
-            >
-              <Phone className="h-5 w-5 mr-2" />
-              Call 910-363-6147
-            </a>
+              {/* Agent Request Form Tab */}
+              {sidebarTab === 'agent' && <AgentRequestForm property={property} />}
 
-            <div className="mt-6 pt-6 border-t border-blue-200">
-              <p className="text-sm text-gray-600 mb-2">Lightkeeper Realty</p>
-              <p className="text-xs text-gray-500">Registered HUD Buyer's Agency</p>
-              <p className="text-xs text-gray-500">Helping people bid on HUD homes for 25 years</p>
+              {/* Property Request Form Tab */}
+              {sidebarTab === 'property' && <PropertyRequestForm property={property} />}
+            </>
+          ) : (
+            /* Contact Card (for unauthenticated users) */
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 sticky top-24">
+              <h3 className="text-xl font-bold mb-4">Interested in this property?</h3>
+              <p className="text-gray-700 mb-6">
+                Contact us today to schedule a viewing or get more information about this HUD home.
+              </p>
+
+              <button
+                onClick={() => setShowAddressGate(true)}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 mb-3"
+              >
+                Unlock Full Details
+              </button>
+
+              <Link
+                to="/alerts"
+                className="mb-3 block w-full rounded-lg bg-orange-500 py-3 text-center font-semibold text-white hover:bg-orange-600"
+              >
+                Get HUD Home Alerts
+              </Link>
+
+              <a
+                href="tel:9103636147"
+                className="w-full bg-white border-2 border-blue-600 text-blue-600 py-3 rounded-lg font-semibold hover:bg-blue-50 flex items-center justify-center"
+              >
+                <Phone className="h-5 w-5 mr-2" />
+                Call 910-363-6147
+              </a>
+
+              <div className="mt-6 pt-6 border-t border-blue-200">
+                <p className="text-sm text-gray-600 mb-2">Lightkeeper Realty</p>
+                <p className="text-xs text-gray-500">Registered HUD Buyer's Agency</p>
+                <p className="text-xs text-gray-500">Helping people bid on HUD homes for 25 years</p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* HUD Benefits */}
           <div className="bg-white border rounded-lg p-6">
@@ -1151,6 +1214,17 @@ function PropertyDetailPage() {
           onClose={() => setShowInquiryForm(false)}
         />
       )}
+
+      {/* Address Reveal Gate Modal */}
+      <AddressRevealGate
+        property={property}
+        isOpen={showAddressGate}
+        onClose={() => setShowAddressGate(false)}
+        onSuccess={() => {
+          // Reload the page or user context after successful registration
+          window.location.reload()
+        }}
+      />
     </div>
   )
 }
