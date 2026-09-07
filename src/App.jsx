@@ -7,6 +7,7 @@ import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCi
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import DashboardRouter from './components/DashboardRouter'
 import LeadDetail from './pages/LeadDetail'
 import LeadDetailsPage from './pages/LeadDetailsPage'
 import ContactForm from './pages/ContactForm'
@@ -51,12 +52,26 @@ class ErrorBoundary extends React.Component {
 
 // Header Component
 function Header() {
-  const { user, signOut } = useAuth()
+  const { user, role, signOut, isAdmin, isBroker, isEndUser } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleSignOut = async () => {
     await signOut()
     window.location.href = '/'
+  }
+
+  const getRoleLabel = () => {
+    if (isAdmin()) return 'Admin Dashboard'
+    if (isBroker()) return 'Broker Portal'
+    if (isEndUser()) return 'My Account'
+    return 'Dashboard'
+  }
+
+  const getDashboardPath = () => {
+    if (isAdmin()) return '/dashboard'
+    if (isBroker()) return '/dashboard'
+    if (isEndUser()) return '/dashboard'
+    return '/dashboard'
   }
 
   return (
@@ -67,7 +82,7 @@ function Header() {
             <HomeIcon className="h-8 w-8 text-blue-600 mr-2" />
             <span className="text-2xl font-bold text-gray-900">USAHUDhomes.com</span>
           </Link>
-          
+
           {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-8 items-center">
             <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Home</Link>
@@ -75,13 +90,22 @@ function Header() {
             <Link to="/how-it-works" className="text-gray-700 hover:text-blue-600 font-medium">How It Works</Link>
             <Link to="/alerts" className="text-gray-700 hover:text-blue-600 font-medium">Home Alerts</Link>
             <Link to="/deals" className="text-gray-700 hover:text-blue-600 font-medium">Successful Deals</Link>
-            <Link to="/broker/register" className="text-gray-700 hover:text-blue-600 font-medium">Become a Partner</Link>
-            <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>
+            {!user && <Link to="/broker/register" className="text-gray-700 hover:text-blue-600 font-medium">Become a Partner</Link>}
+            {!user && <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>}
             {user ? (
               <>
-                <Link to="/dashboard" className="text-gray-700 hover:text-blue-600 font-medium flex items-center">
+                <Link
+                  to={getDashboardPath()}
+                  className={`font-medium flex items-center px-3 py-2 rounded-lg ${
+                    isAdmin()
+                      ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                      : isBroker()
+                      ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                      : 'text-gray-700 hover:text-blue-600'
+                  }`}
+                >
                   <User className="h-4 w-4 mr-1" />
-                  Dashboard
+                  {getRoleLabel()}
                 </Link>
                 <button
                   onClick={handleSignOut}
@@ -117,15 +141,15 @@ function Header() {
         {mobileMenuOpen && (
           <nav className="md:hidden mt-4 pb-4 border-t border-gray-200 pt-4">
             <div className="flex flex-col space-y-4">
-              <Link 
-                to="/" 
+              <Link
+                to="/"
                 className="text-gray-700 hover:text-blue-600 font-medium"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Home
               </Link>
-              <Link 
-                to="/search" 
+              <Link
+                to="/search"
                 className="text-gray-700 hover:text-blue-600 font-medium"
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -145,29 +169,46 @@ function Header() {
               >
                 Home Alerts
               </Link>
-              <Link 
-                to="/broker/register" 
+              <Link
+                to="/deals"
                 className="text-gray-700 hover:text-blue-600 font-medium"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Become a Partner
+                Successful Deals
               </Link>
-              <Link 
-                to="/contact" 
-                className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold text-center transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Get Connected
-              </Link>
+              {!user && (
+                <>
+                  <Link
+                    to="/broker/register"
+                    className="text-gray-700 hover:text-blue-600 font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Become a Partner
+                  </Link>
+                  <Link
+                    to="/contact"
+                    className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold text-center transition-colors"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Get Connected
+                  </Link>
+                </>
+              )}
               {user ? (
                 <>
-                  <Link 
-                    to="/dashboard" 
-                    className="text-gray-700 hover:text-blue-600 font-medium flex items-center"
+                  <Link
+                    to={getDashboardPath()}
+                    className={`font-medium flex items-center px-3 py-2 rounded-lg ${
+                      isAdmin()
+                        ? 'bg-purple-100 text-purple-700'
+                        : isBroker()
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'text-gray-700'
+                    }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <User className="h-4 w-4 mr-1" />
-                    Dashboard
+                    {getRoleLabel()}
                   </Link>
                   <button
                     onClick={() => {
@@ -181,8 +222,8 @@ function Header() {
                   </button>
                 </>
               ) : (
-                <Link 
-                  to="/login" 
+                <Link
+                  to="/login"
                   className="text-gray-700 hover:text-blue-600 font-medium"
                   onClick={() => setMobileMenuOpen(false)}
                 >
@@ -1245,9 +1286,10 @@ export default function App() {
               <Route path="/how-it-works" element={<HowItWorksGuide />} />
               <Route path="/alerts" element={<BuyerAlerts />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/admin" element={<Dashboard />} />
-              <Route path="/broker-dashboard" element={<BrokerShell />} />
+              {/* Role-based dashboard routing */}
+              <Route path="/dashboard" element={<DashboardRouter />} />
+              <Route path="/admin" element={<DashboardRouter />} />
+              <Route path="/broker-dashboard" element={<DashboardRouter />} />
               <Route path="/lead/:id" element={<LeadDetail />} />
               <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />
               <Route path="/hud-homes/:stateSlug" element={<HudHomesLanding />} />
