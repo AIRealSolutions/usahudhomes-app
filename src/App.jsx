@@ -25,6 +25,7 @@ import HowItWorksPreview from './components/HowItWorksPreview'
 import AddressRevealGate from './components/AddressRevealGate'
 import PropertyRequestForm from './components/PropertyRequestForm'
 import AgentRequestForm from './components/AgentRequestForm'
+import SearchFilters from './components/SearchFilters'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -515,52 +516,6 @@ function SearchPage() {
     bathrooms: '',
     status: ''
   })
-  const [states, setStates] = useState([])
-  const [cities, setCities] = useState([])
-
-  // Load all states on mount
-  useEffect(() => {
-    async function loadStates() {
-      try {
-        const { data, error } = await supabase
-          .from('properties')
-          .select('state')
-          .order('state')
-        
-        if (error) throw error
-        const uniqueStates = [...new Set(data.map(p => p.state))].filter(Boolean)
-        setStates(uniqueStates)
-      } catch (err) {
-        console.error('Error loading states:', err)
-      }
-    }
-    loadStates()
-  }, [])
-
-  // Load cities when state changes
-  useEffect(() => {
-    if (!filters.state) {
-      setCities([])
-      return
-    }
-    
-    async function loadCities() {
-      try {
-        const { data, error } = await supabase
-          .from('properties')
-          .select('city')
-          .eq('state', filters.state)
-          .order('city')
-        
-        if (error) throw error
-        const uniqueCities = [...new Set(data.map(p => p.city))].filter(Boolean)
-        setCities(uniqueCities)
-      } catch (err) {
-        console.error('Error loading cities:', err)
-      }
-    }
-    loadCities()
-  }, [filters.state])
 
   // Search properties
   useEffect(() => {
@@ -594,147 +549,36 @@ function SearchPage() {
     searchProperties()
   }, [filters])
 
-  const handleFilterChange = (key, value) => {
-    if (key === 'state') {
-      setFilters(prev => ({ ...prev, [key]: value, city: '' }))
-    } else {
-      setFilters(prev => ({ ...prev, [key]: value }))
-    }
-  }
-
-  const clearFilters = () => {
-    setFilters({
-      state: '',
-      city: '',
-      minPrice: '',
-      maxPrice: '',
-      bedrooms: '',
-      bathrooms: '',
-      status: ''
-    })
-  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-3xl font-bold mb-8">Search HUD Homes</h1>
-      
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* State Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
-            <select
-              value={filters.state}
-              onChange={(e) => handleFilterChange('state', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All States</option>
-              {states.map(state => (
-                <option key={state} value={state}>{state}</option>
-              ))}
-            </select>
-          </div>
 
-          {/* City Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
-            <select
-              value={filters.city}
-              onChange={(e) => handleFilterChange('city', e.target.value)}
-              disabled={!filters.state}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-            >
-              <option value="">All Cities</option>
-              {cities.map(city => (
-                <option key={city} value={city}>{city}</option>
-              ))}
-            </select>
-          </div>
+      {/* Search Filters Component */}
+      <SearchFilters
+        filters={filters}
+        onFilterChange={(key, value, resetCity = false) => {
+          if (resetCity) {
+            setFilters(prev => ({ ...prev, [key]: value, city: '' }))
+          } else {
+            setFilters(prev => ({ ...prev, [key]: value }))
+          }
+        }}
+        onSearch={(clear) => {
+          if (clear) {
+            setFilters({
+              state: '',
+              city: '',
+              minPrice: '',
+              maxPrice: '',
+              bedrooms: '',
+              bathrooms: '',
+              status: ''
+            })
+          }
+        }}
+      />
 
-          {/* Min Price */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Min Price</label>
-            <input
-              type="number"
-              value={filters.minPrice}
-              onChange={(e) => handleFilterChange('minPrice', e.target.value)}
-              placeholder="$0"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Max Price */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Max Price</label>
-            <input
-              type="number"
-              value={filters.maxPrice}
-              onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
-              placeholder="Any"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Bedrooms */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Min Bedrooms</label>
-            <select
-              value={filters.bedrooms}
-              onChange={(e) => handleFilterChange('bedrooms', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Any</option>
-              <option value="1">1+</option>
-              <option value="2">2+</option>
-              <option value="3">3+</option>
-              <option value="4">4+</option>
-              <option value="5">5+</option>
-            </select>
-          </div>
-
-          {/* Bathrooms */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Min Bathrooms</label>
-            <select
-              value={filters.bathrooms}
-              onChange={(e) => handleFilterChange('bathrooms', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Any</option>
-              <option value="1">1+</option>
-              <option value="1.5">1.5+</option>
-              <option value="2">2+</option>
-              <option value="2.5">2.5+</option>
-              <option value="3">3+</option>
-            </select>
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-            <select
-              value={filters.status}
-              onChange={(e) => handleFilterChange('status', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All</option>
-              <option value="AVAILABLE">Available</option>
-              <option value="BIDS OPEN">Bids Open</option>
-            </select>
-          </div>
-
-          {/* Clear Button */}
-          <div className="flex items-end">
-            <button
-              onClick={clearFilters}
-              className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-            >
-              Clear Filters
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* Results */}
       <div>
@@ -752,7 +596,17 @@ function SearchPage() {
           <div className="text-center py-12">
             <p className="text-gray-600">No properties match your search criteria.</p>
             <button
-              onClick={clearFilters}
+              onClick={() =>
+                setFilters({
+                  state: '',
+                  city: '',
+                  minPrice: '',
+                  maxPrice: '',
+                  bedrooms: '',
+                  bathrooms: '',
+                  status: ''
+                })
+              }
               className="mt-4 text-blue-600 hover:underline"
             >
               Clear filters to see all properties
