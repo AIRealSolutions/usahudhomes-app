@@ -25,6 +25,8 @@ import AddressRevealGate from './components/AddressRevealGate'
 import PropertyRequestForm from './components/PropertyRequestForm'
 import AgentRequestForm from './components/AgentRequestForm'
 import UserDashboard from './components/UserDashboard'
+import UserProfileSettings from './components/UserProfileSettings'
+import AdminReferralManager from './components/AdminReferralManager'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -1248,6 +1250,8 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/my-dashboard" element={<UserDashboard />} />
+              <Route path="/profile" element={<UserProfileSettings />} />
+              <Route path="/admin/referrals" element={<AdminReferralManager />} />
               <Route path="/admin" element={<Dashboard />} />
               <Route path="/broker-dashboard" element={<BrokerShell />} />
               <Route path="/lead/:id" element={<LeadDetail />} />
