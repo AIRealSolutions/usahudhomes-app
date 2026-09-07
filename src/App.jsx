@@ -56,22 +56,25 @@ function Header() {
   const { user, role, signOut, isAdmin, isBroker, isEndUser } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
+  // Debug logging
+  console.log('Header: user=', user?.email, 'role=', role, 'isAdmin()=', isAdmin?.(), 'isBroker()=', isBroker?.(), 'isEndUser()=', isEndUser?.())
+
   const handleSignOut = async () => {
     await signOut()
     window.location.href = '/'
   }
 
   const getRoleLabel = () => {
-    if (isAdmin()) return 'Admin Dashboard'
-    if (isBroker()) return 'Broker Portal'
-    if (isEndUser()) return 'My Account'
+    if (isAdmin?.()) return 'Admin Dashboard'
+    if (isBroker?.()) return 'Broker Portal'
+    if (isEndUser?.()) return 'My Account'
     return 'Dashboard'
   }
 
   const getDashboardPath = () => {
-    if (isAdmin()) return '/dashboard'
-    if (isBroker()) return '/dashboard'
-    if (isEndUser()) return '/dashboard'
+    if (isAdmin?.()) return '/dashboard'
+    if (isBroker?.()) return '/dashboard'
+    if (isEndUser?.()) return '/dashboard'
     return '/dashboard'
   }
 
@@ -98,9 +101,9 @@ function Header() {
                 <Link
                   to={getDashboardPath()}
                   className={`font-medium flex items-center px-3 py-2 rounded-lg ${
-                    isAdmin()
+                    isAdmin?.()
                       ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                      : isBroker()
+                      : isBroker?.()
                       ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                       : 'text-gray-700 hover:text-blue-600'
                   }`}
@@ -200,9 +203,9 @@ function Header() {
                   <Link
                     to={getDashboardPath()}
                     className={`font-medium flex items-center px-3 py-2 rounded-lg ${
-                      isAdmin()
+                      isAdmin?.()
                         ? 'bg-purple-100 text-purple-700'
-                        : isBroker()
+                        : isBroker?.()
                         ? 'bg-blue-100 text-blue-700'
                         : 'text-gray-700'
                     }`}
