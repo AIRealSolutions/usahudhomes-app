@@ -139,7 +139,19 @@ class ConsultationService {
           customer_name: consultationData.customerName,
           customer_email: consultationData.customerEmail,
           customer_phone: consultationData.customerPhone,
-          message: consultationData.message
+          message: consultationData.message,
+          // Qualification fields
+          financing_type: consultationData.financingType,
+          down_payment: consultationData.downPayment,
+          credit_score_range: consultationData.creditScoreRange,
+          pre_approved: consultationData.preApproved || false,
+          timeline: consultationData.timeline,
+          buyer_type: consultationData.buyerType,
+          experience_level: consultationData.experienceLevel,
+          price_range_min: consultationData.priceRangeMin,
+          price_range_max: consultationData.priceRangeMax,
+          property_preferences: consultationData.propertyPreferences,
+          hear_about_us: consultationData.hearAboutUs
         }])
         .select()
 

@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { referralService } from '../services/referralService'
+import { consultationService } from '../services/database/consultationService'
 import { Phone, Mail, ChevronDown, CheckCircle, AlertCircle, Loader } from 'lucide-react'
 
 export default function AgentRequestForm({ property, onSuccess }) {
@@ -70,33 +70,31 @@ export default function AgentRequestForm({ property, onSuccess }) {
       if (!formData.phone.trim()) throw new Error('Phone is required')
       if (!profile?.state) throw new Error('Your state is required (from profile)')
 
-      const result = await referralService.submitAgentRequest(user.id, {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
-        userAddress: profile?.address,
+      // Call consultationService to create consultation with qualification data
+      const result = await consultationService.addConsultation({
+        customerName: `${formData.firstName} ${formData.lastName}`,
+        customerEmail: formData.email,
+        customerPhone: formData.phone,
         state: profile?.state,
-        preferredContact: formData.preferredContact,
+        consultationType: 'agent_callback_request',
+        status: 'pending',
 
+        // Qualification fields
         financingType: formData.financingType || null,
         downPayment: formData.downPayment || null,
         creditScoreRange: formData.creditScoreRange || null,
-        preApproved: formData.preApproved,
-
+        preApproved: formData.preApproved || false,
         timeline: formData.timeline || null,
         buyerType: formData.buyerType || null,
         experienceLevel: formData.experienceLevel || null,
-
         priceRangeMin: formData.priceRangeMin ? parseFloat(formData.priceRangeMin) : null,
         priceRangeMax: formData.priceRangeMax ? parseFloat(formData.priceRangeMax) : null,
-        propertyPreferences: {
+        propertyPreferences: formData.propertyCondition || formData.locationPreferences ? {
           condition: formData.propertyCondition,
           locationPreferences: formData.locationPreferences
-        },
-
-        questions: formData.questions || null,
-        hearAboutUs: formData.hearAboutUs || null
+        } : null,
+        hearAboutUs: formData.hearAboutUs || null,
+        message: formData.questions || null
       })
 
       if (!result.success) {

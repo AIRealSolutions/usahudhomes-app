@@ -229,6 +229,70 @@ const ConsultationCard = ({ consultation, onUpdate }) => {
             </div>
           )}
 
+          {/* Buyer Qualification Details */}
+          {(consultation.buyer_type || consultation.financing_type || consultation.timeline ||
+            consultation.price_range_min || consultation.price_range_max) && (
+            <div className="mb-4 pb-4 border-b border-gray-200">
+              <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-gray-600" />
+                Buyer Qualification
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {consultation.buyer_type && (
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium">Buyer Type</p>
+                    <p className="text-sm text-gray-900">{consultation.buyer_type}</p>
+                  </div>
+                )}
+                {consultation.experience_level && (
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium">Experience</p>
+                    <p className="text-sm text-gray-900">{consultation.experience_level}</p>
+                  </div>
+                )}
+                {consultation.financing_type && (
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium">Financing Type</p>
+                    <p className="text-sm text-gray-900">{consultation.financing_type}</p>
+                  </div>
+                )}
+                {consultation.credit_score_range && (
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium">Credit Score</p>
+                    <p className="text-sm text-gray-900">{consultation.credit_score_range}</p>
+                  </div>
+                )}
+                {consultation.down_payment && (
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium">Down Payment</p>
+                    <p className="text-sm text-gray-900">{consultation.down_payment}</p>
+                  </div>
+                )}
+                {consultation.pre_approved && (
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium">Pre-Approved</p>
+                    <p className="text-sm text-green-600 font-semibold">✓ Yes</p>
+                  </div>
+                )}
+                {consultation.timeline && (
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium">Timeline</p>
+                    <p className="text-sm text-gray-900">{consultation.timeline}</p>
+                  </div>
+                )}
+                {(consultation.price_range_min || consultation.price_range_max) && (
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium">Budget Range</p>
+                    <p className="text-sm text-gray-900 flex items-center gap-1">
+                      <DollarSign className="w-3 h-3" />
+                      {consultation.price_range_min?.toLocaleString() || '0'} - {consultation.price_range_max?.toLocaleString() || '∞'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* View Details Button with AI Agent */}
           {consultation.customer_id && (
             <div className="mb-3">
