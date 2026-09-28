@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
 export default function Login() {
@@ -10,6 +11,21 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const navigate = useNavigate()
+  const { getDashboardRoute, initialized } = useAuth()
+
+  useEffect(() => {
+    // If user is already authenticated, redirect to their dashboard
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session && initialized) {
+        const route = getDashboardRoute()
+        navigate(route)
+      }
+    }
+    if (initialized) {
+      checkAuth()
+    }
+  }, [initialized, navigate, getDashboardRoute])
 
   const handleAuth = async (e) => {
     e.preventDefault()
@@ -57,8 +73,11 @@ export default function Login() {
 
         if (error) throw error
 
-        // Redirect to dashboard
-        navigate('/dashboard')
+        // Wait a moment for auth context to update, then get the correct dashboard route
+        setTimeout(() => {
+          const route = getDashboardRoute()
+          navigate(route)
+        }, 500)
       }
     } catch (error) {
       setError(error.message)
@@ -70,6 +89,10 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">USAHUDhomes</h1>
+          <p className="text-gray-600">Broker & Admin Portal</p>
+        </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           {isSignUp ? 'Create your account' : 'Sign in to your account'}
         </h2>

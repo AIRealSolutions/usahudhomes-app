@@ -26,6 +26,7 @@ import AddressRevealGate from './components/AddressRevealGate'
 import PropertyRequestForm from './components/PropertyRequestForm'
 import AgentRequestForm from './components/AgentRequestForm'
 import SearchFilters from './components/SearchFilters'
+import RoleSelector from './components/RoleSelector'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -55,9 +56,6 @@ class ErrorBoundary extends React.Component {
 function Header() {
   const { user, role, signOut, isAdmin, isBroker, isEndUser } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-  // Debug logging
-  console.log('Header: user=', user?.email, 'role=', role, 'isAdmin()=', isAdmin?.(), 'isBroker()=', isBroker?.(), 'isEndUser()=', isEndUser?.())
 
   const handleSignOut = async () => {
     await signOut()
@@ -89,28 +87,21 @@ function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-8 items-center">
-            <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Home</Link>
-            <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Properties</Link>
-            <Link to="/how-it-works" className="text-gray-700 hover:text-blue-600 font-medium">How It Works</Link>
-            <Link to="/alerts" className="text-gray-700 hover:text-blue-600 font-medium">Home Alerts</Link>
-            <Link to="/deals" className="text-gray-700 hover:text-blue-600 font-medium">Successful Deals</Link>
-            {!user && <Link to="/broker/register" className="text-gray-700 hover:text-blue-600 font-medium">Become a Partner</Link>}
-            {!user && <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>}
-            {user ? (
+            {!user && (
               <>
-                <Link
-                  to={getDashboardPath()}
-                  className={`font-medium flex items-center px-3 py-2 rounded-lg ${
-                    isAdmin?.()
-                      ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                      : isBroker?.()
-                      ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                      : 'text-gray-700 hover:text-blue-600'
-                  }`}
-                >
-                  <User className="h-4 w-4 mr-1" />
-                  {getRoleLabel()}
-                </Link>
+                <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Home</Link>
+                <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Properties</Link>
+                <Link to="/how-it-works" className="text-gray-700 hover:text-blue-600 font-medium">How It Works</Link>
+                <Link to="/alerts" className="text-gray-700 hover:text-blue-600 font-medium">Home Alerts</Link>
+                <Link to="/deals" className="text-gray-700 hover:text-blue-600 font-medium">Successful Deals</Link>
+                <Link to="/broker/register" className="text-gray-700 hover:text-blue-600 font-medium">Become a Partner</Link>
+                <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>
+                <Link to="/login" className="text-gray-700 hover:text-blue-600 font-medium">Login</Link>
+              </>
+            )}
+            {user && (
+              <>
+                <RoleSelector />
                 <button
                   onClick={handleSignOut}
                   className="text-gray-700 hover:text-blue-600 font-medium flex items-center"
@@ -119,8 +110,6 @@ function Header() {
                   Logout
                 </button>
               </>
-            ) : (
-              <Link to="/login" className="text-gray-700 hover:text-blue-600 font-medium">Login</Link>
             )}
           </nav>
           
@@ -145,43 +134,43 @@ function Header() {
         {mobileMenuOpen && (
           <nav className="md:hidden mt-4 pb-4 border-t border-gray-200 pt-4">
             <div className="flex flex-col space-y-4">
-              <Link
-                to="/"
-                className="text-gray-700 hover:text-blue-600 font-medium"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Home
-              </Link>
-              <Link
-                to="/search"
-                className="text-gray-700 hover:text-blue-600 font-medium"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Search Properties
-              </Link>
-              <Link
-                to="/how-it-works"
-                className="text-gray-700 hover:text-blue-600 font-medium"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                How It Works
-              </Link>
-              <Link
-                to="/alerts"
-                className="text-gray-700 hover:text-blue-600 font-medium"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Home Alerts
-              </Link>
-              <Link
-                to="/deals"
-                className="text-gray-700 hover:text-blue-600 font-medium"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Successful Deals
-              </Link>
               {!user && (
                 <>
+                  <Link
+                    to="/"
+                    className="text-gray-700 hover:text-blue-600 font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Home
+                  </Link>
+                  <Link
+                    to="/search"
+                    className="text-gray-700 hover:text-blue-600 font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Search Properties
+                  </Link>
+                  <Link
+                    to="/how-it-works"
+                    className="text-gray-700 hover:text-blue-600 font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    How It Works
+                  </Link>
+                  <Link
+                    to="/alerts"
+                    className="text-gray-700 hover:text-blue-600 font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Home Alerts
+                  </Link>
+                  <Link
+                    to="/deals"
+                    className="text-gray-700 hover:text-blue-600 font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Successful Deals
+                  </Link>
                   <Link
                     to="/broker/register"
                     className="text-gray-700 hover:text-blue-600 font-medium"
@@ -196,24 +185,20 @@ function Header() {
                   >
                     Get Connected
                   </Link>
-                </>
-              )}
-              {user ? (
-                <>
                   <Link
-                    to={getDashboardPath()}
-                    className={`font-medium flex items-center px-3 py-2 rounded-lg ${
-                      isAdmin?.()
-                        ? 'bg-purple-100 text-purple-700'
-                        : isBroker?.()
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'text-gray-700'
-                    }`}
+                    to="/login"
+                    className="text-gray-700 hover:text-blue-600 font-medium"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    <User className="h-4 w-4 mr-1" />
-                    {getRoleLabel()}
+                    Login
                   </Link>
+                </>
+              )}
+              {user && (
+                <>
+                  <div onClick={() => setMobileMenuOpen(false)}>
+                    <RoleSelector />
+                  </div>
                   <button
                     onClick={() => {
                       handleSignOut()
@@ -225,14 +210,6 @@ function Header() {
                     Logout
                   </button>
                 </>
-              ) : (
-                <Link
-                  to="/login"
-                  className="text-gray-700 hover:text-blue-600 font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Login
-                </Link>
               )}
             </div>
           </nav>
