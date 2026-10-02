@@ -20,6 +20,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [role, setRole] = useState(null)
+  const [viewingAsRole, setViewingAsRole] = useState(null)
   const [loading, setLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
 
@@ -265,14 +266,24 @@ export const AuthProvider = ({ children }) => {
     return roles.includes(role)
   }
 
+  // Switch viewing role (for admins to view as other roles)
+  const switchViewingRole = (newRole) => {
+    if (role === 'admin') {
+      setViewingAsRole(newRole === role ? null : newRole)
+    }
+  }
+
+  // Get the current role to display (prioritize viewing role over actual role)
+  const getCurrentRole = () => viewingAsRole || role
+
   // Check if user is admin
-  const isAdmin = () => role === 'admin'
+  const isAdmin = () => getCurrentRole() === 'admin'
 
   // Check if user is broker
-  const isBroker = () => role === 'broker'
+  const isBroker = () => getCurrentRole() === 'broker'
 
   // Check if user is end user
-  const isEndUser = () => role === 'end_user'
+  const isEndUser = () => getCurrentRole() === 'end_user'
 
   // Get dashboard route based on role
   const getDashboardRoute = () => {
@@ -292,6 +303,7 @@ export const AuthProvider = ({ children }) => {
     user,
     profile,
     role,
+    viewingAsRole,
     loading,
     initialized,
     signUp,
@@ -305,6 +317,8 @@ export const AuthProvider = ({ children }) => {
     isBroker,
     isEndUser,
     getDashboardRoute,
+    switchViewingRole,
+    getCurrentRole,
     isAuthenticated: !!user
   }
 

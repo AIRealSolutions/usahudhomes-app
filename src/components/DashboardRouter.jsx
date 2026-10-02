@@ -14,7 +14,7 @@ import UserDashboard from '../pages/UserDashboard'
  * Unauthenticated -> Login
  */
 const DashboardRouter = () => {
-  const { user, role, loading } = useAuth()
+  const { user, loading, getCurrentRole } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -32,8 +32,9 @@ const DashboardRouter = () => {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // Route based on role
-  switch (role) {
+  // Route based on current role (includes viewing-as role override)
+  const currentRole = getCurrentRole()
+  switch (currentRole) {
     case 'admin':
       return <AdminShell initialTab="overview" />
     case 'broker':

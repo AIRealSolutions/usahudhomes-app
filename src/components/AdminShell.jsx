@@ -267,7 +267,7 @@ function Sidebar({ active, onNavigate, collapsed, onToggle, alerts }) {
 
 // ── Main Shell ───────────────────────────────────────────────────────────────
 export default function AdminShell({ initialTab = 'overview' }) {
-  const { user, signOut, isAdmin, isBroker } = useAuth()
+  const { user, signOut, isAdmin, isBroker, switchViewingRole } = useAuth()
   const navigate = useNavigate()
   const [activeTab, setActiveTab]     = useState(initialTab)
   const [collapsed, setCollapsed]     = useState(false)
@@ -402,7 +402,7 @@ export default function AdminShell({ initialTab = 'overview' }) {
                   {isAdmin?.() && (
                     <button
                       onClick={() => {
-                        navigate('/broker-dashboard')
+                        switchViewingRole('broker')
                         setRoleMenuOpen(false)
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"

@@ -1101,7 +1101,7 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
 
 // ── Main BrokerShell ──────────────────────────────────────────────────────────
 export default function BrokerShell({ user, showAdminAccess }) {
-  const { profile, signOut, isAdmin, isBroker } = useAuth()
+  const { profile, signOut, isAdmin, isBroker, switchViewingRole } = useAuth()
   const navigate = useNavigate()
   const [activePanel, setActivePanel]   = useState('overview')
   const [sidebarOpen, setSidebarOpen]   = useState(true)
@@ -1337,7 +1337,7 @@ export default function BrokerShell({ user, showAdminAccess }) {
                   {isAdmin?.() && (
                     <button
                       onClick={() => {
-                        navigate('/dashboard')
+                        switchViewingRole('admin')
                         setRoleMenuOpen(false)
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
