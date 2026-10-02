@@ -1,15 +1,16 @@
 import React from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import AdminDashboard from '../pages/AdminDashboard'
-import BrokerDashboard from '../pages/BrokerDashboard'
+import AdminShell from './AdminShell'
+import BrokerShell from './BrokerShell'
+import DashboardLayout from './DashboardLayout'
 import UserDashboard from '../pages/UserDashboard'
 
 /**
  * DashboardRouter - Routes users to the correct dashboard based on their role
- * Admin -> Admin Dashboard
- * Broker -> Broker Dashboard
- * End User -> User Dashboard
+ * Admin -> AdminShell
+ * Broker -> BrokerShell
+ * End User -> DashboardLayout + UserDashboard
  * Unauthenticated -> Login
  */
 const DashboardRouter = () => {
@@ -34,11 +35,15 @@ const DashboardRouter = () => {
   // Route based on role
   switch (role) {
     case 'admin':
-      return <AdminDashboard />
+      return <AdminShell initialTab="overview" />
     case 'broker':
-      return <BrokerDashboard />
+      return <BrokerShell user={user} />
     case 'end_user':
-      return <UserDashboard />
+      return (
+        <DashboardLayout currentRole="User">
+          <UserDashboard user={user} />
+        </DashboardLayout>
+      )
     default:
       // No role, redirect to login
       return <Navigate to="/login" state={{ from: location }} replace />
