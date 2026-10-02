@@ -24,6 +24,7 @@
  */
 
 import React, { useState, useEffect, lazy, Suspense } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../config/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -33,7 +34,7 @@ import {
   Film, Zap, BookOpen, Layout,
   Facebook, Bot, HardDrive, Trash2,
   LogOut, ChevronLeft, ChevronRight, Menu, X,
-  ChevronDown, ChevronUp, Bell
+  ChevronDown, ChevronUp, Bell, Shield, Briefcase, Settings
 } from 'lucide-react'
 
 // Lazy-load all admin panels
@@ -266,11 +267,18 @@ function Sidebar({ active, onNavigate, collapsed, onToggle, alerts }) {
 
 // ── Main Shell ───────────────────────────────────────────────────────────────
 export default function AdminShell({ initialTab = 'overview' }) {
-  const { user, signOut } = useAuth()
+  const { user, signOut, isAdmin, isBroker } = useAuth()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab]     = useState(initialTab)
   const [collapsed, setCollapsed]     = useState(false)
   const [mobileOpen, setMobileOpen]   = useState(false)
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false)
   const [alerts, setAlerts]           = useState({ newLeads: 0 })
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/')
+  }
 
   // Fetch alert counts
   useEffect(() => {
@@ -372,26 +380,55 @@ export default function AdminShell({ initialTab = 'overview' }) {
               </button>
             )}
 
-            {/* User info */}
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
-                <span className="text-xs font-bold text-white">
-                  {user?.email?.[0]?.toUpperCase() || 'A'}
-                </span>
-              </div>
-              <span className="text-xs font-medium text-gray-700 max-w-[120px] truncate">
-                {user?.email?.split('@')[0] || 'Admin'}
-              </span>
-            </div>
+            {/* Role Menu */}
+            <div className="relative">
+              <button
+                onClick={() => setRoleMenuOpen(!roleMenuOpen)}
+                className="flex items-center gap-2 px-2 sm:px-3 py-1.5 bg-purple-50 hover:bg-purple-100 rounded-lg border border-purple-200 transition-colors"
+              >
+                <Shield className="w-4 h-4 text-purple-600" />
+                <span className="hidden sm:inline text-xs font-medium text-purple-700">Admin</span>
+                <ChevronDown className={`w-3 h-3 text-purple-600 transition-transform ${roleMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-            {/* Logout */}
-            <button
-              onClick={signOut}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
+              {roleMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg z-50 py-2 border border-gray-200">
+                  <div className="px-4 py-2 border-b border-gray-100">
+                    <p className="text-xs text-gray-500">Current Role</p>
+                    <p className="font-medium text-gray-900">Admin Dashboard</p>
+                  </div>
+
+                  {isAdmin?.() && (
+                    <>
+                      <button
+                        onClick={() => {
+                          navigate('/broker-dashboard')
+                          setRoleMenuOpen(false)
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                      >
+                        <Briefcase className="w-4 h-4 text-blue-600" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">View as Broker</p>
+                          <p className="text-xs text-gray-500">See broker perspective</p>
+                        </div>
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      handleSignOut()
+                      setRoleMenuOpen(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-red-50 transition-colors text-red-600 hover:text-red-700"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="text-sm font-medium">Sign Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

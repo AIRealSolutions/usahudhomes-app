@@ -14,7 +14,7 @@ import {
   ChevronLeft, ChevronRight, Menu, X, LogOut, Bell, RefreshCw,
   Phone, Mail, CheckCircle, Clock, AlertCircle,
   ArrowRight, Inbox, Share2, User, BarChart2, Shield,
-  ChevronDown, Search, Trash2, AlertTriangle, CheckSquare, Square
+  ChevronDown, Search, Trash2, AlertTriangle, CheckSquare, Square, Briefcase
 } from 'lucide-react'
 
 // ── Lazy-loaded leaf components ───────────────────────────────────────────────
@@ -1101,11 +1101,12 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
 
 // ── Main BrokerShell ──────────────────────────────────────────────────────────
 export default function BrokerShell({ user, showAdminAccess }) {
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, isAdmin, isBroker } = useAuth()
   const navigate = useNavigate()
   const [activePanel, setActivePanel]   = useState('overview')
   const [sidebarOpen, setSidebarOpen]   = useState(true)
   const [collapsed, setCollapsed]       = useState(false)
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false)
   const [agentId, setAgentId]           = useState(null)
   const [agentName, setAgentName]       = useState('')
   const [alerts, setAlerts]             = useState({ activeLeads: 0, pendingReferrals: 0 })
@@ -1149,7 +1150,7 @@ export default function BrokerShell({ user, showAdminAccess }) {
 
   const handleSignOut = async () => {
     await signOut()
-    navigate('/login')
+    navigate('/')
   }
 
   // ── Render active panel ───────────────────────────────────────────────────
@@ -1313,8 +1314,55 @@ export default function BrokerShell({ user, showAdminAccess }) {
                 </span>
               </button>
             )}
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-              <User className="w-4 h-4 text-blue-600" />
+
+            {/* Role Menu */}
+            <div className="relative">
+              <button
+                onClick={() => setRoleMenuOpen(!roleMenuOpen)}
+                className="flex items-center gap-2 px-2 sm:px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
+              >
+                <Briefcase className="w-4 h-4 text-blue-600" />
+                <span className="hidden sm:inline text-xs font-medium text-blue-700">Broker</span>
+                <ChevronDown className={`w-3 h-3 text-blue-600 transition-transform ${roleMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {roleMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg z-50 py-2 border border-gray-200">
+                  <div className="px-4 py-2 border-b border-gray-100">
+                    <p className="text-xs text-gray-500">Current Role</p>
+                    <p className="font-medium text-gray-900">Broker Dashboard</p>
+                  </div>
+
+                  {isAdmin?.() && (
+                    <>
+                      <button
+                        onClick={() => {
+                          navigate('/dashboard')
+                          setRoleMenuOpen(false)
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                      >
+                        <Shield className="w-4 h-4 text-purple-600" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">View as Admin</p>
+                          <p className="text-xs text-gray-500">See admin perspective</p>
+                        </div>
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      handleSignOut()
+                      setRoleMenuOpen(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-red-50 transition-colors text-red-600 hover:text-red-700"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="text-sm font-medium">Sign Out</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
