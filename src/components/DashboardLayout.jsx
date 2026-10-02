@@ -181,7 +181,12 @@ export default function DashboardLayout({ children, currentRole }) {
                 </button>
 
                 {roleMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl z-50 py-2">
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl z-50 py-2 border border-gray-200">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <p className="text-xs text-gray-500 mb-1">Current Role</p>
+                      <p className="font-medium text-gray-900">{roleInfo.label} Dashboard</p>
+                      <p className="text-xs text-gray-500 mt-1">{user?.email}</p>
+                    </div>
                     {isAdmin?.() && (
                       <>
                         <button
@@ -202,7 +207,7 @@ export default function DashboardLayout({ children, currentRole }) {
                             navigate('/broker-dashboard')
                             setRoleMenuOpen(false)
                           }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50"
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100"
                         >
                           <Briefcase className="w-5 h-5 text-blue-600" />
                           <div>
@@ -218,7 +223,7 @@ export default function DashboardLayout({ children, currentRole }) {
                           navigate('/dashboard')
                           setRoleMenuOpen(false)
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50"
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100"
                       >
                         <Briefcase className="w-5 h-5 text-blue-600" />
                         <div>
@@ -227,6 +232,17 @@ export default function DashboardLayout({ children, currentRole }) {
                         </div>
                       </button>
                     )}
+                    <button
+                      onClick={() => {
+                        signOut()
+                        setRoleMenuOpen(false)
+                        navigate('/')
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-red-50 transition-colors text-red-600 hover:text-red-700"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span className="text-sm font-medium">Sign Out</span>
+                    </button>
                   </div>
                 )}
               </div>

@@ -1328,27 +1328,26 @@ export default function BrokerShell({ user, showAdminAccess }) {
 
               {roleMenuOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg z-50 py-2 border border-gray-200">
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="text-xs text-gray-500">Current Role</p>
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-xs text-gray-500 mb-1">Current Role</p>
                     <p className="font-medium text-gray-900">Broker Dashboard</p>
+                    <p className="text-xs text-gray-500 mt-1">{user?.email || profile?.email}</p>
                   </div>
 
                   {isAdmin?.() && (
-                    <>
-                      <button
-                        onClick={() => {
-                          navigate('/dashboard')
-                          setRoleMenuOpen(false)
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
-                      >
-                        <Shield className="w-4 h-4 text-purple-600" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">View as Admin</p>
-                          <p className="text-xs text-gray-500">See admin perspective</p>
-                        </div>
-                      </button>
-                    </>
+                    <button
+                      onClick={() => {
+                        navigate('/dashboard')
+                        setRoleMenuOpen(false)
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                    >
+                      <Shield className="w-4 h-4 text-purple-600" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">View as Admin</p>
+                        <p className="text-xs text-gray-500">See admin perspective</p>
+                      </div>
+                    </button>
                   )}
 
                   <button
@@ -1356,7 +1355,7 @@ export default function BrokerShell({ user, showAdminAccess }) {
                       handleSignOut()
                       setRoleMenuOpen(false)
                     }}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-red-50 transition-colors text-red-600 hover:text-red-700"
+                    className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-red-50 transition-colors text-red-600 hover:text-red-700 border-t border-gray-100"
                   >
                     <LogOut className="w-4 h-4" />
                     <span className="text-sm font-medium">Sign Out</span>
