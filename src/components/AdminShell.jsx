@@ -296,7 +296,7 @@ export default function AdminShell({ initialTab = 'overview' }) {
     return () => clearInterval(interval)
   }, [])
 
-  const navigate = (tab) => {
+  const goToTab = (tab) => {
     setActiveTab(tab)
     setMobileOpen(false)
   }
@@ -323,7 +323,7 @@ export default function AdminShell({ initialTab = 'overview' }) {
       <div className="hidden lg:flex flex-col flex-shrink-0">
         <Sidebar
           active={activeTab}
-          onNavigate={navigate}
+          onNavigate={goToTab}
           collapsed={collapsed}
           onToggle={() => setCollapsed(c => !c)}
           alerts={alerts}
@@ -338,7 +338,7 @@ export default function AdminShell({ initialTab = 'overview' }) {
         <div className="w-64 h-full">
           <Sidebar
             active={activeTab}
-            onNavigate={navigate}
+            onNavigate={goToTab}
             collapsed={false}
             onToggle={() => setMobileOpen(false)}
             alerts={alerts}
@@ -371,7 +371,7 @@ export default function AdminShell({ initialTab = 'overview' }) {
             {/* Alert bell */}
             {alerts.newLeads > 0 && (
               <button
-                onClick={() => navigate('leads')}
+                onClick={() => goToTab('leads')}
                 className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
                 title={`${alerts.newLeads} new leads`}
               >
