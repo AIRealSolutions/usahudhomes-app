@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../config/supabase'
 
 export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false)
@@ -11,21 +11,15 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const navigate = useNavigate()
-  const { getDashboardRoute, initialized } = useAuth()
+  const { getDashboardRoute, initialized, isAuthenticated } = useAuth()
 
   useEffect(() => {
     // If user is already authenticated, redirect to their dashboard
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session && initialized) {
-        const route = getDashboardRoute()
-        navigate(route)
-      }
+    if (isAuthenticated && initialized) {
+      const route = getDashboardRoute()
+      navigate(route)
     }
-    if (initialized) {
-      checkAuth()
-    }
-  }, [initialized, navigate, getDashboardRoute])
+  }, [isAuthenticated, initialized, navigate, getDashboardRoute])
 
   const handleAuth = async (e) => {
     e.preventDefault()
