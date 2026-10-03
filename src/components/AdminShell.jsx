@@ -267,7 +267,7 @@ function Sidebar({ active, onNavigate, collapsed, onToggle, alerts }) {
 
 // ── Main Shell ───────────────────────────────────────────────────────────────
 export default function AdminShell({ initialTab = 'overview' }) {
-  const { user, signOut, isAdmin, isBroker, switchViewingRole } = useAuth()
+  const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const [activeTab, setActiveTab]     = useState(initialTab)
   const [collapsed, setCollapsed]     = useState(false)
@@ -399,21 +399,26 @@ export default function AdminShell({ initialTab = 'overview' }) {
                     <p className="text-xs text-gray-500 mt-1">{user?.email}</p>
                   </div>
 
-                  {isAdmin?.() && (
-                    <button
-                      onClick={() => {
-                        switchViewingRole('broker')
-                        setRoleMenuOpen(false)
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
-                    >
-                      <Briefcase className="w-4 h-4 text-blue-600" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">View as Broker</p>
-                        <p className="text-xs text-gray-500">See broker perspective</p>
-                      </div>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      navigate('/dashboard')
+                      setRoleMenuOpen(false)
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                  >
+                    <LayoutDashboard className="w-4 h-4 text-gray-600" />
+                    <p className="text-sm font-medium text-gray-900">My Dashboard</p>
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/broker-dashboard')
+                      setRoleMenuOpen(false)
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                  >
+                    <Briefcase className="w-4 h-4 text-blue-600" />
+                    <p className="text-sm font-medium text-gray-900">Broker Portal</p>
+                  </button>
 
                   <button
                     onClick={() => {

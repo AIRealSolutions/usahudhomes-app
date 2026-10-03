@@ -1101,7 +1101,7 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
 
 // ── Main BrokerShell ──────────────────────────────────────────────────────────
 export default function BrokerShell({ user, showAdminAccess }) {
-  const { profile, signOut, isAdmin, isBroker, switchViewingRole } = useAuth()
+  const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const [activePanel, setActivePanel]   = useState('overview')
   const [sidebarOpen, setSidebarOpen]   = useState(true)
@@ -1334,20 +1334,29 @@ export default function BrokerShell({ user, showAdminAccess }) {
                     <p className="text-xs text-gray-500 mt-1">{user?.email || profile?.email}</p>
                   </div>
 
-                  {isAdmin?.() && (
-                    <button
-                      onClick={() => {
-                        switchViewingRole('admin')
-                        setRoleMenuOpen(false)
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
-                    >
-                      <Shield className="w-4 h-4 text-purple-600" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">View as Admin</p>
-                        <p className="text-xs text-gray-500">See admin perspective</p>
-                      </div>
-                    </button>
+                  <button
+                    onClick={() => {
+                      navigate('/dashboard')
+                      setRoleMenuOpen(false)
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                  >
+                    <LayoutDashboard className="w-4 h-4 text-gray-600" />
+                    <p className="text-sm font-medium text-gray-900">My Dashboard</p>
+                  </button>
+                  {showAdminAccess && (
+                    <>
+                  <button
+                    onClick={() => {
+                      navigate('/admin')
+                      setRoleMenuOpen(false)
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100"
+                  >
+                    <Shield className="w-4 h-4 text-purple-600" />
+                    <p className="text-sm font-medium text-gray-900">Admin Panel</p>
+                  </button>
+                    </>
                   )}
 
                   <button

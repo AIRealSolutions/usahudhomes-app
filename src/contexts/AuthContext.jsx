@@ -322,7 +322,9 @@ export const AuthProvider = ({ children }) => {
     getDashboardRoute,
     switchViewingRole,
     getCurrentRole,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
+    canAccessAdmin: role === 'admin',
+    canAccessBroker: role === 'broker' || role === 'admin'
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

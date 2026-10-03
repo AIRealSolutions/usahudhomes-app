@@ -7,15 +7,15 @@ import DashboardLayout from './DashboardLayout'
 import UserDashboard from '../pages/UserDashboard'
 
 /**
- * DashboardRouter - Always routes to UserDashboard first
- * Users see the general dashboard with options to access admin/broker areas based on their role
- * Unauthenticated -> Login
+ * /dashboard        → basic user dashboard (all signed-in users)
+ * /admin            → admin workspace (admins only)
+ * /broker-dashboard → broker workspace (brokers and admins)
  */
 const DashboardRouter = () => {
-  const { user, loading } = useAuth()
+  const { user, loading, initialized, canAccessAdmin, canAccessBroker } = useAuth()
   const location = useLocation()
 
-  if (loading) {
+  if (loading || !initialized) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -30,9 +30,18 @@ const DashboardRouter = () => {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // Always show UserDashboard first - they can navigate to admin/broker from there
+  if (location.pathname === '/admin') {
+    return canAccessAdmin ? <AdminShell /> : <Navigate to="/dashboard" replace />
+  }
+
+  if (location.pathname === '/broker-dashboard') {
+    return canAccessBroker
+      ? <BrokerShell user={user} showAdminAccess={canAccessAdmin} />
+      : <Navigate to="/dashboard" replace />
+  }
+
   return (
-    <DashboardLayout currentRole="User">
+    <DashboardLayout>
       <UserDashboard user={user} />
     </DashboardLayout>
   )

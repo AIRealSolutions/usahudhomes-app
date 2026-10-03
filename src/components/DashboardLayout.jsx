@@ -12,7 +12,7 @@ import {
  * Provides consistent navigation and role switching for all dashboard types
  */
 export default function DashboardLayout({ children, currentRole }) {
-  const { user, isAdmin, isBroker, isEndUser, signOut } = useAuth()
+  const { user, role, canAccessAdmin, canAccessBroker, signOut } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -24,10 +24,10 @@ export default function DashboardLayout({ children, currentRole }) {
   }
 
   const getRoleInfo = () => {
-    if (isAdmin?.()) {
+    if (role === 'admin') {
       return { label: 'Admin', color: 'text-purple-600', bgColor: 'bg-purple-50', icon: Shield }
     }
-    if (isBroker?.()) {
+    if (role === 'broker') {
       return { label: 'Broker', color: 'text-blue-600', bgColor: 'bg-blue-50', icon: Briefcase }
     }
     return { label: 'User', color: 'text-gray-600', bgColor: 'bg-gray-50', icon: User }
@@ -36,36 +36,13 @@ export default function DashboardLayout({ children, currentRole }) {
   const roleInfo = getRoleInfo()
   const RoleIcon = roleInfo.icon
 
-  const getNavItems = () => {
-    if (isAdmin?.()) {
-      return [
-        { id: 'overview', label: 'Overview', icon: LayoutDashboard, path: '/dashboard' },
-        { id: 'leads', label: 'Leads', icon: FileText, path: '/admin/leads' },
-        { id: 'brokers', label: 'Brokers', icon: Users, path: '/admin/brokers' },
-        { id: 'properties', label: 'Properties', icon: Home, path: '/admin/properties' },
-        { id: 'analytics', label: 'Analytics', icon: TrendingUp, path: '/admin/analytics' },
-        { id: 'settings', label: 'Settings', icon: Settings, path: '/admin/settings' }
-      ]
-    }
-    if (isBroker?.()) {
-      return [
-        { id: 'overview', label: 'Overview', icon: LayoutDashboard, path: '/dashboard' },
-        { id: 'leads', label: 'My Leads', icon: FileText, path: '/broker/leads' },
-        { id: 'properties', label: 'Properties', icon: Home, path: '/broker/properties' },
-        { id: 'analytics', label: 'Analytics', icon: TrendingUp, path: '/broker/analytics' },
-        { id: 'settings', label: 'Settings', icon: Settings, path: '/broker/settings' }
-      ]
-    }
-    // End User
-    return [
-      { id: 'overview', label: 'My Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-      { id: 'inquiries', label: 'My Inquiries', icon: FileText, path: '/user/inquiries' },
-      { id: 'alerts', label: 'Alerts', icon: Bell, path: '/alerts' },
-      { id: 'settings', label: 'Settings', icon: Settings, path: '/user/settings' }
-    ]
-  }
-
-  const navItems = getNavItems()
+  const navItems = [
+    { id: 'overview', label: 'My Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { id: 'search', label: 'Search Homes', icon: Search, path: '/search' },
+    { id: 'alerts', label: 'Home Alerts', icon: Bell, path: '/alerts' },
+    ...(canAccessBroker ? [{ id: 'broker', label: 'Broker Portal', icon: Briefcase, path: '/broker-dashboard', workspace: true }] : []),
+    ...(canAccessAdmin ? [{ id: 'admin', label: 'Admin Panel', icon: Shield, path: '/admin', workspace: true }] : [])
+  ]
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
@@ -160,7 +137,7 @@ export default function DashboardLayout({ children, currentRole }) {
 
             {/* Title */}
             <h1 className="hidden md:block text-xl font-semibold text-gray-900">
-              {currentRole || roleInfo.label} Dashboard
+              {currentRole || 'My'} Dashboard
             </h1>
 
             {/* Right Actions */}
@@ -183,55 +160,26 @@ export default function DashboardLayout({ children, currentRole }) {
                 {roleMenuOpen && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl z-50 py-2 border border-gray-200">
                     <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="text-xs text-gray-500 mb-1">Current Role</p>
-                      <p className="font-medium text-gray-900">{roleInfo.label} Dashboard</p>
+                      <p className="text-xs text-gray-500 mb-1">Signed in as</p>
+                      <p className="font-medium text-gray-900">{roleInfo.label}</p>
                       <p className="text-xs text-gray-500 mt-1">{user?.email}</p>
                     </div>
-                    {isAdmin?.() && (
-                      <>
+                    {navItems.filter(i => i.workspace).map(item => {
+                      const ItemIcon = item.icon
+                      return (
                         <button
+                          key={item.id}
                           onClick={() => {
-                            navigate('/dashboard')
+                            navigate(item.path)
                             setRoleMenuOpen(false)
                           }}
                           className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100"
                         >
-                          <Shield className="w-5 h-5 text-purple-600" />
-                          <div>
-                            <p className="font-medium text-gray-900 text-sm">Admin Dashboard</p>
-                            <p className="text-xs text-gray-500">Manage all systems</p>
-                          </div>
+                          <ItemIcon className={`w-5 h-5 ${item.id === 'admin' ? 'text-purple-600' : 'text-blue-600'}`} />
+                          <p className="font-medium text-gray-900 text-sm">{item.label}</p>
                         </button>
-                        <button
-                          onClick={() => {
-                            navigate('/broker-dashboard')
-                            setRoleMenuOpen(false)
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100"
-                        >
-                          <Briefcase className="w-5 h-5 text-blue-600" />
-                          <div>
-                            <p className="font-medium text-gray-900 text-sm">Broker View</p>
-                            <p className="text-xs text-gray-500">See broker perspective</p>
-                          </div>
-                        </button>
-                      </>
-                    )}
-                    {isBroker?.() && (
-                      <button
-                        onClick={() => {
-                          navigate('/dashboard')
-                          setRoleMenuOpen(false)
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100"
-                      >
-                        <Briefcase className="w-5 h-5 text-blue-600" />
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">Broker Portal</p>
-                          <p className="text-xs text-gray-500">Your leads & properties</p>
-                        </div>
-                      </button>
-                    )}
+                      )
+                    })}
                     <button
                       onClick={() => {
                         signOut()

@@ -1,91 +1,60 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { Shield, Briefcase, User, ChevronDown } from 'lucide-react'
+import { Shield, Briefcase, User, ChevronDown, LayoutDashboard } from 'lucide-react'
 
 export default function RoleSelector() {
-  const authContext = useAuth()
-  const { role } = authContext
-  const isAdmin = typeof authContext.isAdmin === 'function' ? authContext.isAdmin() : false
-  const isBroker = typeof authContext.isBroker === 'function' ? authContext.isBroker() : false
+  const { user, role, canAccessAdmin, canAccessBroker } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
 
-  if (!role) {
+  if (!user) {
     return null
   }
 
-  const getRoleInfo = () => {
-    if (isAdmin) {
-      return { label: 'Admin Panel', icon: Shield, color: 'text-purple-600', bgColor: 'bg-purple-50' }
-    }
-    if (isBroker) {
-      return { label: 'Broker Portal', icon: Briefcase, color: 'text-blue-600', bgColor: 'bg-blue-50' }
-    }
-    return { label: 'My Account', icon: User, color: 'text-gray-600', bgColor: 'bg-gray-50' }
-  }
+  const current =
+    role === 'admin' ? { label: 'Admin', icon: Shield, color: 'text-purple-600', bgColor: 'bg-purple-50' }
+    : role === 'broker' ? { label: 'Broker', icon: Briefcase, color: 'text-blue-600', bgColor: 'bg-blue-50' }
+    : { label: 'My Account', icon: User, color: 'text-gray-600', bgColor: 'bg-gray-50' }
+  const CurrentIcon = current.icon
 
-  const currentRole = getRoleInfo()
-  const CurrentIcon = currentRole.icon
-
-  const handleMenuClick = (path) => {
-    navigate(path)
-    setIsOpen(false)
-  }
+  const items = [
+    { path: '/dashboard', label: 'My Dashboard', sub: 'Your account home', icon: LayoutDashboard, color: 'text-gray-600' },
+    ...(canAccessBroker ? [{ path: '/broker-dashboard', label: 'Broker Portal', sub: 'Leads & referrals', icon: Briefcase, color: 'text-blue-600' }] : []),
+    ...(canAccessAdmin ? [{ path: '/admin', label: 'Admin Panel', sub: 'Manage all operations', icon: Shield, color: 'text-purple-600' }] : [])
+  ]
 
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${currentRole.bgColor} ${currentRole.color} hover:opacity-80`}
         type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${current.bgColor} ${current.color} hover:opacity-80`}
       >
         <CurrentIcon className="w-4 h-4" />
-        <span className="hidden sm:inline">{currentRole.label}</span>
+        <span className="hidden sm:inline">{current.label}</span>
         <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
         <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-lg shadow-xl z-50 py-2">
-          {isAdmin && (
-            <>
-              <button
-                onClick={() => handleMenuClick('/dashboard')}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 transition-colors"
-                type="button"
-              >
-                <Shield className="w-5 h-5 text-purple-600" />
-                <div>
-                  <p className="font-medium text-gray-900">Admin Dashboard</p>
-                  <p className="text-sm text-gray-600">Manage all operations</p>
-                </div>
-              </button>
-              <button
-                onClick={() => handleMenuClick('/dashboard')}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-                type="button"
-              >
-                <Briefcase className="w-5 h-5 text-blue-600" />
-                <div>
-                  <p className="font-medium text-gray-900">View Broker Perspective</p>
-                  <p className="text-sm text-gray-600">See broker view</p>
-                </div>
-              </button>
-            </>
-          )}
-          {isBroker && (
+          {items.map(({ path, label, sub, icon: Icon, color }) => (
             <button
-              onClick={() => handleMenuClick('/dashboard')}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+              key={path}
               type="button"
+              onClick={() => {
+                navigate(path)
+                setIsOpen(false)
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 border-b last:border-b-0 border-gray-100 transition-colors"
             >
-              <Briefcase className="w-5 h-5 text-blue-600" />
+              <Icon className={`w-5 h-5 ${color}`} />
               <div>
-                <p className="font-medium text-gray-900">Broker Portal</p>
-                <p className="text-sm text-gray-600">Your active leads</p>
+                <p className="font-medium text-gray-900">{label}</p>
+                <p className="text-sm text-gray-600">{sub}</p>
               </div>
             </button>
-          )}
+          ))}
         </div>
       )}
     </div>
