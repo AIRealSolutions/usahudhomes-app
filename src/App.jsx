@@ -13,6 +13,9 @@ import LeadDetailsPage from './pages/LeadDetailsPage'
 import ContactForm from './pages/ContactForm'
 import ContactThankYou from './pages/ContactThankYou'
 import AgentRegistration from './components/agent/AgentRegistration'
+import VerifyEmail from './components/agent/VerifyEmail'
+import ApplicationSubmitted from './components/agent/ApplicationSubmitted'
+import ResendVerification from './components/agent/ResendVerification'
 import SuccessfulDeals from './components/SuccessfulDeals'
 import FullAdminDashboard from './components/AdminShell'
 import BrokerShell from './components/BrokerShell'
@@ -1148,6 +1151,9 @@ export default function App() {
               <Route path="/contact" element={<ContactForm />} />
               <Route path="/contact/thank-you" element={<ContactThankYou />} />
               <Route path="/broker/register" element={<AgentRegistration />} />
+              <Route path="/agent/application-submitted" element={<ApplicationSubmitted />} />
+              <Route path="/agent/verify-email" element={<VerifyEmail />} />
+              <Route path="/agent/resend-verification" element={<ResendVerification />} />
               <Route path="/admin/leads/:id" element={<LeadDetailsPage />} />
               <Route path="/deals" element={<SuccessfulDeals />} />
             </Routes>

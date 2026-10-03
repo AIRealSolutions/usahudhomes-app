@@ -139,10 +139,13 @@ const AgentRegistration = () => {
     setIsSubmitting(true)
 
     try {
-      // Get user's IP address for audit trail
-      const ipResponse = await fetch('https://api.ipify.org?format=json')
-      const ipData = await ipResponse.json()
-      formData.ipAddress = ipData.ip
+      // IP is for the audit trail only; ad blockers often block this lookup.
+      try {
+        const ipResponse = await fetch('https://api.ipify.org?format=json')
+        formData.ipAddress = (await ipResponse.json()).ip
+      } catch {
+        formData.ipAddress = null
+      }
 
       // Import and call the agent application service
       const { agentApplicationService } = await import('../../services/database')
@@ -150,7 +153,7 @@ const AgentRegistration = () => {
 
       if (result.success) {
         // Navigate to success page with application ID
-        navigate(`/agent/application-submitted?id=${result.data.id}`)
+        navigate(`/agent/application-submitted?id=${result.data.id}`, { state: { application: result.data } })
       } else {
         setErrors({ submit: result.error || 'Failed to submit application. Please try again.' })
       }

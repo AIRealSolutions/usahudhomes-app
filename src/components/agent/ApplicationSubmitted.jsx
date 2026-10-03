@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams, useLocation, Link } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { CheckCircle, Mail, Clock, FileText, Home, RefreshCw } from 'lucide-react'
@@ -8,14 +8,19 @@ import { agentApplicationService } from '../../services/agentApplicationService'
 const ApplicationSubmitted = () => {
   const [searchParams] = useSearchParams()
   const applicationId = searchParams.get('id')
-  const [application, setApplication] = useState(null)
-  const [loading, setLoading] = useState(true)
+  // Passed from the registration form; applicants can't read agent_applications back under RLS.
+  const passedApplication = useLocation().state?.application || null
+  const [application, setApplication] = useState(passedApplication)
+  const [loading, setLoading] = useState(!passedApplication)
   const [resendingEmail, setResendingEmail] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
 
   useEffect(() => {
+    if (passedApplication) return
     if (applicationId) {
       loadApplication()
+    } else {
+      setLoading(false)
     }
   }, [applicationId])
 

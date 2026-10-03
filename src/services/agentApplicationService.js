@@ -13,7 +13,7 @@ export const agentApplicationService = {
   async submitApplication(applicationData) {
     try {
       // Generate email verification token
-      const verificationToken = Math.random().toString(36).substring(2) + Date.now().toString(36)
+      const verificationToken = crypto.randomUUID().replace(/-/g, '')
 
       // Prepare application data
       const application = {
@@ -52,14 +52,17 @@ export const agentApplicationService = {
       await this.logVerificationAction(data.id, null, 'application_submitted', 'Application submitted by agent')
 
       // Send verification email
-      await this.sendVerificationEmail(data.id, applicationData.email, verificationToken, applicationData.firstName)
+      await this.sendVerificationEmail(data, verificationToken)
 
       return {
         success: true,
         data: {
           id: data.id,
           email: data.email,
-          status: data.status
+          first_name: data.first_name,
+          last_name: data.last_name,
+          status: data.status,
+          email_verified: false
         }
       }
     } catch (error) {
@@ -74,23 +77,10 @@ export const agentApplicationService = {
   /**
    * Send email verification link
    */
-  async sendVerificationEmail(applicationId, email, token, firstName) {
+  async sendVerificationEmail(application, token) {
     try {
-      // Get full application data
-      const { data: application } = await supabase
-        .from('agent_applications')
-        .select('*')
-        .eq('id', applicationId)
-        .single()
-
-      if (!application) throw new Error('Application not found')
-
-      // Use the new email service
       const result = await emailService.sendAgentVerificationEmail(application, token)
-
-      // Log email sent
-      await this.logVerificationAction(applicationId, null, 'verification_email_sent', `Verification email sent to ${email}`)
-
+      await this.logVerificationAction(application.id, null, 'verification_email_sent', `Verification email sent to ${application.email}`)
       return result
     } catch (error) {
       console.error('Error sending verification email:', error)
@@ -99,110 +89,44 @@ export const agentApplicationService = {
   },
 
   /**
-   * Verify email with token
+   * Verify email with token (server-side: applicants can't read agent_applications under RLS)
    */
   async verifyEmail(token) {
     try {
-      // Find application with this token
-      const { data: application, error: findError } = await supabase
-        .from('agent_applications')
-        .select('*')
-        .eq('email_verification_token', token)
-        .eq('email_verified', false)
-        .single()
-
-      if (findError || !application) {
-        return {
-          success: false,
-          error: 'Invalid or expired verification token'
-        }
+      const response = await fetch('/api/notifications?action=agent-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || !result.success) {
+        return { success: false, error: result.error || 'Invalid or expired verification token' }
       }
-
-      // Check if token is expired (24 hours)
-      const createdAt = new Date(application.created_at)
-      const now = new Date()
-      const hoursDiff = (now - createdAt) / (1000 * 60 * 60)
-
-      if (hoursDiff > 24) {
-        return {
-          success: false,
-          error: 'Verification link has expired. Please request a new one.'
-        }
-      }
-
-      // Update application as verified
-      const { error: updateError } = await supabase
-        .from('agent_applications')
-        .update({
-          email_verified: true,
-          email_verified_at: new Date().toISOString(),
-          email_verification_token: null,
-          status: 'under_review'
-        })
-        .eq('id', application.id)
-
-      if (updateError) throw updateError
-
-      // Log verification
-      await this.logVerificationAction(application.id, null, 'email_verified', 'Email address verified successfully')
-
-      // Notify admins of new application
-      await this.notifyAdminsOfNewApplication(application)
-
-      return {
-        success: true,
-        data: {
-          id: application.id,
-          email: application.email,
-          firstName: application.first_name
-        }
-      }
+      return { success: true, data: result.data }
     } catch (error) {
       console.error('Error verifying email:', error)
-      return {
-        success: false,
-        error: error.message || 'Failed to verify email'
-      }
+      return { success: false, error: 'Failed to verify email' }
     }
   },
 
   /**
-   * Resend verification email
+   * Resend verification email (server issues the new token)
    */
   async resendVerificationEmail(email) {
     try {
-      // Find pending application
-      const { data: application, error } = await supabase
-        .from('agent_applications')
-        .select('*')
-        .eq('email', email.toLowerCase())
-        .eq('email_verified', false)
-        .eq('status', 'pending')
-        .single()
-
-      if (error || !application) {
-        return {
-          success: false,
-          error: 'No pending application found for this email'
-        }
+      const response = await fetch('/api/notifications?action=agent-resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || !result.success) {
+        return { success: false, error: result.error || 'Failed to resend verification email' }
       }
-
-      // Generate new token
-      const newToken = Math.random().toString(36).substring(2) + Date.now().toString(36)
-
-      // Update token
-      await supabase
-        .from('agent_applications')
-        .update({ email_verification_token: newToken })
-        .eq('id', application.id)
-
-      // Send new email
-      await this.sendVerificationEmail(application.id, email, newToken, application.first_name)
-
       return { success: true }
     } catch (error) {
       console.error('Error resending verification email:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: 'Failed to resend verification email' }
     }
   },
 
