@@ -7,14 +7,12 @@ import DashboardLayout from './DashboardLayout'
 import UserDashboard from '../pages/UserDashboard'
 
 /**
- * DashboardRouter - Routes users to the correct dashboard based on their role
- * Admin -> AdminShell
- * Broker -> BrokerShell
- * End User -> DashboardLayout + UserDashboard
+ * DashboardRouter - Always routes to UserDashboard first
+ * Users see the general dashboard with options to access admin/broker areas based on their role
  * Unauthenticated -> Login
  */
 const DashboardRouter = () => {
-  const { user, loading, getCurrentRole } = useAuth()
+  const { user, loading } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -32,23 +30,12 @@ const DashboardRouter = () => {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // Route based on current role (includes viewing-as role override)
-  const currentRole = getCurrentRole()
-  switch (currentRole) {
-    case 'admin':
-      return <AdminShell initialTab="overview" />
-    case 'broker':
-      return <BrokerShell user={user} />
-    case 'end_user':
-      return (
-        <DashboardLayout currentRole="User">
-          <UserDashboard user={user} />
-        </DashboardLayout>
-      )
-    default:
-      // No role, redirect to login
-      return <Navigate to="/login" state={{ from: location }} replace />
-  }
+  // Always show UserDashboard first - they can navigate to admin/broker from there
+  return (
+    <DashboardLayout currentRole="User">
+      <UserDashboard user={user} />
+    </DashboardLayout>
+  )
 }
 
 export default DashboardRouter
