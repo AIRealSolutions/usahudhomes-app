@@ -1,5 +1,5 @@
 import { supabase } from '../config/supabase'
-import { eventService, EVENT_TYPES, EVENT_CATEGORIES, EVENT_SOURCES } from './database/eventService'
+import { assignLeadToAgent } from './database/leadService'
 
 /**
  * Facebook Leads Import Service
@@ -87,9 +87,9 @@ class FacebookLeadsImportService {
   }
 
   /**
-   * Transform Facebook lead to consultation format
+   * Transform Facebook lead to lead format
    * @param {Object} fbLead - Raw Facebook lead data
-   * @returns {Object} Transformed consultation data
+   * @returns {Object} Transformed lead data
    */
   transformLead(fbLead) {
     // Extract name parts
@@ -356,8 +356,7 @@ class FacebookLeadsImportService {
   async importLeads(leads, options = {}) {
     const {
       skipDuplicates = true,
-      assignToAgent = null,
-      defaultStatus = 'new'
+      assignToAgent = null
     } = options
 
     const results = {
@@ -373,7 +372,7 @@ class FacebookLeadsImportService {
         // Check for duplicates by email or phone
         if (skipDuplicates) {
           const { data: existing } = await supabase
-            .from('consultations')
+            .from('leads')
             .select('id, email, phone')
             .or(`email.eq.${lead.email},phone.eq.${lead.phone}`)
             .limit(1)
@@ -384,90 +383,84 @@ class FacebookLeadsImportService {
           }
         }
 
-        // Create consultation (lead) - customer will be created when assigned to broker
-        const consultationData = {
-          customer_id: null, // Will be set when assigned to broker
-          first_name: lead.first_name,
-          last_name: lead.last_name,
-          email: lead.email,
-          phone: lead.phone,
-          budget_min: lead.budget_min,
-          budget_max: lead.budget_max,
-          preferred_location: lead.preferred_location,
-          state: lead.state,
-          timeline: lead.timeline,
-          notes: lead.notes,
-          source: lead.source,
-          source_details: lead.source_details,
-          status: defaultStatus,
-          priority: lead.priority,
-          consultation_date: lead.consultation_date,
-          created_at: lead.created_at
-        }
-
-        // Assign to agent if specified
-        if (assignToAgent) {
-          consultationData.assigned_agent_id = assignToAgent
-        }
-
-        const { data: consultation, error: consultationError } = await supabase
-          .from('consultations')
-          .insert(consultationData)
+        // Imported leads land in the leads table like every other intake
+        const { data: newLead, error: leadError } = await supabase
+          .from('leads')
+          .insert({
+            first_name: lead.first_name,
+            last_name: lead.last_name,
+            email: lead.email,
+            phone: lead.phone,
+            budget_min: lead.budget_min,
+            budget_max: lead.budget_max,
+            preferred_location: lead.preferred_location,
+            state: lead.state,
+            timeline: lead.timeline,
+            notes: lead.notes,
+            source: lead.source,
+            source_details: lead.source_details,
+            status: 'new_lead',
+            priority: lead.priority,
+            created_at: lead.created_at
+          })
           .select()
           .single()
 
-        if (consultationError) {
+        if (leadError) {
           results.failed++
           results.errors.push({
             lead: `${lead.first_name} ${lead.last_name}`,
-            error: consultationError.message
+            error: leadError.message
           })
           continue
         }
 
         // Log Facebook lead import event with all original data
-        try {
-          await eventService.logEvent({
-            customerId: null, // No customer yet - will be created when assigned to broker
-            consultationId: consultation.id,
-            agentId: assignToAgent || null,
-            eventType: EVENT_TYPES.FACEBOOK_LEAD_IMPORTED,
-            eventCategory: EVENT_CATEGORIES.ONBOARDING,
-            eventTitle: 'Facebook Lead Imported',
-            eventDescription: `Lead imported from Facebook ${lead.source_details.platform === 'ig' ? 'Instagram' : 'Lead'} Ad`,
-            eventData: {
-              facebook_id: lead.source_details.facebook_id,
-              platform: lead.source_details.platform,
-              campaign_name: lead.source_details.campaign_name,
-              ad_name: lead.source_details.ad_name,
-              form_name: lead.source_details.form_name,
-              created_time: lead.source_details.created_time,
-              original_data: {
-                full_name: `${lead.first_name} ${lead.last_name}`,
-                email: lead.email,
-                phone: lead.phone,
-                raw_budget: lead.source_details.raw_budget,
-                raw_location: lead.source_details.raw_location,
-                raw_timeline: lead.source_details.raw_timeline
-              },
-              parsed_data: {
-                budget_min: lead.budget_min,
-                budget_max: lead.budget_max,
-                preferred_location: lead.preferred_location,
-                state: lead.state,
-                timeline: lead.timeline,
-                priority: lead.priority
-              }
+        const { error: eventError } = await supabase.from('lead_events').insert({
+          lead_id: newLead.id,
+          event_type: 'facebook_lead_imported',
+          event_data: {
+            facebook_id: lead.source_details.facebook_id,
+            platform: lead.source_details.platform,
+            campaign_name: lead.source_details.campaign_name,
+            ad_name: lead.source_details.ad_name,
+            form_name: lead.source_details.form_name,
+            created_time: lead.source_details.created_time,
+            original_data: {
+              full_name: `${lead.first_name} ${lead.last_name}`,
+              email: lead.email,
+              phone: lead.phone,
+              raw_budget: lead.source_details.raw_budget,
+              raw_location: lead.source_details.raw_location,
+              raw_timeline: lead.source_details.raw_timeline
             },
-            source: EVENT_SOURCES.SYSTEM
-          })
-        } catch (eventError) {
-          console.error('Failed to log Facebook import event:', eventError)
-          // Don't fail the import if event logging fails
+            parsed_data: {
+              budget_min: lead.budget_min,
+              budget_max: lead.budget_max,
+              preferred_location: lead.preferred_location,
+              state: lead.state,
+              timeline: lead.timeline,
+              priority: lead.priority
+            }
+          }
+        })
+        // Don't fail the import if event logging fails
+        if (eventError) console.error('Failed to log Facebook import event:', eventError)
+
+        // Assign to agent if specified (same path as assigning from the Leads Hub)
+        if (assignToAgent) {
+          try {
+            await assignLeadToAgent(newLead, assignToAgent)
+          } catch (assignError) {
+            results.errors.push({
+              lead: `${lead.first_name} ${lead.last_name}`,
+              error: `Imported, but agent assignment failed: ${assignError.message}`
+            })
+          }
         }
 
         results.success++
-        results.imported.push(consultation)
+        results.imported.push(newLead)
       } catch (error) {
         results.failed++
         results.errors.push({

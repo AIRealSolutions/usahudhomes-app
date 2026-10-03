@@ -12,7 +12,7 @@
  *   POST ?action=agent-resend-verification — issue and email a new verification link
  *   POST ?action=lead-email — broker/admin emails a lead via Gmail (Bearer token required)
  *   POST ?action=lead-sms   — broker/admin texts a lead via Twilio (Bearer token required)
- *   POST ?action=consultation-request — signed-in buyer asks for an agent callback
+ *   POST ?action=consultation-request — signed-in buyer asks for an agent callback (saved as a lead)
  *
  * agent-email and sms also require a broker/admin Bearer token.
  *
@@ -392,8 +392,8 @@ async function notifyAdminsOfLead({ consultation, customer, property }) {
 }
 
 // ─── Action: consultation request (signed-in buyer) ───────────────────────────
-// Buyers can't read or write customers/consultations under RLS, so the server
-// finds or creates the customer record and the consultation on their behalf.
+// Buyers can't read or write customers under RLS, so the server finds or creates
+// the customer record and files the request as a new lead on their behalf.
 const CONSULTATION_TYPES = ['agent_callback_request', 'property_inquiry']
 
 async function handleConsultationRequest(req, res) {
@@ -430,18 +430,28 @@ async function handleConsultationRequest(req, res) {
     if (!customerId) return res.status(500).json({ success: false, error: 'Could not save your request. Please try again.' })
   }
 
-  const rows = await supabaseFetch('consultations', {
+  const propertyId = /^[0-9a-f-]{36}$/i.test(String(b.propertyId || '')) ? b.propertyId : null
+  const prop = propertyId
+    ? (await supabaseFetch(`properties?select=address,city,state,price&id=eq.${propertyId}&limit=1`))?.[0]
+    : null
+
+  // Requests land in leads like every other intake; an admin assigns them from the Leads Hub.
+  const rows = await supabaseFetch('leads', {
     method: 'POST',
     headers: { Prefer: 'return=representation' },
     body: JSON.stringify({
       customer_id: customerId,
-      property_id: /^[0-9a-f-]{36}$/i.test(String(b.propertyId || '')) ? b.propertyId : null,
-      case_number: str(b.caseNumber, 40),
-      consultation_type: CONSULTATION_TYPES.includes(b.consultationType) ? b.consultationType : 'agent_callback_request',
-      status: 'pending',
-      customer_name: `${firstName} ${lastName}`,
-      customer_email: email,
-      customer_phone: phone,
+      property_id: propertyId,
+      property_case_number: str(b.caseNumber, 40),
+      property_address: prop ? [prop.address, prop.city, prop.state].filter(Boolean).join(', ') : null,
+      property_price: prop?.price ?? null,
+      lead_type: CONSULTATION_TYPES.includes(b.consultationType) ? b.consultationType : 'agent_callback_request',
+      status: 'new_lead',
+      source: 'agent_request',
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      phone,
       state,
       message: str(b.message, 4000),
       financing_type: str(b.financingType, 60),
@@ -457,27 +467,27 @@ async function handleConsultationRequest(req, res) {
       hear_about_us: str(b.hearAboutUs, 120),
     }),
   })
-  const consultation = rows?.[0]
-  if (!consultation) return res.status(500).json({ success: false, error: 'Could not save your request. Please try again.' })
+  const lead = rows?.[0]
+  if (!lead) return res.status(500).json({ success: false, error: 'Could not save your request. Please try again.' })
 
-  await supabaseWrite('customer_events', 'POST', {
-    customer_id: customerId,
-    consultation_id: consultation.id,
-    event_type: 'consultation_created',
-    event_category: 'consultation',
-    event_title: 'Lead Created',
-    event_description: `${consultation.consultation_type} submitted from the website`,
-    event_data: { case_number: consultation.case_number, requested_by: caller.id },
-    source: 'website',
+  await supabaseWrite('lead_events', 'POST', {
+    lead_id: lead.id,
+    event_type: 'lead_received',
+    event_data: {
+      source: 'agent_request',
+      form_type: lead.lead_type,
+      property_case_number: lead.property_case_number,
+      requested_by: caller.id,
+    },
   })
 
   try {
-    await notifyAdminsOfLead({ consultation, property: { state } })
+    await notifyAdminsOfLead({ customer: { name: `${firstName} ${lastName}`, email, phone }, property: { state } })
   } catch (e) {
     console.error('[lead-request] admin notification failed:', e.message)
   }
 
-  return res.status(200).json({ success: true, data: { id: consultation.id } })
+  return res.status(200).json({ success: true, data: { id: lead.id } })
 }
 
 // ─── Action: direct SMS ───────────────────────────────────────────────────────

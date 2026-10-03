@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../config/supabase'
+import { assignLeadToAgent } from '../../services/database/leadService'
 import {
   Search, Filter, Eye, Calendar, MapPin, DollarSign, Home,
   AlertCircle, Phone, Mail, User, Clock, CheckCircle,
@@ -123,69 +124,7 @@ function NewLeadsTab({ onNavigate }) {
     try {
       const lead = leads.find(l => l.id === leadId)
       if (!lead) return
-
-      // Find or create customer
-      let customerId = lead.customer_id
-      if (!customerId) {
-        // Try to find existing customer by email
-        if (lead.email) {
-          const { data: existing } = await supabase
-            .from('customers')
-            .select('id')
-            .eq('email', lead.email)
-            .eq('is_active', true)
-            .limit(1)
-          if (existing?.length) {
-            customerId = existing[0].id
-          }
-        }
-        // Create customer if not found
-        if (!customerId) {
-          const { data: newCust } = await supabase
-            .from('customers')
-            .insert([{
-              first_name: lead.first_name,
-              last_name: lead.last_name,
-              email: lead.email,
-              phone: lead.phone,
-              state: lead.state,
-              lead_source: lead.source || 'website',
-              status: 'active',
-              is_active: true,
-            }])
-            .select('id')
-            .single()
-          if (newCust) customerId = newCust.id
-        }
-      }
-
-      // Update lead
-      await supabase
-        .from('leads')
-        .update({
-          customer_id: customerId,
-          status: 'under_review',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', leadId)
-
-      // Create consultation for the broker
-      await supabase
-        .from('consultations')
-        .insert([{
-          customer_id: customerId,
-          agent_id: agentId,
-          first_name: lead.first_name,
-          last_name: lead.last_name,
-          email: lead.email,
-          phone: lead.phone,
-          state: lead.state,
-          message: lead.message,
-          source: lead.source,
-          status: 'new',
-          is_deleted: false,
-        }])
-
+      await assignLeadToAgent(lead, agentId)
       await fetchLeads()
     } catch (e) {
       console.error('Assign agent error:', e)

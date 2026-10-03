@@ -51,8 +51,7 @@ const FacebookLeadsImport = ({ onImportComplete }) => {
         preview.leads,
         {
           skipDuplicates: skipDuplicates,
-          assignToAgent: assignAgent || null,
-          defaultStatus: 'new'
+          assignToAgent: assignAgent || null
         }
       )
 
