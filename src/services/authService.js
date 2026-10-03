@@ -52,10 +52,10 @@ class AuthService {
         .select()
         .single()
 
+      // The on_auth_user_created trigger already created the profile; without a session
+      // (email confirmation pending) RLS rejects this insert, which is expected.
       if (profileError) {
-        console.error('Profile creation error:', profileError)
-        // Auth user created but profile failed - should handle cleanup
-        return { success: false, error: profileError.message, data: authData }
+        console.warn('Client profile insert skipped:', profileError.message)
       }
 
       return {
