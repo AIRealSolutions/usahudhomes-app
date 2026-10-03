@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, lazy, Suspense } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate, useLocation } from 'react-router-dom'
 import { HelmetProvider } from 'react-helmet-async'
@@ -10,6 +10,9 @@ import Dashboard from './pages/Dashboard'
 import DashboardRouter from './components/DashboardRouter'
 import LeadDetail from './pages/LeadDetail'
 import LeadDetailsPage from './pages/LeadDetailsPage'
+import ProtectedRoute from './components/ProtectedRoute'
+import Unauthorized from './components/Unauthorized'
+const CustomerDetailsPage = lazy(() => import('./components/admin/CustomerDetailsPage'))
 import ContactForm from './pages/ContactForm'
 import ContactThankYou from './pages/ContactThankYou'
 import AgentRegistration from './components/agent/AgentRegistration'
@@ -1155,6 +1158,9 @@ export default function App() {
               <Route path="/agent/verify-email" element={<VerifyEmail />} />
               <Route path="/agent/resend-verification" element={<ResendVerification />} />
               <Route path="/admin/leads/:id" element={<LeadDetailsPage />} />
+              <Route path="/admin/customer/:customerId" element={<ProtectedRoute allowedRoles={['admin']}><Suspense fallback={null}><CustomerDetailsPage /></Suspense></ProtectedRoute>} />
+              <Route path="/admin-dashboard" element={<Navigate to="/admin" replace />} />
+              <Route path="/unauthorized" element={<Unauthorized />} />
               <Route path="/deals" element={<SuccessfulDeals />} />
             </Routes>
           </main>

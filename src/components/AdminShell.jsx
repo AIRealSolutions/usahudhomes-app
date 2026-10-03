@@ -301,6 +301,12 @@ export default function AdminShell({ initialTab = 'overview' }) {
     setMobileOpen(false)
   }
 
+  // Panels call onNavigate with either a tab id ('leads') or a route path ('/admin/leads/123')
+  const handlePanelNavigate = (target, options) => {
+    if (typeof target === 'string' && COMPONENT_MAP[target]) goToTab(target)
+    else navigate(target, options)
+  }
+
   // Find active label for breadcrumb
   const allItems = NAV.flatMap(n => n.items || [n]).filter(n => n.id)
   const activeItem = allItems.find(i => i.id === activeTab)
@@ -447,7 +453,7 @@ export default function AdminShell({ initialTab = 'overview' }) {
                 </div>
               </div>
             }>
-              <ActiveComponent onNavigate={navigate} />
+              <ActiveComponent onNavigate={handlePanelNavigate} />
             </Suspense>
           </div>
         </main>
