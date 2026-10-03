@@ -39,3 +39,19 @@ do $$ declare t text; begin
     execute format('revoke truncate, references, trigger on public.%I from anon, authenticated', t);
   end loop;
 end $$;
+
+-- SECURITY DEFINER functions bypass RLS; nothing signed-out should call them.
+-- Trigger functions still fire (EXECUTE isn't checked when a trigger fires).
+alter policy "Authenticated users can manage activities" on public.activities to authenticated;
+do $$ declare f regprocedure; begin
+  for f in select p.oid::regprocedure from pg_proc p where p.pronamespace='public'::regnamespace and p.prosecdef
+    and p.proname in ('accept_referral','assign_consultation_to_broker','decline_referral','expire_referrals','get_lead_statistics','get_user_role','handle_new_auth_user','is_admin','is_broker','is_broker_or_admin','log_communication','my_agent_ids','restore_consultation','restore_customer','users_before_insert','users_guard_insert_role','users_protect_role')
+  loop
+    execute format('revoke execute on function %s from public, anon', f);
+  end loop;
+  for f in select p.oid::regprocedure from pg_proc p where p.pronamespace='public'::regnamespace
+    and p.proname in ('handle_new_auth_user','users_before_insert','users_guard_insert_role','users_protect_role')
+  loop
+    execute format('revoke execute on function %s from authenticated', f);
+  end loop;
+end $$;
