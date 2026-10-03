@@ -36,6 +36,8 @@ export default function DashboardLayout({ children, currentRole }) {
   const roleInfo = getRoleInfo()
   const RoleIcon = roleInfo.icon
 
+  const expanded = sidebarOpen || mobileMenuOpen
+
   const navItems = [
     { id: 'overview', label: 'My Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { id: 'search', label: 'Search Homes', icon: Search, path: '/search' },
@@ -46,35 +48,47 @@ export default function DashboardLayout({ children, currentRole }) {
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setMobileMenuOpen(false)} />
+      )}
+
       {/* Sidebar */}
       <div
-        className={`fixed md:relative inset-y-0 left-0 z-50 bg-white shadow-lg transition-all duration-300 ${
-          sidebarOpen ? 'w-64' : 'w-0 md:w-20'
-        } overflow-hidden`}
+        className={`fixed md:relative inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transition-all duration-300 overflow-hidden ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        } md:translate-x-0 ${sidebarOpen ? 'md:w-64' : 'md:w-20'}`}
       >
         {/* Logo/Brand */}
-        <div className={`flex items-center justify-between p-4 border-b border-gray-200 ${sidebarOpen ? '' : 'flex-col'}`}>
-          <div className={`flex items-center gap-2 ${sidebarOpen ? '' : 'flex-col'}`}>
+        <div className={`flex items-center justify-between p-4 border-b border-gray-200 ${expanded ? '' : 'flex-col'}`}>
+          <div className={`flex items-center gap-2 ${expanded ? '' : 'flex-col'}`}>
             <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
               <LayoutDashboard className="w-6 h-6 text-white" />
             </div>
-            {sidebarOpen && <span className="font-bold text-gray-900">Portal</span>}
+            {expanded && <span className="font-bold text-gray-900">Portal</span>}
           </div>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="hidden md:block p-1 hover:bg-gray-100 rounded"
+            aria-label={sidebarOpen ? 'Collapse menu' : 'Expand menu'}
           >
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="md:hidden p-1 hover:bg-gray-100 rounded"
+            aria-label="Close menu"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* User Info */}
-        <div className={`p-4 border-b border-gray-200 ${sidebarOpen ? '' : 'text-center'}`}>
-          <div className={`flex items-center gap-2 mb-2 ${sidebarOpen ? '' : 'justify-center'}`}>
+        <div className={`p-4 border-b border-gray-200 ${expanded ? '' : 'text-center'}`}>
+          <div className={`flex items-center gap-2 mb-2 ${expanded ? '' : 'justify-center'}`}>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${roleInfo.bgColor}`}>
               <RoleIcon className={`w-4 h-4 ${roleInfo.color}`} />
             </div>
-            {sidebarOpen && (
+            {expanded && (
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm text-gray-900 truncate">{user?.email}</p>
                 <p className={`text-xs ${roleInfo.color}`}>{roleInfo.label}</p>
@@ -96,12 +110,12 @@ export default function DashboardLayout({ children, currentRole }) {
                     setMobileMenuOpen(false)
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                    sidebarOpen ? '' : 'justify-center'
+                    expanded ? '' : 'justify-center'
                   } hover:bg-gray-100 text-gray-700 hover:text-blue-600`}
-                  title={sidebarOpen ? '' : item.label}
+                  title={expanded ? '' : item.label}
                 >
                   <ItemIcon className="w-5 h-5 flex-shrink-0" />
-                  {sidebarOpen && <span className="text-sm font-medium">{item.label}</span>}
+                  {expanded && <span className="text-sm font-medium">{item.label}</span>}
                 </button>
               )
             })}
@@ -113,11 +127,11 @@ export default function DashboardLayout({ children, currentRole }) {
           <button
             onClick={handleSignOut}
             className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-              sidebarOpen ? '' : 'justify-center'
+              expanded ? '' : 'justify-center'
             } hover:bg-red-50 text-red-600 hover:text-red-700`}
           >
             <LogOut className="w-5 h-5" />
-            {sidebarOpen && <span className="text-sm font-medium">Logout</span>}
+            {expanded && <span className="text-sm font-medium">Logout</span>}
           </button>
         </div>
       </div>
@@ -129,8 +143,9 @@ export default function DashboardLayout({ children, currentRole }) {
           <div className="flex items-center justify-between px-4 py-4">
             {/* Mobile Menu Button */}
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={() => setMobileMenuOpen(true)}
               className="md:hidden p-2 hover:bg-gray-100 rounded-lg"
+              aria-label="Open menu"
             >
               <Menu className="w-6 h-6" />
             </button>
@@ -197,30 +212,6 @@ export default function DashboardLayout({ children, currentRole }) {
             </div>
           </div>
         </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-b border-gray-200 p-4">
-            <div className="space-y-2">
-              {navItems.map((item) => {
-                const ItemIcon = item.icon
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      navigate(item.path)
-                      setMobileMenuOpen(false)
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors hover:bg-gray-100 text-gray-700 hover:text-blue-600"
-                  >
-                    <ItemIcon className="w-5 h-5" />
-                    <span className="text-sm font-medium">{item.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Content Area */}
         <main className="flex-1 overflow-auto">

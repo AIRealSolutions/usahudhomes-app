@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate, useLocation } from 'react-router-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import { supabase } from './config/supabase'
 import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User, Menu } from 'lucide-react'
@@ -54,8 +54,13 @@ class ErrorBoundary extends React.Component {
 
 // Header Component
 function Header() {
-  const { user, role, signOut, isAdmin, isBroker, isEndUser } = useAuth()
+  const { user, role, signOut, isAdmin, isBroker, isEndUser, canAccessAdmin, canAccessBroker } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const location = useLocation()
+
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [location.pathname])
 
   const handleSignOut = async () => {
     await signOut()
@@ -80,9 +85,9 @@ function Header() {
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex justify-between items-center">
-          <Link to="/" className="flex items-center">
-            <HomeIcon className="h-8 w-8 text-blue-600 mr-2" />
-            <span className="text-2xl font-bold text-gray-900">USAHUDhomes.com</span>
+          <Link to="/" className="flex items-center min-w-0">
+            <HomeIcon className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 mr-2 flex-shrink-0" />
+            <span className="text-lg sm:text-2xl font-bold text-gray-900 truncate">USAHUDhomes.com</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -113,7 +118,7 @@ function Header() {
             )}
           </nav>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
             <a href="tel:9103636147" className="flex items-center text-blue-600 hover:text-blue-700 font-semibold">
               <Phone className="h-5 w-5 mr-2" />
               <span className="hidden sm:inline">910-363-6147</span>
@@ -123,9 +128,10 @@ function Header() {
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden p-2 text-gray-700 hover:text-blue-600"
-              aria-label="Toggle menu"
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileMenuOpen}
             >
-              <Menu className="h-6 w-6" />
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
         </div>
@@ -196,9 +202,19 @@ function Header() {
               )}
               {user && (
                 <>
-                  <div onClick={() => setMobileMenuOpen(false)}>
-                    <RoleSelector />
-                  </div>
+                  <Link to="/dashboard" className="text-gray-700 hover:text-blue-600 font-medium">
+                    My Dashboard
+                  </Link>
+                  {canAccessBroker && (
+                    <Link to="/broker-dashboard" className="text-gray-700 hover:text-blue-600 font-medium">
+                      Broker Portal
+                    </Link>
+                  )}
+                  {canAccessAdmin && (
+                    <Link to="/admin" className="text-gray-700 hover:text-blue-600 font-medium">
+                      Admin Panel
+                    </Link>
+                  )}
                   <button
                     onClick={() => {
                       handleSignOut()
