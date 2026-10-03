@@ -170,16 +170,10 @@ export const AuthProvider = ({ children }) => {
   // Sign in (memoized to prevent unnecessary re-renders)
   const signIn = useCallback(async (email, password) => {
     try {
-      console.log('AuthContext.signIn called with email:', email)
       setLoading(true)
       const result = await authService.signIn(email, password)
-      console.log('authService.signIn returned:', result)
 
       if (result.success && result.data) {
-        console.log('Sign in successful, updating state')
-        console.log('User:', result.data.user)
-        console.log('Profile:', result.data.profile)
-        console.log('Role:', result.data.role)
 
         setUser(result.data.user)
         setProfile(result.data.profile)

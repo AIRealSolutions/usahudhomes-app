@@ -16,7 +16,6 @@ export default function Login() {
   useEffect(() => {
     // If user is already authenticated, redirect to dashboard
     if (isAuthenticated && initialized) {
-      console.log('User authenticated in useEffect, redirecting to dashboard')
       navigate('/dashboard', { replace: true })
     }
   }, [isAuthenticated, initialized])
@@ -45,9 +44,7 @@ export default function Login() {
         setIsSignUp(false)
       } else {
         // Sign in existing user using AuthContext
-        console.log('Attempting sign in with email:', email)
         const result = await signIn(email, password)
-        console.log('Sign in result:', result)
 
         if (!result.success) {
           const errorMsg = result.error || 'Sign in failed'
@@ -55,7 +52,6 @@ export default function Login() {
           throw new Error(errorMsg)
         }
 
-        console.log('Sign in successful, waiting for state update to trigger useEffect redirect')
         // Don't navigate here - let the useEffect handle it after state updates
         // This avoids race conditions with async state updates
       }

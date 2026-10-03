@@ -46,12 +46,8 @@ class AuthService {
           id: authData.user.id,
           email,
           role,
-          first_name: firstName,
-          last_name: lastName,
-          phone,
-          state,
-          address,
-          is_active: true
+          name: [firstName, lastName].filter(Boolean).join(' ') || null,
+          phone
         })
         .select()
         .single()
@@ -88,14 +84,12 @@ class AuthService {
         console.error('Supabase not configured')
         return { success: false, error: 'Database not configured', data: null }
       }
-      console.log('authService.signIn: Attempting Supabase auth with email:', email)
       // Authenticate user
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password
       })
 
-      console.log('Supabase auth response - authData:', authData?.user?.id ? 'user found' : 'no user', 'error:', authError)
 
       if (authError) {
         console.error('Supabase auth signin error:', authError)
@@ -121,9 +115,7 @@ class AuthService {
           .insert({
             id: authData.user.id,
             email: authData.user.email,
-            role: 'end_user',
-            is_active: true,
-            created_at: new Date().toISOString()
+            role: 'end_user'
           })
           .select()
           .single()
@@ -140,17 +132,17 @@ class AuthService {
         profileData = newProfile
       }
 
-      // Check if user is active
-      if (!profileData.is_active) {
+      // users table has no is_active column; only block when explicitly disabled
+      if (profileData.is_active === false) {
         await this.signOut()
         return { success: false, error: 'Account is inactive', data: null }
       }
 
-      // Update last login
-      await supabase
+      supabase
         .from('users')
-        .update({ last_login_at: new Date().toISOString() })
+        .update({ last_signed_in: new Date().toISOString() })
         .eq('id', authData.user.id)
+        .then(({ error }) => error && console.warn('last_signed_in update failed:', error.message))
 
       return {
         success: true,
@@ -410,19 +402,20 @@ class AuthService {
       return { data: { subscription: { unsubscribe: () => {} } } }
     }
     
-    return supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        // Get profile
+    return supabase.auth.onAuthStateChange((event, session) => {
+      if (!session?.user) {
+        callback(event, null, null)
+        return
+      }
+      // Awaiting Supabase calls inside this callback deadlocks the auth lock; defer them.
+      setTimeout(async () => {
         const { data: profileData } = await supabase
           .from('users')
           .select('*')
           .eq('id', session.user.id)
           .single()
-
         callback(event, session, profileData)
-      } else {
-        callback(event, null, null)
-      }
+      }, 0)
     })
   }
 }
