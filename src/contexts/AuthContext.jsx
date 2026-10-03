@@ -3,7 +3,7 @@
  * Provides authentication state and methods throughout the app
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { authService } from '../services/authService'
 
 const AuthContext = createContext({})
@@ -139,8 +139,8 @@ export const AuthProvider = ({ children }) => {
     }
   }, [initialized])
 
-  // Sign up
-  const signUp = async (userData) => {
+  // Sign up (memoized to prevent unnecessary re-renders)
+  const signUp = useCallback(async (userData) => {
     try {
       setLoading(true)
       const result = await authService.signUp(userData)
@@ -165,10 +165,10 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  // Sign in
-  const signIn = async (email, password) => {
+  // Sign in (memoized to prevent unnecessary re-renders)
+  const signIn = useCallback(async (email, password) => {
     try {
       console.log('AuthContext.signIn called with email:', email)
       setLoading(true)
@@ -202,10 +202,10 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  // Sign out
-  const signOut = async () => {
+  // Sign out (memoized to prevent unnecessary re-renders)
+  const signOut = useCallback(async () => {
     try {
       setLoading(true)
       const result = await authService.signOut()
@@ -225,10 +225,10 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   // Update profile
-  const updateProfile = async (updates) => {
+  const updateProfile = useCallback(async (updates) => {
     try {
       if (!user) {
         return { success: false, error: 'No authenticated user' }
@@ -246,34 +246,34 @@ export const AuthProvider = ({ children }) => {
       console.error('Error in updateProfile:', error)
       return { success: false, error: error.message }
     }
-  }
+  }, [user])
 
   // Reset password
-  const resetPassword = async (email) => {
+  const resetPassword = useCallback(async (email) => {
     try {
       return await authService.resetPassword(email)
     } catch (error) {
       console.error('Error in resetPassword:', error)
       return { success: false, error: error.message }
     }
-  }
+  }, [])
 
   // Update password
-  const updatePassword = async (newPassword) => {
+  const updatePassword = useCallback(async (newPassword) => {
     try {
       return await authService.updatePassword(newPassword)
     } catch (error) {
       console.error('Error in updatePassword:', error)
       return { success: false, error: error.message }
     }
-  }
+  }, [])
 
   // Check if user has role
-  const hasRole = (allowedRoles) => {
+  const hasRole = useCallback((allowedRoles) => {
     if (!role) return false
     const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles]
     return roles.includes(role)
-  }
+  }, [role])
 
   // Switch viewing role (for admins to view as other roles)
   const switchViewingRole = (newRole) => {

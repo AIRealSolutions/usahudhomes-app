@@ -16,9 +16,10 @@ export default function Login() {
   useEffect(() => {
     // If user is already authenticated, redirect to dashboard
     if (isAuthenticated && initialized) {
+      console.log('User authenticated in useEffect, redirecting to dashboard')
       navigate('/dashboard', { replace: true })
     }
-  }, [isAuthenticated, initialized, navigate])
+  }, [isAuthenticated, initialized])
 
   const handleAuth = async (e) => {
     e.preventDefault()
