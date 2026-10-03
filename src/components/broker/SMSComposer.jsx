@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { sendLeadText } from '../../services/leadMessaging'
 import { useAuth } from '../../contexts/AuthContext'
 import { consultationService } from '../../services/database/consultationService'
 import { X, MessageSquare, Send, Sparkles } from 'lucide-react'
@@ -62,14 +63,20 @@ const SMSComposer = ({ consultation, customer, property, onSend, onCancel }) => 
 
     setSending(true)
     try {
-      // Log the SMS communication
+      const sent = await sendLeadText({ to: customer.phone, body: message })
+      if (!sent.success) {
+        alert('Text not sent: ' + (sent.error || 'Unknown error'))
+        return
+      }
+
       const result = await consultationService.logCommunication(
         consultation.id,
         profile.id,
         'sms_sent',
         {
           to: customer.phone,
-          message: message
+          message: message,
+          via: sent.via
         }
       )
 
@@ -87,18 +94,11 @@ const SMSComposer = ({ consultation, customer, property, onSend, onCancel }) => 
             }
           ).catch(err => console.error('Failed to log SMS event:', err))
         }
-        
-        // Open SMS app (works on mobile devices)
-        const smsLink = `sms:${customer.phone}?body=${encodeURIComponent(message)}`
-        window.location.href = smsLink
-        
-        // Call onSend after a short delay
-        setTimeout(() => {
-          onSend()
-        }, 1000)
       } else {
-        alert('Failed to log SMS: ' + (result.error || 'Unknown error'))
+        console.error('Text sent but not logged:', result.error)
       }
+      if (sent.via === 'twilio') alert(`Text sent to ${customer.phone}`)
+      onSend()
     } catch (error) {
       console.error('Error sending SMS:', error)
       alert('Failed to send SMS. Please try again.')

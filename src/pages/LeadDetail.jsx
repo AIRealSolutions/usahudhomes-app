@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { sendLeadEmail, sendLeadText } from '../services/leadMessaging';
 import { US_STATES } from '../utils/states';
 import { 
   ArrowLeft, Edit2, Save, X, Mail, Phone, MessageSquare, 
@@ -20,6 +21,8 @@ export default function LeadDetail() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [eventType, setEventType] = useState('');
   const [eventNotes, setEventNotes] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [sending, setSending] = useState(false);
   const [loadingProperties, setLoadingProperties] = useState(false);
   const [selectedProperties, setSelectedProperties] = useState([]);
 
@@ -197,9 +200,29 @@ export default function LeadDetail() {
   };
 
   const submitEvent = async () => {
-    await logEvent(eventType, eventNotes);
+    if (eventType === 'email' || eventType === 'sms') {
+      if (!eventNotes.trim() || (eventType === 'email' && !emailSubject.trim())) {
+        alert(eventType === 'email' ? 'Please enter a subject and message' : 'Please enter a message');
+        return;
+      }
+      setSending(true);
+      const sent = eventType === 'email'
+        ? await sendLeadEmail({ to: (lead.email || lead.customer_email), subject: emailSubject, body: eventNotes })
+        : await sendLeadText({ to: (lead.phone || lead.customer_phone), body: eventNotes });
+      setSending(false);
+      if (!sent.success) {
+        alert(`${eventType === 'email' ? 'Email' : 'Text'} not sent: ${sent.error || 'Unknown error'}`);
+        return;
+      }
+      if (eventType === 'email') alert(`Email sent to ${(lead.email || lead.customer_email)}`);
+      else if (sent.via === 'twilio') alert(`Text sent to ${(lead.phone || lead.customer_phone)}`);
+      await logEvent(eventType, eventType === 'email' ? `Subject: ${emailSubject}\n\n${eventNotes}` : eventNotes);
+    } else {
+      await logEvent(eventType, eventNotes);
+    }
     setShowEventModal(false);
     setEventNotes('');
+    setEmailSubject('');
   };
 
   const handleStatusChange = async (newStatus) => {
@@ -744,20 +767,34 @@ export default function LeadDetail() {
       {showEventModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-semibold mb-4 capitalize">Log {eventType}</h3>
+            <h3 className="text-xl font-semibold mb-1">
+              {eventType === 'email' ? 'Send Email' : eventType === 'sms' ? 'Send Text' : `Log ${eventType}`}
+            </h3>
+            {(eventType === 'email' || eventType === 'sms') && (
+              <p className="text-sm text-gray-600 mb-3">To: {eventType === 'email' ? (lead.email || lead.customer_email) : (lead.phone || lead.customer_phone)}</p>
+            )}
+            {eventType === 'email' && (
+              <input
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                placeholder="Subject"
+                className="w-full px-3 py-2 border rounded-lg mb-3"
+              />
+            )}
             <textarea
               value={eventNotes}
               onChange={(e) => setEventNotes(e.target.value)}
-              placeholder="Enter notes about this interaction..."
-              rows={4}
+              placeholder={eventType === 'email' || eventType === 'sms' ? 'Type your message' : 'Enter notes about this interaction...'}
+              rows={eventType === 'email' ? 8 : 4}
               className="w-full px-3 py-2 border rounded-lg mb-4"
             />
             <div className="flex gap-2">
               <button
                 onClick={submitEvent}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                disabled={sending}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                Save
+                {sending ? 'Sending…' : eventType === 'email' || eventType === 'sms' ? 'Send' : 'Save'}
               </button>
               <button
                 onClick={() => {

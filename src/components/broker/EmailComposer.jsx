@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { sendLeadEmail } from '../../services/leadMessaging'
 import { useAuth } from '../../contexts/AuthContext'
 import { consultationService } from '../../services/database/consultationService'
 import { X, Mail, Send, FileText, Sparkles } from 'lucide-react'
@@ -176,7 +177,12 @@ ${profile.email || '[Your Email]'}`
 
     setSending(true)
     try {
-      // Log the email communication
+      const sent = await sendLeadEmail({ to: customer.email, subject, body })
+      if (!sent.success) {
+        alert('Email not sent: ' + (sent.error || 'Unknown error'))
+        return
+      }
+
       const result = await consultationService.logCommunication(
         consultation.id,
         profile.id,
@@ -204,19 +210,11 @@ ${profile.email || '[Your Email]'}`
             }
           ).catch(err => console.error('Failed to log email event:', err))
         }
-        
-        // In a real app, this would actually send the email via an email service
-        // For now, we just open the user's email client
-        const mailtoLink = `mailto:${customer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-        window.location.href = mailtoLink
-        
-        // Call onSend after a short delay to allow mailto to open
-        setTimeout(() => {
-          onSend()
-        }, 1000)
       } else {
-        alert('Failed to log email: ' + (result.error || 'Unknown error'))
+        console.error('Email sent but not logged:', result.error)
       }
+      alert(`Email sent to ${customer.email}`)
+      onSend()
     } catch (error) {
       console.error('Error sending email:', error)
       alert('Failed to send email. Please try again.')

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../config/supabase';
+import { sendLeadEmail, sendLeadText } from '../services/leadMessaging';
 import { 
   ArrowLeft, Phone, Mail, MessageSquare, Calendar, MapPin, 
   DollarSign, Home, User, Clock, FileText, Send, X, Check,
@@ -175,21 +176,26 @@ export default function LeadDetailsPage() {
     }
 
     try {
+      const sent = await sendLeadEmail({ to: lead.email, subject: emailSubject, body: emailBody });
+      if (!sent.success) {
+        alert('Email not sent: ' + (sent.error || 'Unknown error'));
+        return;
+      }
       await logEvent('email_sent', {
+        to: lead.email,
         subject: emailSubject,
         body: emailBody,
         template: selectedTemplate?.name
       });
 
-      // TODO: Integrate with actual email sending service
-      alert('Email logged successfully! (Email sending integration pending)');
+      alert(`Email sent to ${lead.email}`);
       setShowEmailModal(false);
       setEmailSubject('');
       setEmailBody('');
       setSelectedTemplate(null);
     } catch (error) {
       console.error('Error sending email:', error);
-      alert('Failed to log email');
+      alert('Failed to send email');
     }
   };
 
@@ -221,17 +227,23 @@ export default function LeadDetailsPage() {
     }
 
     try {
+      const sent = await sendLeadText({ to: lead.phone, body: textMessage });
+      if (!sent.success) {
+        alert('Text not sent: ' + (sent.error || 'Unknown error'));
+        return;
+      }
       await logEvent('text_sent', {
         message: textMessage,
-        phone: lead.phone
+        phone: lead.phone,
+        via: sent.via
       });
 
-      alert('Text logged successfully!');
+      if (sent.via === 'twilio') alert(`Text sent to ${lead.phone}`);
       setShowTextModal(false);
       setTextMessage('');
     } catch (error) {
-      console.error('Error logging text:', error);
-      alert('Failed to log text');
+      console.error('Error sending text:', error);
+      alert('Failed to send text');
     }
   };
 
@@ -716,7 +728,7 @@ export default function LeadDetailsPage() {
           <div className="bg-white rounded-lg max-w-md w-full">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Log Text Message</h2>
+                <h2 className="text-xl font-semibold">Send Text Message</h2>
                 <button onClick={() => setShowTextModal(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="h-6 w-6" />
                 </button>
@@ -731,7 +743,7 @@ export default function LeadDetailsPage() {
                   onChange={(e) => setTextMessage(e.target.value)}
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="What did you text?"
+                  placeholder="Type your message"
                 />
               </div>
               <div className="flex justify-end gap-3">
@@ -745,7 +757,7 @@ export default function LeadDetailsPage() {
                   onClick={handleLogText}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                  Log Text
+                  Send Text
                 </button>
               </div>
             </div>

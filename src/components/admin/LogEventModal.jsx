@@ -23,14 +23,14 @@ const LogEventModal = ({
     switch (eventType) {
       case 'email':
         return {
-          title: 'Log Email Communication',
+          title: 'Send Email',
           icon: Mail,
           color: 'blue',
           fields: ['subject', 'message']
         }
       case 'sms':
         return {
-          title: 'Log SMS Communication',
+          title: 'Send Text Message',
           icon: MessageSquare,
           color: 'green',
           fields: ['message']
@@ -86,7 +86,7 @@ const LogEventModal = ({
       onClose()
     } catch (error) {
       console.error('Error saving event:', error)
-      alert('Failed to save event. Please try again.')
+      alert(error?.message || 'Failed to save event. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -249,12 +249,12 @@ const LogEventModal = ({
               {saving ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Saving...
+                  {eventType === 'email' || eventType === 'sms' ? 'Sending...' : 'Saving...'}
                 </>
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  Save Event
+                  {eventType === 'email' || eventType === 'sms' ? 'Send' : 'Save Event'}
                 </>
               )}
             </button>

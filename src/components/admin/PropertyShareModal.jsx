@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { eventService } from '../../services/database'
 import { useAuth } from '../../contexts/AuthContext'
+import { sendLeadEmail, sendLeadText } from '../../services/leadMessaging'
 import { 
   X, 
   Mail, 
@@ -60,7 +61,9 @@ const PropertyShareModal = ({ customer, properties, onClose, onSuccess }) => {
   const handleSendEmail = async () => {
     setLoading(true)
     try {
-      // Log the email event
+      const sent = await sendLeadEmail({ to: customer.email, subject: emailData.subject, body: emailData.message })
+      if (!sent.success) throw new Error(sent.error || 'Email not sent')
+
       const result = await eventService.logEmailSent(
         customer.id,
         null,
@@ -77,14 +80,9 @@ const PropertyShareModal = ({ customer, properties, onClose, onSuccess }) => {
         }
       )
 
-      if (result.success) {
-        // Here you would integrate with your email service (e.g., Resend, SendGrid)
-        // For now, we'll just log the event
-        alert('Email logged successfully! (Email service integration pending)')
-        onSuccess()
-      } else {
-        throw new Error(result.error || 'Failed to log email')
-      }
+      if (!result.success) console.error('Email sent but not logged:', result.error)
+      alert(`Email sent to ${customer.email}`)
+      onSuccess()
     } catch (error) {
       console.error('Error sending email:', error)
       alert('Failed to send email: ' + error.message)
@@ -96,7 +94,9 @@ const PropertyShareModal = ({ customer, properties, onClose, onSuccess }) => {
   const handleSendSMS = async () => {
     setLoading(true)
     try {
-      // Log the SMS event
+      const sent = await sendLeadText({ to: customer.phone, body: smsData.message })
+      if (!sent.success) throw new Error(sent.error || 'Text not sent')
+
       const result = await eventService.logSMSSent(
         customer.id,
         null,
@@ -104,6 +104,7 @@ const PropertyShareModal = ({ customer, properties, onClose, onSuccess }) => {
         {
           to: customer.phone,
           message: smsData.message,
+          via: sent.via,
           properties: properties.map(p => ({
             id: p.id,
             case_number: p.case_number,
@@ -112,14 +113,9 @@ const PropertyShareModal = ({ customer, properties, onClose, onSuccess }) => {
         }
       )
 
-      if (result.success) {
-        // Here you would integrate with your SMS service (e.g., Twilio)
-        // For now, we'll just log the event
-        alert('SMS logged successfully! (SMS service integration pending)')
-        onSuccess()
-      } else {
-        throw new Error(result.error || 'Failed to log SMS')
-      }
+      if (!result.success) console.error('Text sent but not logged:', result.error)
+      if (sent.via === 'twilio') alert(`Text sent to ${customer.phone}`)
+      onSuccess()
     } catch (error) {
       console.error('Error sending SMS:', error)
       alert('Failed to send SMS: ' + error.message)

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { customerService, eventService } from '../../services/database'
 import { useAuth } from '../../contexts/AuthContext'
+import { sendLeadEmail, sendLeadText } from '../../services/leadMessaging'
 import LogEventModal from './LogEventModal'
 import CustomerManagementAgent from './CustomerManagementAgent'
 import PropertySearchTab from './PropertySearchTab'
@@ -81,7 +82,10 @@ const CustomerDetailsPage = () => {
       let result
       
       switch (eventType) {
-        case 'email':
+        case 'email': {
+          const sent = await sendLeadEmail({ to: customer.email, subject: formData.subject, body: formData.message })
+          if (!sent.success) throw new Error(sent.error || 'Email not sent')
+          alert(`Email sent to ${customer.email}`)
           result = await eventService.logEmailSent(
             customerId,
             null, // no consultation_id
@@ -93,8 +97,12 @@ const CustomerDetailsPage = () => {
             }
           )
           break
-          
-        case 'sms':
+        }
+
+        case 'sms': {
+          const sent = await sendLeadText({ to: customer.phone, body: formData.message })
+          if (!sent.success) throw new Error(sent.error || 'Text not sent')
+          if (sent.via === 'twilio') alert(`Text sent to ${customer.phone}`)
           result = await eventService.logSMSSent(
             customerId,
             null,
@@ -105,6 +113,7 @@ const CustomerDetailsPage = () => {
             }
           )
           break
+        }
           
         case 'call':
           result = await eventService.logCallMade(
