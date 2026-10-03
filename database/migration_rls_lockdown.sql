@@ -1,6 +1,5 @@
 -- Applied to production 2026-10-03.
--- Enable RLS on every remaining USAHUDhomes table. legislative_events
--- (NC Issues) and the cemetery tables are intentionally untouched.
+-- Enable RLS on every remaining USAHUDhomes table.
 -- Server code in api/ uses SUPABASE_SERVICE_KEY and bypasses RLS.
 
 create or replace function public.my_agent_ids() returns setof uuid
