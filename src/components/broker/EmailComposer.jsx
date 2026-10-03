@@ -5,7 +5,22 @@ import { consultationService } from '../../services/database/consultationService
 import { X, Mail, Send, FileText, Sparkles } from 'lucide-react'
 
 const EmailComposer = ({ consultation, customer, property, onSend, onCancel }) => {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
+  // users.name is a single field; first/last only exist on some older profiles.
+  const nameParts = String(profile?.name || '').trim().split(/\s+/).filter(Boolean)
+  const sender = {
+    first: profile?.first_name || nameParts[0] || 'your agent',
+    full: [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || nameParts.join(' ') || 'your agent',
+    phone: profile?.phone || '',
+    email: profile?.email || user?.email || ''
+  }
+  // The linked property record is often missing; the consultation carries the case number/address.
+  property = {
+    ...(property || {}),
+    case_number: property?.case_number || consultation?.case_number || consultation?.property_case_number || '',
+    address: property?.address || consultation?.property_address || ''
+  }
+  customer = { ...(customer || {}), first_name: customer?.first_name || String(customer?.name || consultation?.customer_name || '').split(' ')[0] || 'there' }
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState('')
@@ -20,7 +35,7 @@ const EmailComposer = ({ consultation, customer, property, onSend, onCancel }) =
 
 Thank you for your interest in the HUD property${property.case_number ? ` (Case #${property.case_number})` : ''}${property.address ? ` located at ${property.address}` : ''}.
 
-I'm ${profile.first_name} ${profile.last_name}, a licensed real estate broker specializing in HUD homes in ${profile.state || 'your area'}. I'd be happy to help you with this property and answer any questions you may have.
+I'm ${sender.full}, a licensed real estate broker specializing in HUD homes in ${property.state || 'your area'}. I'd be happy to help you with this property and answer any questions you may have.
 
 Here's what I can help you with:
 • Property showing and inspection
@@ -33,9 +48,9 @@ ${property.list_price ? `The current list price is $${property.list_price.toLoca
 When would be a good time for a call to discuss your interest and next steps? I'm available [your availability here].
 
 Best regards,
-${profile.first_name} ${profile.last_name}
-${profile.phone || '[Your Phone]'}
-${profile.email || '[Your Email]'}`
+${sender.full}
+${sender.phone}
+${sender.email}`
     },
     {
       id: 'property_info',
@@ -47,7 +62,7 @@ Here are the details for the HUD property you inquired about:
 
 PROPERTY DETAILS:
 ${property.case_number ? `• Case Number: ${property.case_number}` : ''}
-${property.address ? `• Address: ${property.address}, ${property.city}, ${property.state} ${property.zip}` : ''}
+${property.address ? `• Address: ${[property.address, property.city, [property.state, property.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')}` : ''}
 ${property.list_price ? `• List Price: $${property.list_price.toLocaleString()}` : ''}
 ${property.bedrooms ? `• Bedrooms: ${property.bedrooms}` : ''}
 ${property.bathrooms ? `• Bathrooms: ${property.bathrooms}` : ''}
@@ -65,9 +80,9 @@ This is a great opportunity! HUD homes are sold "as-is" but often represent exce
 Would you like to schedule a showing or discuss your financing options?
 
 Best regards,
-${profile.first_name} ${profile.last_name}
-${profile.phone || '[Your Phone]'}
-${profile.email || '[Your Email]'}`
+${sender.full}
+${sender.phone}
+${sender.email}`
     },
     {
       id: 'follow_up',
@@ -88,9 +103,9 @@ ${property.bid_open_date ? `Please note that bids close on ${new Date(property.b
 Let me know how I can help!
 
 Best regards,
-${profile.first_name} ${profile.last_name}
-${profile.phone || '[Your Phone]'}
-${profile.email || '[Your Email]'}`
+${sender.full}
+${sender.phone}
+${sender.email}`
     },
     {
       id: 'showing_scheduled',
@@ -123,9 +138,9 @@ Please let me know if you need to reschedule or have any questions before the sh
 Looking forward to showing you the property!
 
 Best regards,
-${profile.first_name} ${profile.last_name}
-${profile.phone || '[Your Phone]'}
-${profile.email || '[Your Email]'}`
+${sender.full}
+${sender.phone}
+${sender.email}`
     },
     {
       id: 'bid_preparation',
@@ -152,9 +167,9 @@ ${property.list_price ? `• List price: $${property.list_price.toLocaleString()
 Let's schedule a time to finalize your bid. The sooner we submit, the better!
 
 Best regards,
-${profile.first_name} ${profile.last_name}
-${profile.phone || '[Your Phone]'}
-${profile.email || '[Your Email]'}`
+${sender.full}
+${sender.phone}
+${sender.email}`
     }
   ]
 

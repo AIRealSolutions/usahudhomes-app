@@ -7,7 +7,7 @@ function EnvDiagnostic() {
   const envVars = {
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
-    VITE_OPENAI_API_KEY: import.meta.env.VITE_OPENAI_API_KEY,
+    VITE_OPENAI_API_KEY: 'server-side only (/api/ai)',
   }
 
   const hasSupabaseUrl = envVars.VITE_SUPABASE_URL && envVars.VITE_SUPABASE_URL !== 'YOUR_SUPABASE_URL'

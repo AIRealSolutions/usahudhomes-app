@@ -5,7 +5,22 @@ import { consultationService } from '../../services/database/consultationService
 import { X, MessageSquare, Send, Sparkles } from 'lucide-react'
 
 const SMSComposer = ({ consultation, customer, property, onSend, onCancel }) => {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
+  // users.name is a single field; first/last only exist on some older profiles.
+  const nameParts = String(profile?.name || '').trim().split(/\s+/).filter(Boolean)
+  const sender = {
+    first: profile?.first_name || nameParts[0] || 'your agent',
+    full: [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || nameParts.join(' ') || 'your agent',
+    phone: profile?.phone || '',
+    email: profile?.email || user?.email || ''
+  }
+  // The linked property record is often missing; the consultation carries the case number/address.
+  property = {
+    ...(property || {}),
+    case_number: property?.case_number || consultation?.case_number || consultation?.property_case_number || '',
+    address: property?.address || consultation?.property_address || ''
+  }
+  customer = { ...(customer || {}), first_name: customer?.first_name || String(customer?.name || consultation?.customer_name || '').split(' ')[0] || 'there' }
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
 
@@ -15,32 +30,34 @@ const SMSComposer = ({ consultation, customer, property, onSend, onCancel }) => 
     {
       id: 'initial_contact',
       name: 'Initial Contact',
-      text: `Hi ${customer.first_name}, this is ${profile.first_name} ${profile.last_name} regarding HUD property ${property.case_number || ''}. When's a good time to talk? ${profile.phone || ''}`
+      text: `Hi ${customer.first_name}, this is ${sender.full} with USAHUDhomes about ${property.address ? `the HUD home at ${property.address}` : property.case_number ? `HUD case #${property.case_number}` : 'your HUD home search'}. When's a good time to talk?${sender.phone ? ` ${sender.phone}` : ''}`
     },
     {
       id: 'property_link',
       name: 'Property Link',
-      text: `Hi ${customer.first_name}! Here's the link to view the property details: https://usahudhomes-app.vercel.app/consult/${property.case_number || ''}. Let me know if you have questions!`
+      text: property.case_number
+        ? `Hi ${customer.first_name}! Here are the property details: https://usahudhomes.com/property/${property.case_number} Let me know if you have questions! - ${sender.first}`
+        : `Hi ${customer.first_name}! You can browse HUD homes here: https://usahudhomes.com/search Let me know which ones interest you! - ${sender.first}`
     },
     {
       id: 'showing_reminder',
       name: 'Showing Reminder',
-      text: `Hi ${customer.first_name}, reminder: property showing tomorrow at [TIME] at ${property.address || '[address]'}. See you there! - ${profile.first_name}`
+      text: `Hi ${customer.first_name}, reminder: property showing tomorrow at [TIME] at ${property.address || '[address]'}. See you there! - ${sender.first}`
     },
     {
       id: 'quick_question',
       name: 'Quick Question',
-      text: `Hi ${customer.first_name}, quick question about ${property.case_number || 'the property'} - when would be a good time for a brief call? Thanks! - ${profile.first_name}`
+      text: `Hi ${customer.first_name}, quick question about ${property.address || (property.case_number ? `case #${property.case_number}` : 'the property')} - when would be a good time for a brief call? Thanks! - ${sender.first}`
     },
     {
       id: 'bid_deadline',
       name: 'Bid Deadline Reminder',
-      text: `Hi ${customer.first_name}, reminder: bids for ${property.case_number || 'the property'} close soon! Let me know if you want to submit an offer. - ${profile.first_name}`
+      text: `Hi ${customer.first_name}, reminder: bids for ${property.address || (property.case_number ? `case #${property.case_number}` : 'the property')} close soon! Let me know if you want to submit an offer. - ${sender.first}`
     },
     {
       id: 'thank_you',
       name: 'Thank You',
-      text: `Thanks for your time today ${customer.first_name}! I'll follow up with the information we discussed. Feel free to text or call anytime. - ${profile.first_name}`
+      text: `Thanks for your time today ${customer.first_name}! I'll follow up with the information we discussed. Feel free to text or call anytime. - ${sender.first}`
     }
   ]
 

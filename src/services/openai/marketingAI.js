@@ -1,16 +1,9 @@
-import OpenAI from 'openai'
+import { getAIClient } from './proxyClient'
 import { customerService, consultationService } from '../database'
 
 // Initialize OpenAI client
-let _openaiClient = null;
-function getOpenAI() {
-  if (!_openaiClient) {
-    const apiKey = import.meta?.env?.VITE_OPENAI_API_KEY || '';
-    if (!apiKey) return null;
-    _openaiClient = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
-  }
-  return _openaiClient;
-}
+// Calls go through /api/ai so the OpenAI key stays on the server.
+const getOpenAI = getAIClient;
 
 /**
  * Marketing AI Service

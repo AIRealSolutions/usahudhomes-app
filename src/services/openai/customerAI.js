@@ -1,16 +1,9 @@
-import OpenAI from 'openai'
+import { getAIClient } from './proxyClient'
 import { propertyService, consultationService, eventService } from '../database'
 
 // Lazy OpenAI client - only instantiated when called, not at module load time
-let _openaiClient = null;
-function getOpenAI() {
-  if (!_openaiClient) {
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    if (!apiKey) return null;
-    _openaiClient = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
-  }
-  return _openaiClient;
-}
+// Calls go through /api/ai so the OpenAI key stays on the server.
+const getOpenAI = getAIClient;
 
 /**
  * Customer Management AI Service
@@ -87,7 +80,7 @@ Consider:
 - Property status (prefer BIDS OPEN or EXTENDED)
 - Value for money`
 
-      const response = _ai = getOpenAI(); if (!_ai) return { success: false, error: "OpenAI not configured" }; const _resp = await _ai.chat.completions.create({
+      const response = await getOpenAI().chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {
@@ -174,7 +167,7 @@ Include:
 - Signature (from USAHUDhomes.com team)`
 
     try {
-      const response = _ai = getOpenAI(); if (!_ai) return { success: false, error: "OpenAI not configured" }; const _resp = await _ai.chat.completions.create({
+      const response = await getOpenAI().chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {
@@ -231,7 +224,7 @@ Write a brief, personalized SMS (160 characters max) that:
 Just return the SMS text, no labels.`
 
     try {
-      const response = _ai = getOpenAI(); if (!_ai) return { success: false, error: "OpenAI not configured" }; const _resp = await _ai.chat.completions.create({
+      const response = await getOpenAI().chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {
@@ -303,7 +296,7 @@ You can help with:
 Be helpful, professional, and action-oriented. Provide specific, actionable recommendations.`
 
     try {
-      const response = _ai = getOpenAI(); if (!_ai) return { success: false, error: "OpenAI not configured" }; const _resp = await _ai.chat.completions.create({
+      const response = await getOpenAI().chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {
@@ -375,7 +368,7 @@ Format as JSON:
 }`
 
     try {
-      const response = _ai = getOpenAI(); if (!_ai) return { success: false, error: "OpenAI not configured" }; const _resp = await _ai.chat.completions.create({
+      const response = await getOpenAI().chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [
           {

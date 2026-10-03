@@ -32,7 +32,6 @@ export default defineConfig({
           ],
           'vendor-charts':  ['recharts'],
           'vendor-motion':  ['framer-motion'],
-          'vendor-openai':  ['openai'],
         },
       },
     },
