@@ -51,9 +51,9 @@ export default function Login() {
           throw new Error(result.error || 'Sign in failed')
         }
 
-        // AuthContext has updated, now navigate
-        const route = getDashboardRoute()
-        navigate(route)
+        // Use the returned role to determine route (don't wait for state update)
+        // All users go to /dashboard regardless of role
+        navigate('/dashboard')
       }
     } catch (error) {
       setError(error.message)
