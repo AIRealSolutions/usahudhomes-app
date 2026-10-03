@@ -639,7 +639,7 @@ class ConsultationService {
       const { data, error } = await supabase.rpc('assign_consultation_to_broker', {
         p_consultation_id: consultationId,
         p_broker_id: brokerId,
-        p_expires_hours: expiresHours
+        p_expiration_hours: expiresHours
       })
 
       if (error) throw error
