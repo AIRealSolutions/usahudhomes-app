@@ -11,7 +11,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const navigate = useNavigate()
-  const { getDashboardRoute, initialized, isAuthenticated } = useAuth()
+  const { getDashboardRoute, initialized, isAuthenticated, signIn, signUp } = useAuth()
 
   useEffect(() => {
     // If user is already authenticated, redirect to their dashboard
@@ -28,50 +28,32 @@ export default function Login() {
 
     try {
       if (isSignUp) {
-        // Sign up new user
-        const { data, error } = await supabase.auth.signUp({
+        // Sign up new user using AuthContext
+        const result = await signUp({
           email,
           password,
-          options: {
-            data: {
-              full_name: fullName
-            }
-          }
+          firstName: fullName.split(' ')[0],
+          lastName: fullName.split(' ').slice(1).join(' '),
+          role: 'end_user'
         })
 
-        if (error) throw error
-
-        if (data.user) {
-          // Create user record in database
-          const { error: dbError } = await supabase
-            .from('users')
-            .insert([
-              {
-                email: data.user.email,
-                name: fullName,
-                role: 'end_user'
-              }
-            ])
-
-          if (dbError) throw dbError
-
-          alert('Account created! Please check your email to verify your account.')
-          setIsSignUp(false)
+        if (!result.success) {
+          throw new Error(result.error || 'Sign up failed')
         }
+
+        alert('Account created! Please check your email to verify your account.')
+        setIsSignUp(false)
       } else {
-        // Sign in existing user
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        })
+        // Sign in existing user using AuthContext
+        const result = await signIn(email, password)
 
-        if (error) throw error
+        if (!result.success) {
+          throw new Error(result.error || 'Sign in failed')
+        }
 
-        // Wait a moment for auth context to update, then get the correct dashboard route
-        setTimeout(() => {
-          const route = getDashboardRoute()
-          navigate(route)
-        }, 500)
+        // AuthContext has updated, now navigate
+        const route = getDashboardRoute()
+        navigate(route)
       }
     } catch (error) {
       setError(error.message)
