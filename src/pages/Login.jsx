@@ -11,15 +11,14 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const navigate = useNavigate()
-  const { getDashboardRoute, initialized, isAuthenticated, signIn, signUp } = useAuth()
+  const { initialized, isAuthenticated, signIn, signUp } = useAuth()
 
   useEffect(() => {
-    // If user is already authenticated, redirect to their dashboard
+    // If user is already authenticated, redirect to dashboard
     if (isAuthenticated && initialized) {
-      const route = getDashboardRoute()
-      navigate(route)
+      navigate('/dashboard', { replace: true })
     }
-  }, [isAuthenticated, initialized, navigate, getDashboardRoute])
+  }, [isAuthenticated, initialized, navigate])
 
   const handleAuth = async (e) => {
     e.preventDefault()
