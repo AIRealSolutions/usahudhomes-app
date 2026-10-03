@@ -103,19 +103,37 @@ class AuthService {
       }
 
       // Get user profile and role
-      const { data: profileData, error: profileError } = await supabase
+      let { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', authData.user.id)
         .single()
 
+      // If profile doesn't exist, create one
       if (profileError) {
-        console.error('Profile fetch error:', profileError)
-        return {
-          success: false,
-          error: 'Profile not found',
-          data: { user: authData.user, profile: null }
+        console.log('Profile not found, creating new profile for user')
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: authData.user.id,
+            email: authData.user.email,
+            role: 'end_user',
+            is_active: true,
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single()
+
+        if (createError) {
+          console.error('Profile creation error:', createError)
+          return {
+            success: false,
+            error: 'Could not create user profile',
+            data: { user: authData.user, profile: null }
+          }
         }
+
+        profileData = newProfile
       }
 
       // Check if user is active
