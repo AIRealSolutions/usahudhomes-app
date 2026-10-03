@@ -34,7 +34,7 @@ serve(async (req) => {
     const emailSubject = `New HUD Inquiry: ${consultation.customer_name}`
     
     const emailBody = `
-NEW CONSULTATION REQUEST
+NEW LEAD REQUEST
 
 Name: ${consultation.customer_name}
 Phone: ${consultation.customer_phone}

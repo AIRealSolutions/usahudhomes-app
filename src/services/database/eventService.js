@@ -193,7 +193,7 @@ class EventService {
 
       return formatSupabaseResponse(data, error)
     } catch (error) {
-      console.error('Error fetching consultation events:', error)
+      console.error('Error fetching lead events:', error)
       return { success: false, error: error.message, data: [] }
     }
   }
@@ -276,8 +276,8 @@ class EventService {
       consultationId,
       eventType: EVENT_TYPES.CONSULTATION_CREATED,
       eventCategory: EVENT_CATEGORIES.CONSULTATION,
-      eventTitle: 'Consultation Request Submitted',
-      eventDescription: `Customer submitted a ${consultationData.type || 'general'} consultation request`,
+      eventTitle: 'Lead Request Submitted',
+      eventDescription: `Customer submitted a ${consultationData.type || 'general'} lead request`,
       eventData: {
         consultation_type: consultationData.type,
         case_number: consultationData.caseNumber,
@@ -297,8 +297,8 @@ class EventService {
       agentId,
       eventType: EVENT_TYPES.CONSULTATION_ASSIGNED,
       eventCategory: EVENT_CATEGORIES.CONSULTATION,
-      eventTitle: 'Consultation Assigned to Broker',
-      eventDescription: `Consultation was assigned to ${agentName}`,
+      eventTitle: 'Lead Assigned to Broker',
+      eventDescription: `Lead was assigned to ${agentName}`,
       eventData: {
         agent_id: agentId,
         agent_name: agentName
@@ -400,7 +400,7 @@ class EventService {
       eventType: EVENT_TYPES.CONSULTATION_STATUS_CHANGED,
       eventCategory: EVENT_CATEGORIES.STATUS,
       eventTitle: `Status Changed: ${oldStatus} → ${newStatus}`,
-      eventDescription: `Consultation status updated from ${oldStatus} to ${newStatus}`,
+      eventDescription: `Lead status updated from ${oldStatus} to ${newStatus}`,
       eventData: {
         old_status: oldStatus,
         new_status: newStatus

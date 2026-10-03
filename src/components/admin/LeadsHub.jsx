@@ -1,5 +1,5 @@
 /**
- * LeadsHub — Unified lead & consultation management.
+ * LeadsHub — Unified lead management (new leads + assigned leads).
  *
  * Fixes the root bug: the old LeadAdmin queried `consultations` with
  * `agent_id.is.null`, but ALL consultations have agent_id set, so nothing
@@ -7,7 +7,7 @@
  *
  * This component:
  *  - Tab 1 "New Leads"    → queries `leads` table (status = new_lead, etc.)
- *  - Tab 2 "Consultations"→ queries `consultations` table (assigned to brokers)
+ *  - Tab 2 "Assigned Leads"→ queries `consultations` table (assigned to brokers)
  *  - Tab 3 "Customers"    → queries `customers` table (linked from leads)
  *  Clicking a lead row navigates to /admin/leads/:id (LeadDetailsPage).
  */
@@ -459,7 +459,7 @@ function ConsultationsTab() {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-gray-400">
             <Inbox className="w-10 h-10 mb-2" />
-            <p className="text-sm">No consultations match your filters</p>
+            <p className="text-sm">No leads match your filters</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -512,7 +512,7 @@ function ConsultationsTab() {
           </div>
         )}
         <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-400">
-          Showing {filtered.length} of {consultations.length} consultations
+          Showing {filtered.length} of {consultations.length} leads
         </div>
       </div>
     </div>
@@ -635,7 +635,7 @@ export default function LeadsHub({ onNavigate }) {
 
   const TABS = [
     { id: 'leads',         label: 'New Leads',      icon: MessageSquare },
-    { id: 'consultations', label: 'Consultations',  icon: Inbox },
+    { id: 'consultations', label: 'Assigned Leads', icon: Inbox },
     { id: 'customers',     label: 'Customers',      icon: Users },
   ]
 

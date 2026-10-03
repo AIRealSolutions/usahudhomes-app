@@ -15,7 +15,7 @@ class ConsultationService {
         const data = JSON.parse(stored)
         this.consultations = new Map(data)
       } catch (error) {
-        console.error('Error loading stored consultations:', error)
+        console.error('Error loading stored leads:', error)
       }
     }
   }
@@ -83,7 +83,7 @@ class ConsultationService {
   async sendNotificationEmail(consultation) {
     const emailData = {
       to: 'marcspencer28461@gmail.com',
-      subject: `New HUD Property Consultation Request - ${consultation.property.caseNumber}`,
+      subject: `New HUD Property Lead Request - ${consultation.property.caseNumber}`,
       body: this.generateNotificationEmailBody(consultation)
     }
 
@@ -119,7 +119,7 @@ class ConsultationService {
     }
 
     return `
-${urgencyEmoji[consultation.consultation.urgency]} NEW HUD PROPERTY CONSULTATION REQUEST
+${urgencyEmoji[consultation.consultation.urgency]} NEW HUD PROPERTY LEAD REQUEST
 
 PROPERTY DETAILS:
 • Case Number: ${consultation.property.caseNumber}
@@ -133,7 +133,7 @@ CLIENT INFORMATION:
 • Phone: ${consultation.client.phone}
 • Preferred Contact: ${consultation.client.preferredContact}
 
-CONSULTATION DETAILS:
+LEAD DETAILS:
 • Type: ${consultation.consultation.type}
 • Urgency: ${consultation.consultation.urgency.toUpperCase()}
 • Message: ${consultation.consultation.message || 'No additional message'}
@@ -146,11 +146,11 @@ ${consultation.consultation.urgency === 'urgent'
   : '📞 Contact client within 2 hours during business hours'
 }
 
-Consultation ID: ${consultation.id}
+Lead ID: ${consultation.id}
 Submitted: ${new Date(consultation.timestamp).toLocaleString()}
 
 ---
-USAhudHomes.com Property Consultation System
+USAhudHomes.com Property Lead System
 Lightkeeper Realty - "Helping people bid on HUD homes for 25 years"
     `.trim()
   }
@@ -283,7 +283,7 @@ This is an automated confirmation. Please do not reply to this email.
       const data = Array.from(this.consultations.entries())
       localStorage.setItem('hudConsultations', JSON.stringify(data))
     } catch (error) {
-      console.error('Error saving consultations to storage:', error)
+      console.error('Error saving leads to storage:', error)
     }
   }
 

@@ -30,7 +30,7 @@ function LeadDetailWithAI() {
       if (allConsultations.success && allConsultations.data) {
         const found = allConsultations.data.find(c => c.id === leadId)
         if (found) {
-          console.log('Found consultation:', found)
+          console.log('Found lead:', found)
           setLead(found)
           return
         }
@@ -238,7 +238,7 @@ function LeadDetailWithAI() {
 
                 {/* Consultation Details */}
                 <div className="pt-6 border-t border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Consultation Details</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Details</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <p className="text-sm text-gray-600">Type</p>

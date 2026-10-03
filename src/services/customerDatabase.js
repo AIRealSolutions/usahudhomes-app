@@ -234,21 +234,21 @@ USAhudHomes.com System
   sendConsultationNotification(consultation) {
     const emailData = {
       to: 'marcspencer28461@gmail.com',
-      subject: `New Consultation Request - ${consultation.name} (${consultation.priority.toUpperCase()} Priority)`,
+      subject: `New Lead Request - ${consultation.name} (${consultation.priority.toUpperCase()} Priority)`,
       body: `
-New consultation request received on USAhudHomes.com:
+New lead request received on USAhudHomes.com:
 
 Client Details:
 - Name: ${consultation.name}
 - Email: ${consultation.email}
 - Phone: ${consultation.phone}
-- Consultation Type: ${consultation.consultationType}
-- Property: ${consultation.propertyId || 'General consultation'}
+- Lead Type: ${consultation.consultationType}
+- Property: ${consultation.propertyId || 'General lead'}
 - Priority: ${consultation.priority.toUpperCase()}
 - Message: ${consultation.message || 'No additional message'}
 - Request Date: ${new Date(consultation.createdAt).toLocaleString()}
 
-Consultation ID: ${consultation.id}
+Lead ID: ${consultation.id}
 
 ${consultation.priority === 'high' ? 'HIGH PRIORITY - Please respond immediately!' : 'Please respond within 2 hours.'}
 
@@ -257,7 +257,7 @@ USAhudHomes.com System
       `
     };
 
-    console.log('Consultation email sent:', emailData);
+    console.log('Lead email sent:', emailData);
     this.logEmail(emailData);
   }
 

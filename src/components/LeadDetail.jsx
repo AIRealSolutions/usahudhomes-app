@@ -52,7 +52,7 @@ function LeadDetail() {
     try {
       console.log('Loading lead with ID:', leadId)
       console.log('customerDatabase:', customerDatabase)
-      console.log('Available consultations:', customerDatabase?.consultations?.length || 0)
+      console.log('Available leads:', customerDatabase?.consultations?.length || 0)
       
       // Safety check
       if (!customerDatabase || !customerDatabase.consultations) {
@@ -63,7 +63,7 @@ function LeadDetail() {
       const consultation = customerDatabase.consultations.find(c => c.id === leadId)
       
       if (consultation) {
-        console.log('Found consultation:', consultation)
+        console.log('Found lead:', consultation)
         setLead(consultation)
         setEditedLead(consultation)
         
@@ -71,7 +71,7 @@ function LeadDetail() {
         setInteractions(customerDatabase.getLeadInteractions?.(leadId) || [])
         setTasks(customerDatabase.getLeadTasks?.(leadId) || [])
       } else {
-        const errorMsg = `Lead not found with ID: ${leadId}. Available: ${customerDatabase.consultations?.length || 0} consultations`
+        const errorMsg = `Lead not found with ID: ${leadId}. Available: ${customerDatabase.consultations?.length || 0} leads`
         console.error(errorMsg)
         setError(errorMsg)
       }
@@ -424,7 +424,7 @@ Lightkeeper Realty
             <Card>
               <CardHeader>
                 <CardTitle>Lead Information</CardTitle>
-                <CardDescription>Customer details and consultation request</CardDescription>
+                <CardDescription>Customer details and lead request</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {editMode ? (
@@ -511,7 +511,7 @@ Lightkeeper Realty
 
                 {/* Consultation Details */}
                 <div className="border-t pt-6">
-                  <h4 className="font-medium text-gray-900 mb-3">Consultation Request</h4>
+                  <h4 className="font-medium text-gray-900 mb-3">Lead Request</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-600">Type</p>

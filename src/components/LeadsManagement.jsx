@@ -370,7 +370,7 @@ Lightkeeper Realty
                 <SelectItem value="all">All Sources</SelectItem>
                 <SelectItem value="website">Website</SelectItem>
                 <SelectItem value="chatbot">Chatbot</SelectItem>
-                <SelectItem value="consultation">Consultation</SelectItem>
+                <SelectItem value="consultation">Lead</SelectItem>
                 <SelectItem value="referral">Referral</SelectItem>
               </SelectContent>
             </Select>

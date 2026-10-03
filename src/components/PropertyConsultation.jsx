@@ -125,10 +125,10 @@ function PropertyConsultation() {
         setShowContactForm(false)
         setContactForm({ name: '', email: '', phone: '', message: '', consultationType: 'general' })
       } else {
-        throw new Error(result.error || 'Failed to save consultation')
+        throw new Error(result.error || 'Failed to save lead')
       }
     } catch (error) {
-      console.error('Error submitting consultation:', error)
+      console.error('Error submitting lead:', error)
       alert('There was an error submitting your consultation. Please try again.')
     }
   }

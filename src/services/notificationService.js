@@ -10,7 +10,7 @@
  */
 export async function sendConsultationNotification(consultation) {
   console.log('=== NOTIFICATION SERVICE CALLED ===')
-  console.log('Consultation data received:', JSON.stringify(consultation, null, 2))
+  console.log('Lead data received:', JSON.stringify(consultation, null, 2))
   
   try {
     console.log('Attempting to send notification...')

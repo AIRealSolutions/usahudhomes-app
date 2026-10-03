@@ -24,16 +24,16 @@ function LeadDetailSimple() {
       
       // First, let's see ALL consultations to debug
       const allConsultations = await consultationService.getAllConsultations()
-      console.log('All consultations result:', allConsultations)
+      console.log('All leads result:', allConsultations)
       
       if (allConsultations.success && allConsultations.data) {
-        console.log('Total consultations:', allConsultations.data.length)
-        console.log('All consultation IDs:', allConsultations.data.map(c => c.id))
+        console.log('Total leads:', allConsultations.data.length)
+        console.log('All lead IDs:', allConsultations.data.map(c => c.id))
         
         // Try to find it manually
         const found = allConsultations.data.find(c => c.id === leadId)
         if (found) {
-          console.log('Found consultation in list:', found)
+          console.log('Found lead in list:', found)
           setLead(found)
           return
         }
@@ -44,12 +44,12 @@ function LeadDetailSimple() {
       console.log('Direct fetch result:', result)
       
       if (result.success && result.data) {
-        console.log('Found consultation via direct fetch:', result.data)
+        console.log('Found lead via direct fetch:', result.data)
         setLead(result.data)
       } else {
         let errorMsg = `Lead not found. Looking for ID: ${leadId}\n\n`
         if (allConsultations.success) {
-          errorMsg += `Found ${allConsultations.data.length} consultations in database.\n`
+          errorMsg += `Found ${allConsultations.data.length} leads in database.\n`
           errorMsg += `IDs: ${allConsultations.data.map(c => c.id).join(', ')}`
         }
         setError(errorMsg)
@@ -123,7 +123,7 @@ function LeadDetailSimple() {
             <div>
               <h2 className="text-2xl font-bold text-gray-900">{lead.name}</h2>
               <p className="text-gray-600">Customer ID: {lead.customer_id}</p>
-              <p className="text-gray-600">Consultation ID: {lead.id}</p>
+              <p className="text-gray-600">Lead ID: {lead.id}</p>
             </div>
             <div className={`px-3 py-1 rounded-full text-sm font-medium ${
               lead.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :

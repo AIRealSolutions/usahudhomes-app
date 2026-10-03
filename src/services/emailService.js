@@ -27,7 +27,7 @@ class EmailService {
     
     const emailData = {
       to: this.defaultRecipient,
-      subject: `${urgencyIcon} New Consultation Request - ${consultationData.name} (${priority.toUpperCase()} Priority)`,
+      subject: `${urgencyIcon} New Lead Request - ${consultationData.name} (${priority.toUpperCase()} Priority)`,
       html: this.generateConsultationEmailHTML(consultationData, priority),
       text: this.generateConsultationEmailText(consultationData, priority)
     };
@@ -173,7 +173,7 @@ Marc Spencer: (910) 363-6147
 <html>
 <head>
     <meta charset="utf-8">
-    <title>New Consultation Request</title>
+    <title>New Lead Request</title>
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -190,14 +190,14 @@ Marc Spencer: (910) 363-6147
     <div class="container">
         <div class="header">
             <h1>🏠 USAhudHomes.com</h1>
-            <h2>New Consultation Request</h2>
+            <h2>New Lead Request</h2>
             <span class="priority">${priority.toUpperCase()} PRIORITY</span>
         </div>
         
         <div class="content">
             <div class="info-box urgent">
                 <h3>⏰ ${urgencyMessage}</h3>
-                <p>A new consultation request has been submitted with ${priority} priority.</p>
+                <p>A new lead request has been submitted with ${priority} priority.</p>
             </div>
             
             <div class="info-box">
@@ -205,11 +205,11 @@ Marc Spencer: (910) 363-6147
                 <p><strong>Name:</strong> ${consultationData.name}</p>
                 <p><strong>Email:</strong> <a href="mailto:${consultationData.email}">${consultationData.email}</a></p>
                 <p><strong>Phone:</strong> <a href="tel:${consultationData.phone}">${consultationData.phone}</a></p>
-                <p><strong>Consultation Type:</strong> ${consultationData.consultationType}</p>
-                <p><strong>Property:</strong> ${consultationData.propertyId || 'General consultation'}</p>
+                <p><strong>Lead Type:</strong> ${consultationData.consultationType}</p>
+                <p><strong>Property:</strong> ${consultationData.propertyId || 'General lead'}</p>
                 <p><strong>Priority:</strong> <span style="color: ${priorityColor}; font-weight: bold;">${priority.toUpperCase()}</span></p>
                 <p><strong>Request Date:</strong> ${new Date(consultationData.createdAt || Date.now()).toLocaleString()}</p>
-                <p><strong>Consultation ID:</strong> ${consultationData.id}</p>
+                <p><strong>Lead ID:</strong> ${consultationData.id}</p>
             </div>
             
             ${consultationData.message ? `
@@ -225,7 +225,7 @@ Marc Spencer: (910) 363-6147
         </div>
         
         <div class="footer">
-            <p>USAhudHomes.com Consultation System</p>
+            <p>USAhudHomes.com Lead System</p>
             <p>Lightkeeper Realty - Registered HUD Buyer's Agency</p>
             <p>Marc Spencer: (910) 363-6147</p>
         </div>
@@ -240,21 +240,21 @@ Marc Spencer: (910) 363-6147
     const urgencyMessage = priority === 'high' ? 'URGENT - Respond immediately!' : 'Please respond within 2 hours';
     
     return `
-🏠 USAhudHomes.com - New Consultation Request
+🏠 USAhudHomes.com - New Lead Request
 
 ⏰ ${urgencyMessage}
 
-New consultation request received with ${priority.toUpperCase()} priority:
+New lead request received with ${priority.toUpperCase()} priority:
 
 👤 Client Details:
 - Name: ${consultationData.name}
 - Email: ${consultationData.email}
 - Phone: ${consultationData.phone}
-- Consultation Type: ${consultationData.consultationType}
-- Property: ${consultationData.propertyId || 'General consultation'}
+- Lead Type: ${consultationData.consultationType}
+- Property: ${consultationData.propertyId || 'General lead'}
 - Priority: ${priority.toUpperCase()}
 - Request Date: ${new Date(consultationData.createdAt || Date.now()).toLocaleString()}
-- Consultation ID: ${consultationData.id}
+- Lead ID: ${consultationData.id}
 
 ${consultationData.message ? `💬 Client Message: "${consultationData.message}"` : ''}
 

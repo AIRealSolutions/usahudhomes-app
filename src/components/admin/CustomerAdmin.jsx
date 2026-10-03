@@ -96,7 +96,7 @@ function CustomerAdmin() {
       `Customer: ${customerName}\n` +
       `Email: ${customer.email}\n\n` +
       `This will also delete:\n` +
-      `• All consultations/leads for this customer\n` +
+      `• All leads/leads for this customer\n` +
       `• All activities and notes\n` +
       `• All related records\n\n` +
       `This action CANNOT be undone!\n\n` +
@@ -126,7 +126,7 @@ function CustomerAdmin() {
         alert(
           `✅ Customer Deleted Successfully\n\n` +
           `Customer: ${result.data.customerName}\n` +
-          `Consultations deleted: ${result.data.consultationsDeleted}\n` +
+          `Leads deleted: ${result.data.consultationsDeleted}\n` +
           `Activities deleted: ${result.data.activitiesDeleted}\n\n` +
           `All references have been permanently removed.`
         )
@@ -280,7 +280,7 @@ function CustomerAdmin() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold">{stats.pendingConsultations}</div>
-            <p className="text-sm text-gray-600">Pending Consultations</p>
+            <p className="text-sm text-gray-600">Pending Leads</p>
           </CardContent>
         </Card>
       </div>

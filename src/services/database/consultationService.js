@@ -42,7 +42,7 @@ class ConsultationService {
 
       return formatSupabaseResponse(data, error)
     } catch (error) {
-      console.error('Error fetching consultations:', error)
+      console.error('Error fetching leads:', error)
       return { success: false, error: error.message, data: [] }
     }
   }
@@ -67,7 +67,7 @@ class ConsultationService {
 
       return formatSupabaseResponse(data, error)
     } catch (error) {
-      console.error('Error fetching consultation:', error)
+      console.error('Error fetching lead:', error)
       return { success: false, error: error.message, data: null }
     }
   }
@@ -112,7 +112,7 @@ class ConsultationService {
             state: consultationData.state,
             status: 'new',
             lead_source: 'website',
-            notes: consultationData.message || 'Lead from consultation form'
+            notes: consultationData.message || 'Lead from lead form'
           })
           
           if (newCustomer.success && newCustomer.data) {
@@ -162,7 +162,7 @@ class ConsultationService {
 
       // Send notification email
       const consultation = data && data.length > 0 ? data[0] : null
-      console.log('Consultation data for notification:', consultation)
+      console.log('Lead data for notification:', consultation)
       if (consultation) {
         // Log consultation creation event
         if (customerId) {
@@ -171,7 +171,7 @@ class ConsultationService {
             type: consultation.consultation_type,
             caseNumber: consultation.case_number,
             message: consultation.message
-          }).catch(err => console.error('Failed to log consultation created event:', err))
+          }).catch(err => console.error('Failed to log lead created event:', err))
         }
         
         console.log('Calling sendConsultationNotification...')
@@ -195,12 +195,12 @@ class ConsultationService {
             })
         }
       } else {
-        console.warn('No consultation data to send notification for')
+        console.warn('No lead data to send notification for')
       }
 
       return { success: true, data: consultation }
     } catch (error) {
-      console.error('Error adding consultation:', error)
+      console.error('Error adding lead:', error)
       return { success: false, error: error.message, data: null }
     }
   }
@@ -243,7 +243,7 @@ class ConsultationService {
       }
 
       if (!data || data.length === 0) {
-        return { success: false, error: 'Consultation not found', data: null }
+        return { success: false, error: 'Lead not found', data: null }
       }
 
       const updated = data[0]
@@ -281,7 +281,7 @@ class ConsultationService {
 
       return { success: true, data: updated }
     } catch (error) {
-      console.error('Error updating consultation:', error)
+      console.error('Error updating lead:', error)
       return { success: false, error: error.message, data: null }
     }
   }
@@ -307,7 +307,7 @@ class ConsultationService {
       }
       return { success: true, deleted: result.deleted }
     } catch (error) {
-      console.error('Error deleting consultation:', error)
+      console.error('Error deleting lead:', error)
       return { success: false, error: error.message }
     }
   }
@@ -335,12 +335,12 @@ class ConsultationService {
       }
 
       if (!data || data.length === 0) {
-        return { success: false, error: 'Consultation not found', data: null }
+        return { success: false, error: 'Lead not found', data: null }
       }
 
       return { success: true, data: data[0] }
     } catch (error) {
-      console.error('Error restoring consultation:', error)
+      console.error('Error restoring lead:', error)
       return { success: false, error: error.message, data: null }
     }
   }
@@ -364,7 +364,7 @@ class ConsultationService {
 
       return formatSupabaseResponse(data, error)
     } catch (error) {
-      console.error('Error fetching deleted consultations:', error)
+      console.error('Error fetching deleted leads:', error)
       return { success: false, error: error.message, data: [] }
     }
   }
@@ -391,7 +391,7 @@ class ConsultationService {
 
       return { success: true, data: stats }
     } catch (error) {
-      console.error('Error getting consultation stats:', error)
+      console.error('Error getting lead stats:', error)
       return { success: false, error: error.message, data: null }
     }
   }
@@ -596,7 +596,7 @@ class ConsultationService {
 
       return formatSupabaseResponse(data, error)
     } catch (error) {
-      console.error('Error fetching broker consultations:', error)
+      console.error('Error fetching broker leads:', error)
       return { success: false, error: error.message, data: [] }
     }
   }
@@ -646,7 +646,7 @@ class ConsultationService {
 
       return { success: true, data }
     } catch (error) {
-      console.error('Error assigning consultation to broker:', error)
+      console.error('Error assigning lead to broker:', error)
       return { success: false, error: error.message }
     }
   }
@@ -796,12 +796,12 @@ class ConsultationService {
       if (error) throw error
 
       if (!data || data.length === 0) {
-        return { success: false, error: 'Consultation not found' }
+        return { success: false, error: 'Lead not found' }
       }
 
       return { success: true, data: data[0] }
     } catch (error) {
-      console.error('Error updating consultation status:', error)
+      console.error('Error updating lead status:', error)
       return { success: false, error: error.message }
     }
   }
@@ -837,7 +837,7 @@ class ConsultationService {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('Error fetching consultations by property:', error)
+        console.error('Error fetching leads by property:', error)
         return []
       }
 

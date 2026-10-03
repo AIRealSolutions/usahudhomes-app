@@ -269,12 +269,12 @@ class CustomerService {
         .eq('customer_id', customerIdToDelete)
 
       if (consultError) {
-        console.error('Error fetching consultations:', consultError)
+        console.error('Error fetching leads:', consultError)
         return { success: false, error: consultError.message, data: null }
       }
 
       const consultationIds = consultations?.map(c => c.id) || []
-      console.log(`Found ${consultationIds.length} consultations to delete`)
+      console.log(`Found ${consultationIds.length} leads to delete`)
 
       // Step 2: Delete all activities related to these consultations
       let activitiesDeleted = 0
@@ -301,11 +301,11 @@ class CustomerService {
           .eq('customer_id', customerIdToDelete)
 
         if (consultDeleteError) {
-          console.error('Error deleting consultations:', consultDeleteError)
+          console.error('Error deleting leads:', consultDeleteError)
           return { success: false, error: consultDeleteError.message, data: null }
         }
         consultationsDeleted = count || consultationIds.length
-        console.log(`Deleted ${consultationsDeleted} consultations`)
+        console.log(`Deleted ${consultationsDeleted} leads`)
       }
 
       // Step 4: Delete the customer record itself (HARD DELETE)
@@ -329,7 +329,7 @@ class CustomerService {
           customerEmail: customer.email,
           consultationsDeleted,
           activitiesDeleted,
-          message: `Successfully deleted customer and ${consultationsDeleted} consultation(s)`
+          message: `Successfully deleted customer and ${consultationsDeleted} lead(s)`
         }
       }
     } catch (error) {

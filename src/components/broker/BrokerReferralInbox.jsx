@@ -144,7 +144,7 @@ const BrokerReferralInbox = () => {
 
       if (updateError) throw updateError
 
-      alert('Referral accepted! A new consultation has been created.')
+      alert('Referral accepted! A new lead has been created.')
       loadReferrals()
       calculateStats()
     } catch (error) {

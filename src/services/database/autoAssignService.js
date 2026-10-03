@@ -13,15 +13,15 @@ class AutoAssignService {
    */
   async autoAssignConsultation(consultation) {
     try {
-      console.log('🔄 Auto-assigning consultation to agent...')
-      console.log('   Consultation ID:', consultation.id)
+      console.log('🔄 Auto-assigning lead to agent...')
+      console.log('   Lead ID:', consultation.id)
       console.log('   State:', consultation.state || 'Not specified')
 
       // Assign to agent (will auto-select based on state)
       const result = await referralService.assignConsultationToAgent(consultation.id)
 
       if (result.success) {
-        console.log('✅ Consultation auto-assigned successfully!')
+        console.log('✅ Lead auto-assigned successfully!')
         console.log('   Agent:', result.data.agents?.first_name, result.data.agents?.last_name)
         console.log('   Expires:', result.data.referral_expires_at)
       } else {

@@ -128,7 +128,7 @@ function ConsultationAdmin() {
     if (!editingConsultation) return
 
     try {
-      console.log('Saving consultation:', editingConsultation.id, editForm)
+      console.log('Saving lead:', editingConsultation.id, editForm)
       
       const agentChanged = editForm.agent_id && editForm.agent_id !== editingConsultation.agent_id
       
@@ -136,7 +136,7 @@ function ConsultationAdmin() {
       const updateResult = await consultationService.updateConsultation(editingConsultation.id, editForm)
       
       if (!updateResult.success) {
-        alert('Failed to update consultation: ' + (updateResult.error || 'Unknown error'))
+        alert('Failed to update lead: ' + (updateResult.error || 'Unknown error'))
         return
       }
       
@@ -162,8 +162,8 @@ function ConsultationAdmin() {
       await loadConsultations() // Reload to show changes
       
     } catch (error) {
-      console.error('Error saving consultation:', error)
-      alert('Failed to save consultation: ' + error.message)
+      console.error('Error saving lead:', error)
+      alert('Failed to save lead: ' + error.message)
     }
   }
 
@@ -229,7 +229,7 @@ function ConsultationAdmin() {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `consultations-${new Date().toISOString().split('T')[0]}.csv`
+    a.download = `leads-${new Date().toISOString().split('T')[0]}.csv`
     a.click()
   }
 
@@ -237,8 +237,8 @@ function ConsultationAdmin() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold">Consultation Requests</h2>
-        <p className="text-gray-600">Manage and respond to customer consultation requests</p>
+        <h2 className="text-2xl font-bold">Lead Requests</h2>
+        <p className="text-gray-600">Manage and respond to customer lead requests</p>
       </div>
 
       {/* Stats */}
@@ -319,13 +319,13 @@ function ConsultationAdmin() {
       {loading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading consultations...</p>
+          <p className="mt-4 text-gray-600">Loading leads...</p>
         </div>
       ) : filteredConsultations.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
             <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No consultations found</p>
+            <p className="text-gray-600">No leads found</p>
           </CardContent>
         </Card>
       ) : (
@@ -452,8 +452,8 @@ function ConsultationAdmin() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b">
-              <h3 className="text-xl font-bold">Update Consultation</h3>
-              <p className="text-sm text-gray-600">Edit consultation details and assign broker</p>
+              <h3 className="text-xl font-bold">Update Lead</h3>
+              <p className="text-sm text-gray-600">Edit lead details and assign broker</p>
             </div>
             
             <div className="p-6 space-y-4">
@@ -483,7 +483,7 @@ function ConsultationAdmin() {
 
               {/* Consultation Type */}
               <div>
-                <label className="block text-sm font-medium mb-2">Consultation Type</label>
+                <label className="block text-sm font-medium mb-2">Lead Type</label>
                 <select
                   value={editForm.consultation_type}
                   onChange={(e) => setEditForm({...editForm, consultation_type: e.target.value})}

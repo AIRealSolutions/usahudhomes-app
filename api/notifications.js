@@ -465,7 +465,7 @@ async function handleConsultationRequest(req, res) {
     consultation_id: consultation.id,
     event_type: 'consultation_created',
     event_category: 'consultation',
-    event_title: 'Consultation Created',
+    event_title: 'Lead Created',
     event_description: `${consultation.consultation_type} submitted from the website`,
     event_data: { case_number: consultation.case_number, requested_by: caller.id },
     source: 'website',
@@ -474,7 +474,7 @@ async function handleConsultationRequest(req, res) {
   try {
     await notifyAdminsOfLead({ consultation, property: { state } })
   } catch (e) {
-    console.error('[consultation-request] admin notification failed:', e.message)
+    console.error('[lead-request] admin notification failed:', e.message)
   }
 
   return res.status(200).json({ success: true, data: { id: consultation.id } })

@@ -57,7 +57,7 @@ const AdminDashboard = ({ showVideoStudio = false }) => {
               <p className="text-sm text-gray-600">
                 {showVideoStudio
                   ? 'Manage properties, customers, leads, agents, and video marketing'
-                  : 'Manage properties, customers, consultations, and agents'}
+                  : 'Manage properties, customers, leads, and agents'}
               </p>
             </div>
             

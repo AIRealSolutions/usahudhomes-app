@@ -877,7 +877,7 @@ function SettingsPanel({ user, profile }) {
           <p className="text-xs font-semibold text-gray-600">You will receive a text when:</p>
           <ul className="text-xs text-gray-500 space-y-0.5 list-disc list-inside">
             <li>A new lead is assigned to you by an admin</li>
-            <li>A new consultation request comes in with your name</li>
+            <li>A new lead request comes in with your name</li>
           </ul>
         </div>
 

@@ -295,8 +295,8 @@ const BrokerDashboard = () => {
               <CheckCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
                 {searchTerm || statusFilter !== 'all' 
-                  ? 'No consultations match your filters' 
-                  : 'No active consultations'}
+                  ? 'No leads match your filters' 
+                  : 'No active leads'}
               </h3>
               <p className="text-gray-600">
                 {searchTerm || statusFilter !== 'all'

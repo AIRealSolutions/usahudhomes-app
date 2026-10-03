@@ -25,7 +25,7 @@ class ReferralService {
           .single()
 
         if (!consultation) {
-          return { success: false, error: 'Consultation not found' }
+          return { success: false, error: 'Lead not found' }
         }
 
         // Find available agent for the state
@@ -62,7 +62,7 @@ class ReferralService {
 
       return formatSupabaseResponse(data, null)
     } catch (error) {
-      console.error('Error assigning consultation:', error)
+      console.error('Error assigning lead:', error)
       return { success: false, error: error.message, data: null }
     }
   }
@@ -204,7 +204,7 @@ class ReferralService {
       // Try to auto-assign again
       return await this.assignConsultationToAgent(consultationId)
     } catch (error) {
-      console.error('Error reassigning consultation:', error)
+      console.error('Error reassigning lead:', error)
       return { success: false, error: error.message, data: null }
     }
   }
@@ -285,7 +285,7 @@ class ReferralService {
 
       return formatSupabaseResponse(data, error)
     } catch (error) {
-      console.error('Error fetching agent consultations:', error)
+      console.error('Error fetching agent leads:', error)
       return { success: false, error: error.message, data: [] }
     }
   }
@@ -330,7 +330,7 @@ class ReferralService {
 
       return formatSupabaseResponse(data, error)
     } catch (error) {
-      console.error('Error updating consultation outcome:', error)
+      console.error('Error updating lead outcome:', error)
       return { success: false, error: error.message, data: null }
     }
   }

@@ -41,11 +41,11 @@ Customer Profile:
 - Location: ${customerProfile.state}
 - Budget: ${customerProfile.budget}
 - Preferences: ${customerProfile.preferences}
-- Previous Consultations: ${customerProfile.consultationHistory.length} consultations
+- Previous Leads: ${customerProfile.consultationHistory.length} leads
 
-Consultation History:
+Lead History:
 ${customerProfile.consultationHistory.map((c, i) => 
-  `${i + 1}. ${c.property} - ${c.type} consultation (${c.status})${c.message ? ': ' + c.message : ''}`
+  `${i + 1}. ${c.property} - ${c.type} lead (${c.status})${c.message ? ': ' + c.message : ''}`
 ).join('\n')}
 
 Available Properties (${allProperties.length} total):
@@ -54,7 +54,7 @@ ${allProperties.slice(0, 20).map(p =>
 ).join('\n')}
 ${allProperties.length > 20 ? `\n... and ${allProperties.length - 20} more properties` : ''}
 
-Task: Analyze this customer's profile and consultation history to recommend the TOP 5 most suitable properties from the list.
+Task: Analyze this customer's profile and lead history to recommend the TOP 5 most suitable properties from the list.
 
 For each recommendation, provide:
 1. Property case number
@@ -75,8 +75,8 @@ Format as JSON array:
 Consider:
 - Location preferences (same state, nearby states)
 - Budget constraints
-- Property features mentioned in consultations
-- Consultation patterns (what types of properties they've shown interest in)
+- Property features mentioned in leads
+- Lead patterns (what types of properties they've shown interest in)
 - Property status (prefer BIDS OPEN or EXTENDED)
 - Value for money`
 
@@ -129,7 +129,7 @@ Consider:
   async generateCustomerEmail(customer, purpose, context = {}) {
     const purposes = {
       welcome: 'Welcome new customer and introduce services',
-      followup: 'Follow up on consultation or property inquiry',
+      followup: 'Follow up on lead or property inquiry',
       recommendation: 'Recommend properties based on their preferences',
       update: 'Update customer on property status or new listings',
       reengagement: 'Re-engage inactive customer'
@@ -149,7 +149,7 @@ ${context.properties ? `\nRecommended Properties:\n${context.properties.map(p =>
   `- ${p.address}, ${p.city}, ${p.state} - $${p.price?.toLocaleString()}`
 ).join('\n')}` : ''}
 
-${context.consultation ? `\nRecent Consultation:\n- Type: ${context.consultation.consultation_type}\n- Status: ${context.consultation.status}\n- Message: ${context.consultation.message}` : ''}
+${context.consultation ? `\nRecent Lead:\n- Type: ${context.consultation.consultation_type}\n- Status: ${context.consultation.status}\n- Message: ${context.consultation.message}` : ''}
 
 ${context.additionalInfo ? `\nAdditional Context:\n${context.additionalInfo}` : ''}
 
@@ -276,7 +276,7 @@ Current Customer:
 
 Customer Activity:
 - Total Events: ${events.length}
-- Consultations: ${consultations.length}
+- Leads: ${consultations.length}
 - Last Contact: ${events[0]?.created_at ? new Date(events[0].created_at).toLocaleDateString() : 'Never'}
 
 Recent Activity:
@@ -339,17 +339,17 @@ Activity Summary:
 - Emails Sent: ${events.filter(e => e.event_type === 'email_sent').length}
 - SMS Sent: ${events.filter(e => e.event_type === 'sms_sent').length}
 - Calls Made: ${events.filter(e => e.event_type === 'call_made').length}
-- Consultations: ${consultations.length}
+- Leads: ${consultations.length}
 
 Recent Events:
 ${events.slice(0, 10).map(e => 
   `- ${new Date(e.created_at).toLocaleDateString()}: ${e.event_type}`
 ).join('\n') || '- No events yet'}
 
-Consultations:
+Leads:
 ${consultations.map(c => 
   `- ${c.consultation_type} (${c.status}): ${c.message || 'No message'}`
-).join('\n') || '- No consultations yet'}
+).join('\n') || '- No leads yet'}
 
 Provide:
 1. Engagement Level (Low/Medium/High)

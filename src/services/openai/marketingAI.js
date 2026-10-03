@@ -99,7 +99,7 @@ export const marketingAI = {
       customerContextSection = `\n\nCustomer Interest Data:
 - ${insights.totalInterested} people have shown interest in this property
 - ${insights.uniqueCustomers} unique customers
-- ${insights.pendingConsultations} pending consultations
+- ${insights.pendingConsultations} pending leads
 - Common interests: ${insights.consultationTypes.join(', ')}
 - Interested buyers from: ${insights.customerStates.join(', ')}
 
@@ -318,9 +318,9 @@ Customer Interest Data:
 ${customerContext && customerContext.insights ? `
 - ${customerContext.insights.totalInterested} people interested
 - ${customerContext.insights.uniqueCustomers} unique customers
-- ${customerContext.insights.pendingConsultations} pending consultations
+- ${customerContext.insights.pendingConsultations} pending leads
 - Interested from: ${customerContext.insights.customerStates.join(', ')}
-- Consultation types: ${customerContext.insights.consultationTypes.join(', ')}
+- Lead types: ${customerContext.insights.consultationTypes.join(', ')}
 
 You can use this customer data to create personalized, targeted marketing content that addresses real buyer interest and creates urgency.` : '- No customer interest data available yet'}
 

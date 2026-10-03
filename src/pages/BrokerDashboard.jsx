@@ -126,11 +126,11 @@ export default function BrokerDashboard({ user, showAdminAccess }) {
       {/* Consultations List */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b">
-          <h2 className="text-xl font-semibold">My Consultations</h2>
+          <h2 className="text-xl font-semibold">My Leads</h2>
         </div>
         {consultations.length === 0 ? (
           <div className="px-6 py-12 text-center text-gray-500">
-            No consultations assigned yet
+            No leads assigned yet
           </div>
         ) : (
           <div className="divide-y">

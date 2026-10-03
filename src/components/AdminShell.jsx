@@ -82,7 +82,7 @@ const NAV = [
       { id: 'leads',            label: 'Leads',             icon: MessageSquare, color: 'text-orange-500', alertKey: 'newLeads' },
       { id: 'customers',        label: 'Customers',         icon: Users,         color: 'text-blue-500' },
       { id: 'referrals',        label: 'Referrals',         icon: GitMerge,      color: 'text-purple-500' },
-      { id: 'consultations',    label: 'Consultations',     icon: PhoneCall,     color: 'text-green-500' },
+      { id: 'consultations',    label: 'Assigned Leads', icon: PhoneCall,     color: 'text-green-500' },
     ]
   },
   {

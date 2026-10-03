@@ -487,7 +487,7 @@ const CustomerDetailsPage = () => {
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      Consultations
+                      Leads
                     </button>
                     <button
                       onClick={() => setFilter('status')}

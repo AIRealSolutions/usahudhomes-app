@@ -60,7 +60,7 @@ const DatabaseReset = () => {
               <ul className="list-disc list-inside mt-2 space-y-1">
                 <li>Clear all cached property data</li>
                 <li>Clear all customer records</li>
-                <li>Clear all leads and consultations</li>
+                <li>Clear all leads and leads</li>
                 <li>Load fresh 25 NC HUD properties from default dataset</li>
                 <li>Reload the page automatically</li>
               </ul>
