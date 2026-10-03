@@ -60,7 +60,14 @@ export default function Login() {
         // This avoids race conditions with async state updates
       }
     } catch (error) {
-      setError(error.message)
+      const errorMsg = error.message || 'An unexpected error occurred'
+      console.error('Login error:', errorMsg)
+      setError(errorMsg)
+
+      // Keep error visible for at least 5 seconds
+      setTimeout(() => {
+        setError(current => current === errorMsg ? null : current)
+      }, 5000)
     } finally {
       setLoading(false)
     }

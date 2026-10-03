@@ -1,43 +1,11 @@
 {
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "usahudhomes.com"
-        }
-      ],
-      "destination": "https://www.usahudhomes.com/$1",
-      "permanent": true
-    }
-  ],
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "devCommand": "npm run dev",
   "rewrites": [
     {
-      "source": "/sitemap.xml",
-      "destination": "/api/sitemap"
-    },
-    {
-      "source": "/hud-homes/:stateSlug/:citySlug",
-      "destination": "/api/geo-meta?stateSlug=:stateSlug&citySlug=:citySlug"
-    },
-    {
-      "source": "/hud-homes/:stateSlug",
-      "destination": "/api/geo-meta?stateSlug=:stateSlug"
-    },
-    {
-      "source": "/property/:caseNumber",
-      "destination": "/api/property-meta?caseNumber=:caseNumber"
-    },
-    {
-      "source": "/((?!api/).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
-    }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/check-closures",
-      "schedule": "0 2 * * *"
     }
   ]
 }
