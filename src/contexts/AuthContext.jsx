@@ -170,22 +170,31 @@ export const AuthProvider = ({ children }) => {
   // Sign in
   const signIn = async (email, password) => {
     try {
+      console.log('AuthContext.signIn called with email:', email)
       setLoading(true)
       const result = await authService.signIn(email, password)
-      
+      console.log('authService.signIn returned:', result)
+
       if (result.success && result.data) {
+        console.log('Sign in successful, updating state')
+        console.log('User:', result.data.user)
+        console.log('Profile:', result.data.profile)
+        console.log('Role:', result.data.role)
+
         setUser(result.data.user)
         setProfile(result.data.profile)
         setRole(result.data.role)
-        
+
         if (result.data.role) {
           localStorage.setItem('userRole', result.data.role)
         }
         if (result.data.profile) {
           localStorage.setItem('userProfile', JSON.stringify(result.data.profile))
         }
+      } else {
+        console.warn('Sign in returned unsuccessful result:', result)
       }
-      
+
       return result
     } catch (error) {
       console.error('Error in signIn:', error)

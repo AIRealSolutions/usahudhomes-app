@@ -85,13 +85,17 @@ class AuthService {
     try {
       // Safety check
       if (!supabase || !supabase.auth) {
+        console.error('Supabase not configured')
         return { success: false, error: 'Database not configured', data: null }
       }
+      console.log('authService.signIn: Attempting Supabase auth with email:', email)
       // Authenticate user
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password
       })
+
+      console.log('Supabase auth response - authData:', authData?.user?.id ? 'user found' : 'no user', 'error:', authError)
 
       if (authError) {
         console.error('Supabase auth signin error:', authError)

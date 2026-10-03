@@ -44,15 +44,19 @@ export default function Login() {
         setIsSignUp(false)
       } else {
         // Sign in existing user using AuthContext
+        console.log('Attempting sign in with email:', email)
         const result = await signIn(email, password)
+        console.log('Sign in result:', result)
 
         if (!result.success) {
-          throw new Error(result.error || 'Sign in failed')
+          const errorMsg = result.error || 'Sign in failed'
+          console.error('Sign in failed:', errorMsg)
+          throw new Error(errorMsg)
         }
 
-        // Use the returned role to determine route (don't wait for state update)
-        // All users go to /dashboard regardless of role
-        navigate('/dashboard')
+        console.log('Sign in successful, waiting for state update to trigger useEffect redirect')
+        // Don't navigate here - let the useEffect handle it after state updates
+        // This avoids race conditions with async state updates
       }
     } catch (error) {
       setError(error.message)
