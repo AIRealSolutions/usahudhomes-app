@@ -21,7 +21,8 @@ export default function SuccessfulDeals() {
       // Fetch closed deals from the successful_deals view
       const { data, error } = await supabase
         .from('successful_deals')
-        .select('*')
+        // Only these columns are public; broker contact details and notes are not.
+        .select('id,case_number,address,city,state,zip_code,estimated_sale_price,actual_sale_price,original_list_price,purchaser_type,date_closed,days_to_close,discount_percentage')
         .limit(50)
 
       if (error) throw error
