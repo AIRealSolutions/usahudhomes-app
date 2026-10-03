@@ -39,9 +39,9 @@ class AuthService {
         return { success: false, error: 'User creation failed', data: null }
       }
 
-      // Create profile
+      // Create user record in database
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
+        .from('users')
         .insert({
           id: authData.user.id,
           email,
@@ -104,7 +104,7 @@ class AuthService {
 
       // Get user profile and role
       let { data: profileData, error: profileError } = await supabase
-        .from('profiles')
+        .from('users')
         .select('*')
         .eq('id', authData.user.id)
         .single()
@@ -113,7 +113,7 @@ class AuthService {
       if (profileError) {
         console.log('Profile not found, creating new profile for user')
         const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
+          .from('users')
           .insert({
             id: authData.user.id,
             email: authData.user.email,
@@ -144,7 +144,7 @@ class AuthService {
 
       // Update last login
       await supabase
-        .from('profiles')
+        .from('users')
         .update({ last_login_at: new Date().toISOString() })
         .eq('id', authData.user.id)
 
@@ -210,7 +210,7 @@ class AuthService {
 
       // Get profile
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
+        .from('users')
         .select('*')
         .eq('id', session.user.id)
         .single()
@@ -256,7 +256,7 @@ class AuthService {
 
       // Get profile
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
+        .from('users')
         .select('*')
         .eq('id', user.id)
         .single()
@@ -304,7 +304,7 @@ class AuthService {
       updateData.updated_at = new Date().toISOString()
 
       const { data, error } = await supabase
-        .from('profiles')
+        .from('users')
         .update(updateData)
         .eq('id', userId)
         .select()
@@ -377,7 +377,7 @@ class AuthService {
   async hasRole(userId, allowedRoles) {
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('users')
         .select('role')
         .eq('id', userId)
         .single()
@@ -410,7 +410,7 @@ class AuthService {
       if (session?.user) {
         // Get profile
         const { data: profileData } = await supabase
-          .from('profiles')
+          .from('users')
           .select('*')
           .eq('id', session.user.id)
           .single()

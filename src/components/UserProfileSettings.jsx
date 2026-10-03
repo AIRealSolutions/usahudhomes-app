@@ -90,7 +90,7 @@ export default function UserProfileSettings() {
 
     try {
       const { error: updateError } = await supabase
-        .from('profiles')
+        .from('users')
         .update({
           first_name: formData.firstName,
           last_name: formData.lastName,
