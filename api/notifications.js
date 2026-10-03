@@ -12,6 +12,9 @@
  *   POST ?action=agent-resend-verification — issue and email a new verification link
  *   POST ?action=lead-email — broker/admin emails a lead via Gmail (Bearer token required)
  *   POST ?action=lead-sms   — broker/admin texts a lead via Twilio (Bearer token required)
+ *   POST ?action=consultation-request — signed-in buyer asks for an agent callback
+ *
+ * agent-email and sms also require a broker/admin Bearer token.
  *
  * Optional, for lead-sms: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER
  * (or TWILIO_MESSAGING_SERVICE_SID). Without them lead-sms answers { configured: false }.
@@ -244,8 +247,8 @@ const TWILIO_TOKEN    = process.env.TWILIO_AUTH_TOKEN
 const TWILIO_FROM     = process.env.TWILIO_FROM_NUMBER
 const TWILIO_MSG_SVC  = process.env.TWILIO_MESSAGING_SERVICE_SID
 
-// Resolves the caller from their Supabase access token; only brokers and admins may message leads.
-async function requireStaff(req) {
+// Resolves the caller's profile from their Supabase access token, or null if not signed in.
+async function getCaller(req) {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
   if (!token || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) return null
   const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -253,10 +256,14 @@ async function requireStaff(req) {
   })
   if (!r.ok) return null
   const authUser = await r.json()
-  const rows = await supabaseFetch(`users?select=id,email,name,role&id=eq.${authUser.id}&limit=1`)
-  const profile = rows?.[0]
-  if (!profile || !['admin', 'broker'].includes(profile.role)) return null
-  return profile
+  const rows = await supabaseFetch(`users?select=id,email,name,phone,role&id=eq.${authUser.id}&limit=1`)
+  return rows?.[0] || { id: authUser.id, email: authUser.email, role: 'end_user' }
+}
+
+// Only brokers and admins may message leads or send arbitrary email/SMS.
+async function requireStaff(req) {
+  const caller = await getCaller(req)
+  return caller && ['admin', 'broker'].includes(caller.role) ? caller : null
 }
 
 function toE164(phone) {
@@ -325,12 +332,15 @@ async function handleLeadSms(req, res) {
 
 // ─── Action: lead notification ────────────────────────────────────────────────
 async function handleLeadNotification(req, res) {
-  const { consultation, customer, property } = req.body || {}
+  const notified = await notifyAdminsOfLead(req.body || {})
+  return res.status(200).json({ success: true, notified })
+}
 
-  const name  = customer?.name  || consultation?.customer_name  || consultation?.name  || 'New Lead'
-  const email = customer?.email || consultation?.customer_email || consultation?.email || ''
-  const phone = customer?.phone || consultation?.customer_phone || consultation?.phone || ''
-  const state = consultation?.state || property?.state || ''
+async function notifyAdminsOfLead({ consultation, customer, property }) {
+  const name  = String(customer?.name  || consultation?.customer_name  || consultation?.name  || 'New Lead').slice(0, 120)
+  const email = String(customer?.email || consultation?.customer_email || consultation?.email || '').slice(0, 200)
+  const phone = String(customer?.phone || consultation?.customer_phone || consultation?.phone || '').slice(0, 40)
+  const state = String(consultation?.state || property?.state || '').slice(0, 40)
 
   // Get all admin agents
   const admins = await supabaseFetch(
@@ -342,10 +352,10 @@ async function handleLeadNotification(req, res) {
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
       <h2 style="color:#1e40af;margin-bottom:16px">🏠 New Lead — USAHUDhomes.com</h2>
       <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
-        <tr style="background:#f9fafb"><td style="padding:10px 16px;font-weight:bold;color:#374151;width:120px">Name</td><td style="padding:10px 16px;color:#111827">${name}</td></tr>
-        <tr><td style="padding:10px 16px;font-weight:bold;color:#374151">Email</td><td style="padding:10px 16px;color:#111827">${email}</td></tr>
-        <tr style="background:#f9fafb"><td style="padding:10px 16px;font-weight:bold;color:#374151">Phone</td><td style="padding:10px 16px;color:#111827">${phone || '—'}</td></tr>
-        <tr><td style="padding:10px 16px;font-weight:bold;color:#374151">State</td><td style="padding:10px 16px;color:#111827">${state || '—'}</td></tr>
+        <tr style="background:#f9fafb"><td style="padding:10px 16px;font-weight:bold;color:#374151;width:120px">Name</td><td style="padding:10px 16px;color:#111827">${escapeHtml(name)}</td></tr>
+        <tr><td style="padding:10px 16px;font-weight:bold;color:#374151">Email</td><td style="padding:10px 16px;color:#111827">${escapeHtml(email)}</td></tr>
+        <tr style="background:#f9fafb"><td style="padding:10px 16px;font-weight:bold;color:#374151">Phone</td><td style="padding:10px 16px;color:#111827">${escapeHtml(phone) || '—'}</td></tr>
+        <tr><td style="padding:10px 16px;font-weight:bold;color:#374151">State</td><td style="padding:10px 16px;color:#111827">${escapeHtml(state) || '—'}</td></tr>
       </table>
       <p style="margin-top:20px">
         <a href="${SITE_URL}/admin" style="background:#1e40af;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold">View in Admin Dashboard</a>
@@ -378,11 +388,101 @@ async function handleLeadNotification(req, res) {
     } catch (e) { console.error('Fallback email failed:', e.message) }
   }
 
-  return res.status(200).json({ success: true, notified })
+  return notified
+}
+
+// ─── Action: consultation request (signed-in buyer) ───────────────────────────
+// Buyers can't read or write customers/consultations under RLS, so the server
+// finds or creates the customer record and the consultation on their behalf.
+const CONSULTATION_TYPES = ['agent_callback_request', 'property_inquiry']
+
+async function handleConsultationRequest(req, res) {
+  const caller = await getCaller(req)
+  if (!caller) return res.status(401).json({ success: false, error: 'Please sign in to request an agent.' })
+
+  const b = req.body || {}
+  const str = (v, max = 200) => (v === undefined || v === null || v === '' ? null : String(v).trim().slice(0, max))
+  const num = (v) => (v === undefined || v === null || v === '' || isNaN(Number(v)) ? null : Number(v))
+  const firstName = str(b.firstName, 80)
+  const lastName  = str(b.lastName, 80)
+  const email     = str(b.email, 200)?.toLowerCase()
+  const phone     = str(b.phone, 40)
+  const state     = str(b.state, 40)
+  if (!firstName || !lastName || !phone || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ success: false, error: 'Name, a valid email and phone are required.' })
+  }
+  if (!state) return res.status(400).json({ success: false, error: 'State is required.' })
+
+  const existing = await supabaseFetch(
+    `customers?select=id&email=eq.${encodeURIComponent(email)}&is_active=eq.true&is_deleted=eq.false&order=created_at.desc&limit=1`
+  )
+  let customerId = existing?.[0]?.id
+  if (!customerId) {
+    const created = await supabaseFetch('customers', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        first_name: firstName, last_name: lastName, email, phone, state,
+        status: 'new', lead_source: 'website', notes: str(b.message, 2000) || 'Lead from agent request form',
+      }),
+    })
+    customerId = created?.[0]?.id
+    if (!customerId) return res.status(500).json({ success: false, error: 'Could not save your request. Please try again.' })
+  }
+
+  const rows = await supabaseFetch('consultations', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      customer_id: customerId,
+      property_id: /^[0-9a-f-]{36}$/i.test(String(b.propertyId || '')) ? b.propertyId : null,
+      case_number: str(b.caseNumber, 40),
+      consultation_type: CONSULTATION_TYPES.includes(b.consultationType) ? b.consultationType : 'agent_callback_request',
+      status: 'pending',
+      customer_name: `${firstName} ${lastName}`,
+      customer_email: email,
+      customer_phone: phone,
+      state,
+      message: str(b.message, 4000),
+      financing_type: str(b.financingType, 60),
+      down_payment: str(b.downPayment, 60),
+      credit_score_range: str(b.creditScoreRange, 60),
+      pre_approved: b.preApproved === true,
+      timeline: str(b.timeline, 60),
+      buyer_type: str(b.buyerType, 60),
+      experience_level: str(b.experienceLevel, 60),
+      price_range_min: num(b.priceRangeMin),
+      price_range_max: num(b.priceRangeMax),
+      property_preferences: b.propertyPreferences && typeof b.propertyPreferences === 'object' ? b.propertyPreferences : null,
+      hear_about_us: str(b.hearAboutUs, 120),
+    }),
+  })
+  const consultation = rows?.[0]
+  if (!consultation) return res.status(500).json({ success: false, error: 'Could not save your request. Please try again.' })
+
+  await supabaseWrite('customer_events', 'POST', {
+    customer_id: customerId,
+    consultation_id: consultation.id,
+    event_type: 'consultation_created',
+    event_category: 'consultation',
+    event_title: 'Consultation Created',
+    event_description: `${consultation.consultation_type} submitted from the website`,
+    event_data: { case_number: consultation.case_number, requested_by: caller.id },
+    source: 'website',
+  })
+
+  try {
+    await notifyAdminsOfLead({ consultation, property: { state } })
+  } catch (e) {
+    console.error('[consultation-request] admin notification failed:', e.message)
+  }
+
+  return res.status(200).json({ success: true, data: { id: consultation.id } })
 }
 
 // ─── Action: direct SMS ───────────────────────────────────────────────────────
 async function handleSms(req, res) {
+  if (!(await requireStaff(req))) return res.status(401).json({ success: false, error: 'Sign in as a broker or admin.' })
   const { phone, carrier, message, type, lead } = req.body || {}
 
   if (!phone || !carrier) {
@@ -413,6 +513,8 @@ async function handleSms(req, res) {
 
 // ─── Action: agent email ──────────────────────────────────────────────────────
 async function handleAgentEmail(req, res) {
+  // Sends caller-supplied HTML, so it must never be open to the public.
+  if (!(await requireStaff(req))) return res.status(401).json({ success: false, error: 'Sign in as a broker or admin.' })
   const { type, to, subject, html, text } = req.body || {}
 
   if (!type || !to || !subject || !html) {
@@ -446,11 +548,12 @@ export default async function handler(req, res) {
     if (action === 'agent-resend-verification') return await handleAgentResendVerification(req, res)
     if (action === 'lead-email')  return await handleLeadEmail(req, res)
     if (action === 'lead-sms')    return await handleLeadSms(req, res)
+    if (action === 'consultation-request') return await handleConsultationRequest(req, res)
 
     return res.status(400).json({
       success: false,
       error: 'Missing or unknown ?action= parameter',
-      valid_actions: ['lead', 'sms', 'agent-email', 'agent-verify', 'agent-resend-verification', 'lead-email', 'lead-sms'],
+      valid_actions: ['lead', 'sms', 'agent-email', 'agent-verify', 'agent-resend-verification', 'lead-email', 'lead-sms', 'consultation-request'],
     })
   } catch (err) {
     console.error(`[notifications/${action}] Error:`, err.message)

@@ -7,6 +7,7 @@
 import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../config/supabase'
 import { consultationService } from '../services/database/consultationService'
 import { agentService } from '../services/database'
 import {
@@ -756,9 +757,10 @@ function SettingsPanel({ user, profile }) {
     }
     setTestStatus('sending')
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const r = await fetch('/api/notifications?action=sms', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
         body: JSON.stringify({ phone: digits, carrier: smsCarrier, type: 'test' }),
       })
       const data = await r.json()

@@ -1,3 +1,4 @@
+import { supabase } from '../config/supabase';
 // Email Service for USAhudHomes.com
 // Handles email notifications for new client registrations and consultations
 
@@ -351,9 +352,14 @@ Marc Spencer: (910) 363-6147
       this.logEmail(emailData);
       
       // Send via Resend API endpoint
+      // agent-email is restricted to signed-in brokers/admins.
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch('/api/notifications?action=agent-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+        },
         body: JSON.stringify({
           type: emailData.type || 'notification',
           to: emailData.to,

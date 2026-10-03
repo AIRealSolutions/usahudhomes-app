@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { consultationService } from '../services/database/consultationService'
+import { postNotification } from '../services/leadMessaging'
 import { Phone, Mail, ChevronDown, CheckCircle, AlertCircle, Loader } from 'lucide-react'
 
 export default function AgentRequestForm({ property, onSuccess }) {
@@ -68,16 +68,19 @@ export default function AgentRequestForm({ property, onSuccess }) {
       if (!formData.lastName.trim()) throw new Error('Last name is required')
       if (!formData.email.trim()) throw new Error('Email is required')
       if (!formData.phone.trim()) throw new Error('Phone is required')
-      if (!profile?.state) throw new Error('Your state is required (from profile)')
+      const state = property?.state || profile?.state
+      if (!state) throw new Error('Could not determine the state for this request')
 
-      // Call consultationService to create consultation with qualification data
-      const result = await consultationService.addConsultation({
-        customerName: `${formData.firstName} ${formData.lastName}`,
-        customerEmail: formData.email,
-        customerPhone: formData.phone,
-        state: profile?.state,
+      // Buyers can't write customers/consultations under RLS; the server creates them.
+      const result = await postNotification('consultation-request', {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        state,
+        caseNumber: property?.case_number || null,
+        propertyId: property?.id || null,
         consultationType: 'agent_callback_request',
-        status: 'pending',
 
         // Qualification fields
         financingType: formData.financingType || null,

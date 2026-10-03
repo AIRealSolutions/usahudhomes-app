@@ -51,8 +51,9 @@ export const agentApplicationService = {
       // Log the submission
       await this.logVerificationAction(data.id, null, 'application_submitted', 'Application submitted by agent')
 
-      // Send verification email
-      await this.sendVerificationEmail(data, verificationToken)
+      // The server issues the token and sends the verification email.
+      const emailResult = await this.resendVerificationEmail(data.email)
+      if (!emailResult.success) console.error('Verification email not sent:', emailResult.error)
 
       return {
         success: true,
@@ -77,17 +78,6 @@ export const agentApplicationService = {
   /**
    * Send email verification link
    */
-  async sendVerificationEmail(application, token) {
-    try {
-      const result = await emailService.sendAgentVerificationEmail(application, token)
-      await this.logVerificationAction(application.id, null, 'verification_email_sent', `Verification email sent to ${application.email}`)
-      return result
-    } catch (error) {
-      console.error('Error sending verification email:', error)
-      return { success: false, error: error.message }
-    }
-  },
-
   /**
    * Verify email with token (server-side: applicants can't read agent_applications under RLS)
    */

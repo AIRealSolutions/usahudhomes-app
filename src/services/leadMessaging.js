@@ -1,6 +1,6 @@
 import { supabase } from '../config/supabase'
 
-async function post(action, payload) {
+export async function postNotification(action, payload) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session?.access_token) {
     return { success: false, error: 'Your session expired. Please sign in again.' }
@@ -36,7 +36,7 @@ export function smsLink(phone, body) {
 
 /** Sends an email to a lead from the server (Gmail). Resolves { success, error? }. */
 export function sendLeadEmail({ to, subject, body }) {
-  return post('lead-email', { to, subject, body })
+  return postNotification('lead-email', { to, subject, body })
 }
 
 /**
@@ -48,7 +48,7 @@ export async function sendLeadText({ to, body }) {
   if (!String(to || '').replace(/\D/g, '')) {
     return { success: false, error: 'This lead has no phone number.' }
   }
-  const result = await post('lead-sms', { to, body })
+  const result = await postNotification('lead-sms', { to, body })
   if (result.success) return { success: true, via: 'twilio' }
   if (result.configured !== false) return { success: false, error: result.error }
 
