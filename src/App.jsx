@@ -664,9 +664,12 @@ function InquiryFormModal({ property, onClose }) {
       const lastName = nameParts.slice(1).join(' ') || ''
 
       // Save inquiry to leads table with property information
-      const { data: leadData, error: leadError } = await supabase
+      // Signed-out visitors can insert leads but not read them back, so the id is generated here.
+      const leadData = { id: crypto.randomUUID() }
+      const { error: leadError } = await supabase
         .from('leads')
         .insert([{
+          id: leadData.id,
           first_name: firstName,
           last_name: lastName,
           email: formData.email,
@@ -678,9 +681,7 @@ function InquiryFormModal({ property, onClose }) {
           property_price: property.list_price,
           source: 'property_inquiry',
           status: 'new_lead'
-        }])
-        .select()
-        .single();
+        }]);
 
       if (leadError) throw leadError;
 

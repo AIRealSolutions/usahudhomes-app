@@ -91,9 +91,12 @@ export default function ContactForm() {
       setSubmitting(true);
 
       // Create lead in leads table
-      const { data: leadData, error: leadError } = await supabase
+      // Signed-out visitors can insert leads but not read them back, so the id is generated here.
+      const leadData = { id: crypto.randomUUID() }
+      const { error: leadError } = await supabase
         .from('leads')
         .insert({
+          id: leadData.id,
           first_name: formData.first_name,
           last_name: formData.last_name,
           email: formData.email,
@@ -105,9 +108,7 @@ export default function ContactForm() {
           message: formData.message || null,
           source: 'website',
           status: 'new_lead'
-        })
-        .select()
-        .single();
+        });
 
       if (leadError) throw leadError;
 

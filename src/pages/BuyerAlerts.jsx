@@ -94,9 +94,12 @@ export default function BuyerAlerts() {
         'Consent: Buyer requested property alerts and agreed to be contacted about matching homes.'
       ].join('\n')
 
-      const { data: lead, error: leadError } = await supabase
+      // Signed-out visitors can insert leads but not read them back, so the id is generated here.
+      const lead = { id: crypto.randomUUID() }
+      const { error: leadError } = await supabase
         .from('leads')
         .insert({
+          id: lead.id,
           first_name: form.firstName.trim(),
           last_name: form.lastName.trim(),
           email: form.email.trim().toLowerCase(),
@@ -109,8 +112,6 @@ export default function BuyerAlerts() {
           source: 'hud_home_alerts',
           status: 'new_lead'
         })
-        .select()
-        .single()
 
       if (leadError) throw leadError
 

@@ -40,12 +40,11 @@ export const agentApplicationService = {
         status: 'pending'
       }
 
-      // Insert application
-      const { data, error } = await supabase
+      // Applicants are signed out and can insert but not read back, so the id is generated here.
+      const data = { ...application, id: crypto.randomUUID() }
+      const { error } = await supabase
         .from('agent_applications')
-        .insert([application])
-        .select()
-        .single()
+        .insert([data])
 
       if (error) throw error
 
