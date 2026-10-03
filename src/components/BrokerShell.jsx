@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../config/supabase'
 import { consultationService } from '../services/database/consultationService'
 import { agentService } from '../services/database'
+import { US_STATES, AGENT_SPECIALTIES } from '../data/referralAgreementTemplate'
 import {
   LayoutDashboard, Users, Home, MessageSquare, Bot, Settings,
   ChevronLeft, ChevronRight, Menu, X, LogOut, Bell, RefreshCw,
@@ -698,55 +699,148 @@ const CARRIER_OPTIONS = [
   { value: 'other',        label: 'Other / Unknown' },
 ]
 
-function SettingsPanel({ user, profile }) {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://lpqjndfjbenolhneqzec.supabase.co'
-  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const toArray = (v) => Array.isArray(v) ? v : (typeof v === 'string' && v ? v.split(',').map(s => s.trim()).filter(Boolean) : [])
+
+const emptyForm = {
+  first_name: '', last_name: '', phone: '', company: '', license_name: '',
+  license_number: '', license_state: '', years_experience: '', bio: '', profile_image: '',
+  states_covered: [], specialties: [],
+}
+
+const inputCls = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+const labelCls = 'block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5'
+
+function SaveStatus({ status, error }) {
+  if (status === 'saved') return (
+    <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+      <CheckCircle className="w-4 h-4" /> Saved!
+    </span>
+  )
+  if (status === 'error') return <span className="text-xs text-red-500 font-medium">{error || 'Save failed — try again'}</span>
+  return null
+}
+
+function SettingsPanel({ user, agentId, onProfileSaved }) {
+  const [agent,       setAgent]       = useState(null)
+  const [loading,     setLoading]     = useState(true)
+  const [loadError,   setLoadError]   = useState(null)
+
+  // Profile form state
+  const [form,          setForm]          = useState(emptyForm)
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [profileStatus, setProfileStatus] = useState(null) // null | 'saved' | 'error'
+  const [profileError,  setProfileError]  = useState(null)
 
   // SMS notification state
-  const [smsEnabled,  setSmsEnabled]  = useState(profile?.sms_notifications_enabled || false)
-  const [smsPhone,    setSmsPhone]    = useState(profile?.notification_phone || profile?.phone || '')
-  const [smsCarrier,  setSmsCarrier]  = useState(profile?.sms_carrier || 'verizon')
+  const [smsEnabled,  setSmsEnabled]  = useState(false)
+  const [smsPhone,    setSmsPhone]    = useState('')
+  const [smsCarrier,  setSmsCarrier]  = useState('verizon')
   const [saving,      setSaving]      = useState(false)
   const [saveStatus,  setSaveStatus]  = useState(null) // null | 'saved' | 'error'
   const [testStatus,  setTestStatus]  = useState(null) // null | 'sending' | 'sent' | 'error'
 
+  const loadAgent = useCallback(async () => {
+    if (!agentId) { setLoading(false); return }
+    setLoading(true)
+    setLoadError(null)
+    const { data, error } = await supabase.from('agents').select('*').eq('id', agentId).single()
+    if (error) {
+      console.error('Load broker profile:', error)
+      setLoadError('Could not load your profile.')
+    } else {
+      setAgent(data)
+      setForm({
+        first_name:       data.first_name || '',
+        last_name:        data.last_name || '',
+        phone:            data.phone || '',
+        company:          data.company || '',
+        license_name:     data.license_name || '',
+        license_number:   data.license_number || '',
+        license_state:    data.license_state || '',
+        years_experience: data.years_experience ?? '',
+        bio:              data.bio || '',
+        profile_image:    data.profile_image || '',
+        states_covered:   toArray(data.states_covered),
+        specialties:      toArray(data.specialties),
+      })
+      setSmsEnabled(!!data.sms_notifications_enabled)
+      setSmsPhone(data.notification_phone || data.phone || '')
+      setSmsCarrier(data.sms_carrier || 'verizon')
+    }
+    setLoading(false)
+  }, [agentId])
+
+  useEffect(() => { loadAgent() }, [loadAgent])
+
+  const setField = (key, value) => setForm(f => ({ ...f, [key]: value }))
+  const toggleInList = (key, value) => setForm(f => ({
+    ...f,
+    [key]: f[key].includes(value) ? f[key].filter(v => v !== value) : [...f[key], value],
+  }))
+
+  const handleSaveProfile = async () => {
+    if (!agentId) return
+    if (!form.first_name.trim() || !form.last_name.trim()) {
+      setProfileStatus('error')
+      setProfileError('First and last name are required.')
+      return
+    }
+    const years = form.years_experience === '' ? null : parseInt(form.years_experience, 10)
+    if (years !== null && (Number.isNaN(years) || years < 0 || years > 80)) {
+      setProfileStatus('error')
+      setProfileError('Years of experience must be a number between 0 and 80.')
+      return
+    }
+    setSavingProfile(true)
+    setProfileStatus(null)
+    setProfileError(null)
+    const updates = {
+      first_name:       form.first_name.trim(),
+      last_name:        form.last_name.trim(),
+      phone:            form.phone.trim() || null,
+      company:          form.company.trim() || null,
+      license_name:     form.license_name.trim() || null,
+      license_number:   form.license_number.trim() || null,
+      license_state:    form.license_state || null,
+      years_experience: years,
+      bio:              form.bio.trim() || null,
+      profile_image:    form.profile_image.trim() || null,
+      states_covered:   form.states_covered,
+      specialties:      form.specialties,
+      updated_at:       new Date().toISOString(),
+    }
+    const { data, error } = await supabase.from('agents').update(updates).eq('id', agentId).select().single()
+    setSavingProfile(false)
+    if (error) {
+      console.error('Save broker profile:', error)
+      setProfileStatus('error')
+      setProfileError('Save failed — try again')
+      return
+    }
+    setAgent(data)
+    onProfileSaved?.(data)
+    setProfileStatus('saved')
+    setTimeout(() => setProfileStatus(null), 3000)
+  }
+
   const handleSaveSms = async () => {
-    if (!profile?.id) return
+    if (!agentId) return
     setSaving(true)
     setSaveStatus(null)
-    try {
-      const r = await fetch(
-        `${supabaseUrl}/rest/v1/agents?id=eq.${profile.id}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal',
-          },
-          body: JSON.stringify({
-            notification_phone:        smsPhone.replace(/\D/g, '').slice(-10) || null,
-            sms_carrier:               smsCarrier,
-            sms_notifications_enabled: smsEnabled,
-            updated_at:                new Date().toISOString(),
-          }),
-        }
-      )
-      if (r.ok) {
-        setSaveStatus('saved')
-        setTimeout(() => setSaveStatus(null), 3000)
-      } else {
-        const err = await r.json()
-        console.error('Save SMS settings error:', err)
-        setSaveStatus('error')
-      }
-    } catch (e) {
-      console.error('Save SMS settings:', e)
+    const { error } = await supabase.from('agents').update({
+      notification_phone:        smsPhone.replace(/\D/g, '').slice(-10) || null,
+      sms_carrier:               smsCarrier,
+      sms_notifications_enabled: smsEnabled,
+      updated_at:                new Date().toISOString(),
+    }).eq('id', agentId)
+    setSaving(false)
+    if (error) {
+      console.error('Save SMS settings:', error)
       setSaveStatus('error')
-    } finally {
-      setSaving(false)
+      return
     }
+    setSaveStatus('saved')
+    setTimeout(() => setSaveStatus(null), 3000)
   }
 
   const handleTestSms = async () => {
@@ -782,41 +876,165 @@ function SettingsPanel({ user, profile }) {
     }
   }
 
+  if (loading) return <PanelFallback />
+  if (!agentId || loadError) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-6 text-center space-y-3">
+        <AlertCircle className="w-8 h-8 text-amber-500 mx-auto" />
+        <p className="text-sm text-gray-700">
+          {loadError || `No broker record is linked to ${user?.email || 'your account'}. Contact your administrator.`}
+        </p>
+        {loadError && (
+          <button onClick={loadAgent} className="text-sm text-blue-600 hover:underline">Try again</button>
+        )}
+      </div>
+    )
+  }
+
+  const specialtyOptions = [...new Set([...AGENT_SPECIALTIES, ...form.specialties])]
+  const displayName = `${agent?.first_name || ''} ${agent?.last_name || ''}`.trim()
+
   return (
     <div className="space-y-5">
       <h2 className="text-xl font-bold text-gray-900">My Profile & Notifications</h2>
 
       {/* Profile card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
-            <User className="w-8 h-8 text-blue-600" />
-          </div>
+          {form.profile_image ? (
+            <img src={form.profile_image} alt="" className="w-16 h-16 rounded-full object-cover bg-blue-100"
+              onError={e => { e.currentTarget.style.display = 'none' }} />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
+              <User className="w-8 h-8 text-blue-600" />
+            </div>
+          )}
           <div>
-            <p className="text-lg font-semibold text-gray-900">
-              {profile?.first_name} {profile?.last_name}
-            </p>
-            <p className="text-sm text-gray-500">{user?.email}</p>
+            <p className="text-lg font-semibold text-gray-900">{displayName || 'Broker'}</p>
+            <p className="text-sm text-gray-500">{agent?.email || user?.email}</p>
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 mt-1">
               Broker
             </span>
           </div>
         </div>
+
+        {/* Contact */}
         <div className="border-t border-gray-100 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[
-            { label: 'Email',   value: user?.email },
-            { label: 'Phone',   value: profile?.phone || '—' },
-            { label: 'State',   value: profile?.license_state || profile?.state || '—' },
-            { label: 'License', value: profile?.license_number || '—' },
-          ].map(({ label, value }) => (
-            <div key={label}>
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</p>
-              <p className="text-sm text-gray-700 mt-0.5">{value}</p>
-            </div>
-          ))}
+          <div>
+            <label className={labelCls}>First Name *</label>
+            <input value={form.first_name} onChange={e => setField('first_name', e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Last Name *</label>
+            <input value={form.last_name} onChange={e => setField('last_name', e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Email</label>
+            <input value={agent?.email || user?.email || ''} disabled className={`${inputCls} bg-gray-50 text-gray-500`} />
+            <p className="text-xs text-gray-400 mt-1">Your login email — contact your administrator to change it</p>
+          </div>
+          <div>
+            <label className={labelCls}>Phone</label>
+            <input type="tel" value={form.phone} onChange={e => setField('phone', e.target.value)}
+              placeholder="(910) 363-6147" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Brokerage / Company</label>
+            <input value={form.company} onChange={e => setField('company', e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Years of Experience</label>
+            <input type="number" min="0" max="80" value={form.years_experience}
+              onChange={e => setField('years_experience', e.target.value)} className={inputCls} />
+          </div>
         </div>
-        <div className="border-t border-gray-100 pt-3">
-          <p className="text-xs text-gray-400">To update your name, email, or license info, contact your administrator.</p>
+
+        {/* License */}
+        <div className="border-t border-gray-100 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className={labelCls}>Name on License</label>
+            <input value={form.license_name} onChange={e => setField('license_name', e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>License Number</label>
+            <input value={form.license_number} onChange={e => setField('license_number', e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>License State</label>
+            <select value={form.license_state} onChange={e => setField('license_state', e.target.value)}
+              className={`${inputCls} bg-white`}>
+              <option value="">Select…</option>
+              {US_STATES.map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Bio & photo */}
+        <div className="border-t border-gray-100 pt-4 space-y-4">
+          <div>
+            <label className={labelCls}>Profile Photo URL</label>
+            <input type="url" value={form.profile_image} onChange={e => setField('profile_image', e.target.value)}
+              placeholder="https://…" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Bio</label>
+            <textarea rows={4} value={form.bio} onChange={e => setField('bio', e.target.value)}
+              placeholder="Tell buyers about your experience with HUD homes…" className={inputCls} />
+          </div>
+        </div>
+
+        {/* States covered */}
+        <div className="border-t border-gray-100 pt-4">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">States Covered ({form.states_covered.length})</label>
+            {form.states_covered.length > 0 && (
+              <button onClick={() => setField('states_covered', [])} className="text-xs text-gray-500 hover:text-gray-700">Clear</button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {US_STATES.map(s => {
+              const on = form.states_covered.includes(s.code)
+              return (
+                <button key={s.code} type="button" title={s.name} onClick={() => toggleInList('states_covered', s.code)}
+                  className={`px-2 py-1 text-xs font-medium rounded-md border transition-colors ${
+                    on ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300'
+                  }`}>
+                  {s.code}
+                </button>
+              )
+            })}
+          </div>
+          <p className="text-xs text-gray-400 mt-1.5">Referrals are routed to you for the states you select</p>
+        </div>
+
+        {/* Specialties */}
+        <div className="border-t border-gray-100 pt-4">
+          <label className={labelCls}>Specialties</label>
+          <div className="flex flex-wrap gap-1.5">
+            {specialtyOptions.map(sp => {
+              const on = form.specialties.includes(sp)
+              return (
+                <button key={sp} type="button" onClick={() => toggleInList('specialties', sp)}
+                  className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                    on ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300'
+                  }`}>
+                  {sp}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="border-t border-gray-100 pt-4 flex items-center gap-3">
+          <button
+            onClick={handleSaveProfile}
+            disabled={savingProfile}
+            className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {savingProfile ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
+            {savingProfile ? 'Saving…' : 'Save Profile'}
+          </button>
+          <SaveStatus status={profileStatus} error={profileError} />
         </div>
       </div>
 
@@ -901,14 +1119,7 @@ function SettingsPanel({ user, profile }) {
             {testStatus === 'sending' ? 'Sending…' : 'Send Test Text'}
           </button>
 
-          {saveStatus === 'saved' && (
-            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-              <CheckCircle className="w-4 h-4" /> Saved!
-            </span>
-          )}
-          {saveStatus === 'error' && (
-            <span className="text-xs text-red-500 font-medium">Save failed — try again</span>
-          )}
+          <SaveStatus status={saveStatus} />
           {testStatus === 'sent' && (
             <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
               <CheckCircle className="w-4 h-4" /> Test text sent!
@@ -1184,7 +1395,13 @@ export default function BrokerShell({ user, showAdminAccess }) {
       case 'ai-assistant':
         return <AIAssistantPanel agentId={agentId} />
       case 'settings':
-        return <SettingsPanel user={user} profile={profile} />
+        return (
+          <SettingsPanel
+            user={user}
+            agentId={agentId}
+            onProfileSaved={a => setAgentName(`${a.first_name || ''} ${a.last_name || ''}`.trim())}
+          />
+        )
       default:
         return <BrokerControlPanel agentId={agentId} agentName={agentName} onNavigate={setActivePanel} />
     }
