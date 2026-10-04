@@ -1,6 +1,6 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react'
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import { supabase } from './config/supabase'
 import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User, Menu } from 'lucide-react'
@@ -506,51 +506,89 @@ function HomePage() {
 }
 
 // Search Page with Filters
+const SEARCH_FILTER_KEYS = ['state', 'city', 'minPrice', 'maxPrice', 'bedrooms', 'bathrooms', 'status']
+const SEARCH_PAGE_SIZE = 24
+
 function SearchPage() {
+  // Filters live in the URL so the homepage search, state links and shared links all work
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filters = Object.fromEntries(SEARCH_FILTER_KEYS.map(k => [k, searchParams.get(k) || '']))
+  const filterKey = SEARCH_FILTER_KEYS.map(k => filters[k]).join('|')
+
   const [properties, setProperties] = useState([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [filters, setFilters] = useState({
-    state: '',
-    city: '',
-    minPrice: '',
-    maxPrice: '',
-    bedrooms: '',
-    bathrooms: '',
-    status: ''
-  })
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState(null)
+  const requestId = useRef(0)
 
-  // Search properties
+  const setFilter = (key, value, resetCity = false) => {
+    const next = new URLSearchParams(searchParams)
+    if (value) next.set(key, value)
+    else next.delete(key)
+    if (resetCity) next.delete('city')
+    setSearchParams(next, { replace: true })
+  }
+
+  const clearFilters = () => setSearchParams({}, { replace: true })
+
+  // Reset to the first page whenever the filters change (debounced for typed prices)
   useEffect(() => {
-    async function searchProperties() {
-      setLoading(true)
-      try {
-        let query = supabase
-          .from('properties')
-          .select('*')
-          .eq('is_active', true)
+    const timer = setTimeout(() => fetchPage(0), 300)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey])
 
-        if (filters.state) query = query.eq('state', filters.state)
-        if (filters.city) query = query.eq('city', filters.city)
-        if (filters.minPrice) query = query.gte('price', parseFloat(filters.minPrice))
-        if (filters.maxPrice) query = query.lte('price', parseFloat(filters.maxPrice))
-        if (filters.bedrooms) query = query.gte('beds', parseInt(filters.bedrooms))
-        if (filters.bathrooms) query = query.gte('baths', parseFloat(filters.bathrooms))
-        if (filters.status) query = query.eq('status', filters.status)
+  async function fetchPage(pageIndex) {
+    const id = ++requestId.current
+    if (pageIndex === 0) setLoading(true)
+    else setLoadingMore(true)
+    setError(null)
+    try {
+      let query = supabase
+        .from('properties')
+        .select('*', { count: 'exact' })
+        .eq('is_active', true)
 
-        query = query.order('price', { ascending: true }).limit(100)
+      let minPrice = parseFloat(filters.minPrice)
+      let maxPrice = parseFloat(filters.maxPrice)
+      if (Number.isFinite(minPrice) && Number.isFinite(maxPrice) && minPrice > maxPrice) {
+        [minPrice, maxPrice] = [maxPrice, minPrice]
+      }
 
-        const { data, error } = await query
-        if (error) throw error
-        setProperties(data || [])
-      } catch (err) {
-        console.error('Error searching properties:', err)
-      } finally {
+      if (filters.state) query = query.eq('state', filters.state.toUpperCase())
+      if (filters.city) query = query.eq('city', filters.city)
+      if (Number.isFinite(minPrice)) query = query.gte('price', minPrice)
+      if (Number.isFinite(maxPrice)) query = query.lte('price', maxPrice)
+      if (filters.bedrooms) query = query.gte('beds', parseInt(filters.bedrooms))
+      if (filters.bathrooms) query = query.gte('baths', parseFloat(filters.bathrooms))
+      if (filters.status) query = query.eq('status', filters.status)
+
+      const from = pageIndex * SEARCH_PAGE_SIZE
+      query = query
+        .order('price', { ascending: true })
+        .order('case_number', { ascending: true })
+        .range(from, from + SEARCH_PAGE_SIZE - 1)
+
+      const { data, error, count } = await query
+      if (error) throw error
+      if (id !== requestId.current) return // a newer search started
+      setProperties(prev => (pageIndex === 0 ? data || [] : [...prev, ...(data || [])]))
+      setTotal(count || 0)
+      setPage(pageIndex)
+    } catch (err) {
+      console.error('Error searching properties:', err)
+      if (id === requestId.current) setError('Something went wrong loading properties. Please try again.')
+    } finally {
+      if (id === requestId.current) {
         setLoading(false)
+        setLoadingMore(false)
       }
     }
-    searchProperties()
-  }, [filters])
+  }
 
+  const hasFilters = SEARCH_FILTER_KEYS.some(k => filters[k])
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -559,67 +597,63 @@ function SearchPage() {
       {/* Search Filters Component */}
       <SearchFilters
         filters={filters}
-        onFilterChange={(key, value, resetCity = false) => {
-          if (resetCity) {
-            setFilters(prev => ({ ...prev, [key]: value, city: '' }))
-          } else {
-            setFilters(prev => ({ ...prev, [key]: value }))
-          }
-        }}
-        onSearch={(clear) => {
-          if (clear) {
-            setFilters({
-              state: '',
-              city: '',
-              minPrice: '',
-              maxPrice: '',
-              bedrooms: '',
-              bathrooms: '',
-              status: ''
-            })
-          }
-        }}
+        onFilterChange={setFilter}
+        onSearch={(clear) => { if (clear) clearFilters() }}
       />
-
 
       {/* Results */}
       <div>
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold">
-            {loading ? 'Searching...' : `${properties.length} Properties Found`}
+            {loading ? 'Searching...' : `${total.toLocaleString()} ${total === 1 ? 'Property' : 'Properties'} Found`}
           </h2>
         </div>
 
-        {loading ? (
+        {error ? (
+          <div className="text-center py-12">
+            <p className="text-red-600">{error}</p>
+            <button onClick={() => fetchPage(0)} className="mt-4 text-blue-600 hover:underline">
+              Try again
+            </button>
+          </div>
+        ) : loading ? (
           <div className="text-center py-12">
             <p className="text-gray-600">Loading properties...</p>
           </div>
         ) : properties.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-600">No properties match your search criteria.</p>
-            <button
-              onClick={() =>
-                setFilters({
-                  state: '',
-                  city: '',
-                  minPrice: '',
-                  maxPrice: '',
-                  bedrooms: '',
-                  bathrooms: '',
-                  status: ''
-                })
-              }
-              className="mt-4 text-blue-600 hover:underline"
-            >
-              Clear filters to see all properties
-            </button>
+            {hasFilters && (
+              <button onClick={clearFilters} className="mt-4 text-blue-600 hover:underline">
+                Clear filters to see all properties
+              </button>
+            )}
+            <p className="mt-4 text-gray-600">
+              <Link to="/alerts" className="text-blue-600 hover:underline">Create a free alert</Link> to hear when new homes are listed.
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {properties.map(property => (
-              <PropertyCard key={property.id} property={property} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {properties.map(property => (
+                <PropertyCard key={property.id} property={property} />
+              ))}
+            </div>
+            {properties.length < total && (
+              <div className="text-center mt-10">
+                <p className="text-sm text-gray-500 mb-3">
+                  Showing {properties.length.toLocaleString()} of {total.toLocaleString()}
+                </p>
+                <button
+                  onClick={() => fetchPage(page + 1)}
+                  disabled={loadingMore}
+                  className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {loadingMore ? 'Loading...' : 'Load More Properties'}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

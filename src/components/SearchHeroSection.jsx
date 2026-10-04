@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, MapPin, DollarSign, Home as HomeIcon, AlertCircle } from 'lucide-react'
-import { supabase } from '../config/supabase'
+import { Search, MapPin, DollarSign, Home as HomeIcon } from 'lucide-react'
+import { getStateOptions, getCityOptions, stateLabel } from '../services/propertyLocations'
 
 export default function SearchHeroSection() {
   const navigate = useNavigate()
@@ -14,25 +14,10 @@ export default function SearchHeroSection() {
   })
   const [states, setStates] = useState([])
   const [cities, setCities] = useState([])
-  const [loading, setLoading] = useState(false)
 
-  // Load all states on component mount
+  // Every state with its active-listing count
   useEffect(() => {
-    async function loadStates() {
-      try {
-        const { data, error } = await supabase
-          .from('properties')
-          .select('state')
-          .order('state')
-
-        if (error) throw error
-        const uniqueStates = [...new Set(data.map(p => p.state))].filter(Boolean)
-        setStates(uniqueStates)
-      } catch (err) {
-        console.error('Error loading states:', err)
-      }
-    }
-    loadStates()
+    getStateOptions().then(setStates)
   }, [])
 
   // Load cities when state changes
@@ -41,23 +26,14 @@ export default function SearchHeroSection() {
       setCities([])
       return
     }
-
-    async function loadCities() {
-      try {
-        const { data, error } = await supabase
-          .from('properties')
-          .select('city')
-          .eq('state', filters.state)
-          .order('city')
-
-        if (error) throw error
-        const uniqueCities = [...new Set(data.map(p => p.city))].filter(Boolean)
-        setCities(uniqueCities)
-      } catch (err) {
+    let cancelled = false
+    getCityOptions(filters.state)
+      .then(list => { if (!cancelled) setCities(list) })
+      .catch(err => {
         console.error('Error loading cities:', err)
-      }
-    }
-    loadCities()
+        if (!cancelled) setCities([])
+      })
+    return () => { cancelled = true }
   }, [filters.state])
 
   const handleFilterChange = (key, value) => {
@@ -115,8 +91,8 @@ export default function SearchHeroSection() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">All States</option>
-                  {states.map(state => (
-                    <option key={state} value={state}>{state}</option>
+                  {states.map(s => (
+                    <option key={s.code} value={s.code}>{stateLabel(s)}</option>
                   ))}
                 </select>
               </div>
@@ -131,8 +107,8 @@ export default function SearchHeroSection() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="">All Cities</option>
-                  {cities.map(city => (
-                    <option key={city} value={city}>{city}</option>
+                  {cities.map(c => (
+                    <option key={c.city} value={c.city}>{c.city} ({c.listings})</option>
                   ))}
                 </select>
               </div>

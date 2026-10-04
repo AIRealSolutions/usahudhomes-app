@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react'
-import { supabase } from '../config/supabase'
+import { getStateOptions, getCityOptions, stateLabel } from '../services/propertyLocations'
 import { ChevronDown } from 'lucide-react'
 
 /**
  * SearchFilters Component
  * Provides property search and filtering with state/city dropdowns
  */
+// Status values as stored by the HUD import
+const STATUS_OPTIONS = ['New Listing', 'Price Reduced', 'Active', 'Pending Sale', 'Hard to Sell', 'Exclusive']
+
 const SearchFilters = ({ filters, onFilterChange, onSearch }) => {
   const [states, setStates] = useState([])
   const [cities, setCities] = useState([])
   const [statesLoading, setStatesLoading] = useState(true)
   const [citiesLoading, setCitiesLoading] = useState(false)
 
-  // Load all states on mount
+  // Every state with its active-listing count
   useEffect(() => {
-    loadStates()
+    getStateOptions()
+      .then(setStates)
+      .finally(() => setStatesLoading(false))
   }, [])
 
   // Load cities when state changes
@@ -23,55 +28,17 @@ const SearchFilters = ({ filters, onFilterChange, onSearch }) => {
       setCities([])
       return
     }
-    loadCities()
+    let cancelled = false
+    setCitiesLoading(true)
+    getCityOptions(filters.state)
+      .then(list => { if (!cancelled) setCities(list) })
+      .catch(err => {
+        console.error('Error loading cities:', err)
+        if (!cancelled) setCities([])
+      })
+      .finally(() => { if (!cancelled) setCitiesLoading(false) })
+    return () => { cancelled = true }
   }, [filters.state])
-
-  const loadStates = async () => {
-    try {
-      setStatesLoading(true)
-      const { data, error } = await supabase
-        .from('properties')
-        .select('state')
-        .order('state')
-        .limit(10000)
-
-      if (error) throw error
-
-      const uniqueStates = [...new Set(data?.map(p => p.state).filter(Boolean) || [])]
-      setStates(uniqueStates)
-
-      console.log(`Loaded ${uniqueStates.length} states:`, uniqueStates)
-    } catch (err) {
-      console.error('Error loading states:', err)
-      setStates([])
-    } finally {
-      setStatesLoading(false)
-    }
-  }
-
-  const loadCities = async () => {
-    try {
-      setCitiesLoading(true)
-      const { data, error } = await supabase
-        .from('properties')
-        .select('city')
-        .eq('state', filters.state)
-        .order('city')
-        .limit(1000)
-
-      if (error) throw error
-
-      const uniqueCities = [...new Set(data?.map(p => p.city).filter(Boolean) || [])]
-      setCities(uniqueCities)
-
-      console.log(`Loaded ${uniqueCities.length} cities for ${filters.state}:`, uniqueCities)
-    } catch (err) {
-      console.error('Error loading cities:', err)
-      setCities([])
-    } finally {
-      setCitiesLoading(false)
-    }
-  }
 
   const handleFilterChange = (key, value) => {
     if (key === 'state') {
@@ -95,19 +62,16 @@ const SearchFilters = ({ filters, onFilterChange, onSearch }) => {
               disabled={statesLoading}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white disabled:bg-gray-100"
             >
-              <option value="">All States ({states.length})</option>
-              {states.map(state => (
-                <option key={state} value={state}>
-                  {state}
+              <option value="">All States</option>
+              {states.map(st => (
+                <option key={st.code} value={st.code}>
+                  {stateLabel(st)}
                 </option>
               ))}
             </select>
             <ChevronDown className="absolute right-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
           </div>
           {statesLoading && <p className="text-xs text-gray-500 mt-1">Loading states...</p>}
-          {states.length === 0 && !statesLoading && (
-            <p className="text-xs text-orange-600 mt-1">No states available</p>
-          )}
         </div>
 
         {/* City Filter */}
@@ -123,9 +87,9 @@ const SearchFilters = ({ filters, onFilterChange, onSearch }) => {
               <option value="">
                 {citiesLoading ? 'Loading cities...' : `All Cities (${cities.length})`}
               </option>
-              {cities.map(city => (
-                <option key={city} value={city}>
-                  {city}
+              {cities.map(c => (
+                <option key={c.city} value={c.city}>
+                  {c.city} ({c.listings})
                 </option>
               ))}
             </select>
@@ -210,8 +174,9 @@ const SearchFilters = ({ filters, onFilterChange, onSearch }) => {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
             >
               <option value="">All</option>
-              <option value="AVAILABLE">Available</option>
-              <option value="BIDS OPEN">Bids Open</option>
+              {STATUS_OPTIONS.map(status => (
+                <option key={status} value={status}>{status}</option>
+              ))}
             </select>
             <ChevronDown className="absolute right-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
           </div>
@@ -220,6 +185,7 @@ const SearchFilters = ({ filters, onFilterChange, onSearch }) => {
         {/* Clear Button */}
         <div className="flex items-end">
           <button
+            type="button"
             onClick={() => onSearch(true)} // Pass true to clear
             className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
           >
