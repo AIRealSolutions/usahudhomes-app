@@ -68,3 +68,21 @@ export async function sendLeadText({ to, body }) {
   )
   return { success: true, via: 'copied' }
 }
+
+/**
+ * Tells the admins a public form saved a new lead (email/text). Works for
+ * signed-out visitors: the server looks the lead up by id and only announces
+ * recent leads, once. Never throws; a failed notice shouldn't block the form.
+ */
+export async function notifyLeadSubmitted(leadId) {
+  try {
+    await fetch('/api/notifications?action=lead-submitted', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId }),
+      keepalive: true,
+    })
+  } catch (err) {
+    console.error('Lead notification failed:', err)
+  }
+}

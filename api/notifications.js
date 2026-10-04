@@ -14,6 +14,9 @@
  *   POST ?action=lead-sms   — broker/admin texts a lead via Twilio (Bearer token required)
  *   POST ?action=consultation-request — signed-in buyer asks for an agent callback (saved as a lead)
  *   POST ?action=agent-invite — admin creates an agent login (invite email, or reset link if it exists)
+ *   POST ?action=lead-submitted — public forms: announce a new lead to admins (looked up by id, once)
+ *   GET/POST ?action=send-alerts — daily cron (CRON_SECRET) or an admin: email HUD home alert matches
+ *   GET  ?action=unsubscribe&token= — one-click unsubscribe link in alert emails
  *
  * agent-email and sms also require a broker/admin Bearer token.
  *
@@ -25,6 +28,7 @@
  *   GMAIL_APP_PASS  — 16-char Gmail App Password (no spaces)
  *   SUPABASE_URL    — Supabase project URL
  *   SUPABASE_SERVICE_KEY — Supabase service-role key
+ *   CRON_SECRET     — sent by the daily Vercel cron (vercel.json) to ?action=send-alerts
  */
 
 import nodemailer from 'nodemailer'
@@ -337,11 +341,17 @@ async function handleLeadNotification(req, res) {
   return res.status(200).json({ success: true, notified })
 }
 
-async function notifyAdminsOfLead({ consultation, customer, property }) {
+async function notifyAdminsOfLead({ consultation, customer, property, details }) {
   const name  = String(customer?.name  || consultation?.customer_name  || consultation?.name  || 'New Lead').slice(0, 120)
   const email = String(customer?.email || consultation?.customer_email || consultation?.email || '').slice(0, 200)
   const phone = String(customer?.phone || consultation?.customer_phone || consultation?.phone || '').slice(0, 40)
   const state = String(consultation?.state || property?.state || '').slice(0, 40)
+  // Optional extra rows, e.g. { Source: 'HUD home alert', Property: '...', Message: '...' }
+  const extraRows = Object.entries(details || {})
+    .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '')
+    .map(([k, v], i) => `<tr${i % 2 ? '' : ' style="background:#f9fafb"'}><td style="padding:10px 16px;font-weight:bold;color:#374151;vertical-align:top">${escapeHtml(k)}</td><td style="padding:10px 16px;color:#111827;white-space:pre-wrap">${escapeHtml(String(v).slice(0, 2000))}</td></tr>`)
+    .join('')
+  const subjectPrefix = details?.Source ? `New ${details.Source}` : 'New Lead'
 
   // Get all admin agents
   const admins = await supabaseFetch(
@@ -357,6 +367,7 @@ async function notifyAdminsOfLead({ consultation, customer, property }) {
         <tr><td style="padding:10px 16px;font-weight:bold;color:#374151">Email</td><td style="padding:10px 16px;color:#111827">${escapeHtml(email)}</td></tr>
         <tr style="background:#f9fafb"><td style="padding:10px 16px;font-weight:bold;color:#374151">Phone</td><td style="padding:10px 16px;color:#111827">${escapeHtml(phone) || '—'}</td></tr>
         <tr><td style="padding:10px 16px;font-weight:bold;color:#374151">State</td><td style="padding:10px 16px;color:#111827">${escapeHtml(state) || '—'}</td></tr>
+        ${extraRows}
       </table>
       <p style="margin-top:20px">
         <a href="${SITE_URL}/admin" style="background:#1e40af;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold">View in Admin Dashboard</a>
@@ -369,7 +380,7 @@ async function notifyAdminsOfLead({ consultation, customer, property }) {
   for (const admin of admins) {
     if (admin.email) {
       try {
-        await sendEmail({ to: admin.email, subject: `New Lead: ${name}`, html })
+        await sendEmail({ to: admin.email, subject: `${subjectPrefix}: ${name}`, html })
         notified.push(`email:${admin.email}`)
       } catch (e) { console.error('Email failed:', e.message) }
     }
@@ -384,7 +395,7 @@ async function notifyAdminsOfLead({ consultation, customer, property }) {
   // If no admins found, fallback to hardcoded email
   if (admins.length === 0) {
     try {
-      await sendEmail({ to: GMAIL_USER || 'marcspencer28461@gmail.com', subject: `New Lead: ${name}`, html })
+      await sendEmail({ to: GMAIL_USER || 'marcspencer28461@gmail.com', subject: `${subjectPrefix}: ${name}`, html })
       notified.push('email:fallback')
     } catch (e) { console.error('Fallback email failed:', e.message) }
   }
@@ -602,15 +613,212 @@ async function handleAgentInvite(req, res) {
   })
 }
 
+// ─── Action: lead submitted (public forms) ────────────────────────────────────
+// Public forms call this after saving a lead. Only the lead id is accepted; the
+// lead is read from the database, must be recent, and is announced once.
+const SOURCE_LABELS = {
+  hud_home_alerts: 'HUD home alert sign-up',
+  property_inquiry: 'property inquiry',
+  website: 'contact form',
+}
+
+async function handleLeadSubmitted(req, res) {
+  const leadId = String(req.body?.leadId || '')
+  if (!/^[0-9a-f-]{36}$/i.test(leadId)) return res.status(400).json({ success: false, error: 'leadId required' })
+
+  const lead = (await supabaseFetch(`leads?id=eq.${leadId}&select=*&limit=1`))?.[0]
+  if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' })
+  if (Date.now() - new Date(lead.created_at + (/[zZ+]/.test(String(lead.created_at).slice(-6)) ? '' : 'Z')).getTime() > 15 * 60 * 1000) {
+    return res.status(200).json({ success: true, skipped: 'not recent' })
+  }
+  const already = await supabaseFetch(`lead_events?lead_id=eq.${leadId}&event_type=eq.admin_notified&select=id&limit=1`)
+  if (already?.length) return res.status(200).json({ success: true, skipped: 'already notified' })
+  await supabaseWrite('lead_events', 'POST', { lead_id: leadId, event_type: 'admin_notified', event_data: {} })
+
+  const sub = lead.source === 'hud_home_alerts'
+    ? (await supabaseFetch(`property_alert_subscriptions?lead_id=eq.${leadId}&select=state,areas,budget_min,budget_max,bedrooms_min&limit=1`))?.[0]
+    : null
+  const money = (v) => (v ? `$${Number(v).toLocaleString()}` : null)
+  const details = {
+    Source: SOURCE_LABELS[lead.source] || (lead.source || 'website').replace(/_/g, ' '),
+    Property: [lead.property_address, lead.property_case_number && `Case #${lead.property_case_number}`].filter(Boolean).join(' — ') || null,
+    'Alert areas': sub ? `${(sub.areas || []).join(', ') || 'Anywhere'} (${sub.state})` : null,
+    'Alert budget': sub && (sub.budget_min || sub.budget_max) ? `${money(sub.budget_min) || 'Any'} – ${money(sub.budget_max) || 'Any'}` : null,
+    'Alert bedrooms': sub?.bedrooms_min ? `${sub.bedrooms_min}+` : null,
+    Message: lead.message,
+  }
+  try {
+    await notifyAdminsOfLead({
+      consultation: { state: lead.state },
+      customer: { name: `${lead.first_name || ''} ${lead.last_name || ''}`.trim(), email: lead.email, phone: lead.phone },
+      details,
+    })
+  } catch (e) {
+    console.error('[lead-submitted] notify failed:', e.message)
+  }
+  return res.status(200).json({ success: true })
+}
+
+// ─── Action: send HUD home alerts (daily cron, or an admin) ───────────────────
+const CRON_SECRET = process.env.CRON_SECRET
+const ALERT_MAX_PER_EMAIL = 10
+
+const norm = (v) => String(v || '').toLowerCase().replace(/\bcounty\b/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+
+function matchesAreas(property, areas) {
+  const wanted = (areas || []).map(norm).filter(Boolean)
+  if (!wanted.length) return true // whole state
+  const city = norm(property.city)
+  const county = norm(property.county)
+  return wanted.some(a => a === city || (county && a === county))
+}
+
+function buildAlertEmail(sub, properties) {
+  const first = sub.first_name || 'there'
+  const where = (sub.areas || []).length ? `${sub.areas.join(', ')}, ${sub.state}` : sub.state
+  const unsubscribeUrl = `${SITE_URL}/api/notifications?action=unsubscribe&token=${sub.unsubscribe_token}`
+  const searchUrl = `${SITE_URL}/search?` + new URLSearchParams(Object.fromEntries(Object.entries({
+    state: sub.state, minPrice: sub.budget_min || '', maxPrice: sub.budget_max || '', bedrooms: sub.bedrooms_min || '',
+  }).filter(([, v]) => v !== '' && v !== null)))
+  const subject = `${properties.length} HUD home${properties.length === 1 ? '' : 's'} matching your alert in ${where}`
+  const fmt = (v) => (v ? `$${Number(v).toLocaleString()}` : 'Price TBD')
+  const line = (p) => [p.beds && `${p.beds} bed`, p.baths && `${p.baths} bath`, p.sq_ft && `${Number(p.sq_ft).toLocaleString()} sq ft`].filter(Boolean).join(' • ')
+  const url = (p) => `${SITE_URL}/property/${encodeURIComponent(p.case_number)}`
+
+  const cards = properties.map(p => `
+    <tr><td style="padding:14px 0;border-bottom:1px solid #e5e7eb">
+      <a href="${url(p)}" style="color:#1e40af;font-size:16px;font-weight:bold;text-decoration:none">${escapeHtml(p.address || 'HUD home')}</a>
+      <div style="color:#374151;margin-top:2px">${escapeHtml([p.city, p.state].filter(Boolean).join(', '))}${p.county ? ` · ${escapeHtml(p.county)} County` : ''}</div>
+      <div style="margin-top:4px"><strong style="color:#111827">${fmt(p.price)}</strong> <span style="color:#6b7280">${escapeHtml(line(p))}</span></div>
+      ${p.status ? `<div style="color:#059669;font-size:13px;margin-top:2px">${escapeHtml(p.status)}</div>` : ''}
+    </td></tr>`).join('')
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#111827">
+      <h2 style="color:#1e40af;margin:0 0 8px">New HUD homes for you</h2>
+      <p>Hi ${escapeHtml(first)}, here ${properties.length === 1 ? 'is a home' : `are ${properties.length} homes`} matching your alert for <strong>${escapeHtml(where)}</strong>.</p>
+      <table style="width:100%;border-collapse:collapse">${cards}</table>
+      <p style="margin:24px 0">
+        <a href="${searchUrl}" style="background:#1e40af;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold">See all matching homes</a>
+      </p>
+      <p>Questions or ready to bid? Call Marc Spencer, Lightkeeper Realty, at <a href="tel:9103636147">(910) 363-6147</a> or just reply to this email.</p>
+      <p style="color:#6b7280;font-size:12px;margin-top:28px">You are receiving this because you created a HUD home alert at USAHUDhomes.com.
+        <a href="${unsubscribeUrl}" style="color:#6b7280">Unsubscribe</a></p>
+    </div>`
+
+  const text = [
+    `Hi ${first},`, '', `New HUD homes matching your alert for ${where}:`, '',
+    ...properties.map(p => `${p.address || 'HUD home'}, ${[p.city, p.state].filter(Boolean).join(', ')}\n${fmt(p.price)}  ${line(p)}\n${url(p)}\n`),
+    `See all matching homes: ${searchUrl}`, '',
+    'Questions or ready to bid? Call Marc Spencer, Lightkeeper Realty, at (910) 363-6147 or reply to this email.', '',
+    `Unsubscribe: ${unsubscribeUrl}`,
+  ].join('\n')
+
+  return { subject, html, text, unsubscribeUrl }
+}
+
+async function sendAlertFor(sub, transporter) {
+  let q = `properties?select=id,case_number,address,city,county,state,price,beds,baths,sq_ft,status,created_at`
+    + `&is_active=eq.true&state=eq.${encodeURIComponent(sub.state)}&order=created_at.desc&limit=500`
+  if (sub.budget_min) q += `&price=gte.${Number(sub.budget_min)}`
+  if (sub.budget_max) q += `&price=lte.${Number(sub.budget_max)}`
+  if (sub.bedrooms_min) q += `&beds=gte.${Number(sub.bedrooms_min)}`
+  const candidates = (await supabaseFetch(q)) || []
+  const sent = new Set(((await supabaseFetch(`property_alert_sends?subscription_id=eq.${sub.id}&select=property_id`)) || []).map(r => r.property_id))
+  const fresh = candidates.filter(p => !sent.has(p.id) && matchesAreas(p, sub.areas)).slice(0, ALERT_MAX_PER_EMAIL)
+  if (!fresh.length) return 0
+
+  const { subject, html, text, unsubscribeUrl } = buildAlertEmail(sub, fresh)
+  await transporter.sendMail({
+    from: `USAHUDHomes Alerts <${GMAIL_USER}>`,
+    replyTo: GMAIL_USER,
+    to: sub.email,
+    subject,
+    text,
+    html,
+    headers: { 'List-Unsubscribe': `<${unsubscribeUrl}>` },
+  })
+  await supabaseWrite('property_alert_sends', 'POST', fresh.map(p => ({ subscription_id: sub.id, property_id: p.id })))
+  await supabaseWrite(`property_alert_subscriptions?id=eq.${sub.id}`, 'PATCH', { last_sent_at: new Date().toISOString() })
+  return fresh.length
+}
+
+async function handleSendAlerts(req, res) {
+  const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
+  const fromCron = !!CRON_SECRET && bearer === CRON_SECRET
+  if (!fromCron) {
+    const caller = await getCaller(req)
+    if (caller?.role !== 'admin') return res.status(401).json({ success: false, error: 'Not authorized' })
+  }
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ success: false, error: 'Server is not configured.' })
+
+  const onlyId = /^[0-9a-f-]{36}$/i.test(String(req.body?.subscriptionId || '')) ? req.body.subscriptionId : null
+  let q = 'property_alert_subscriptions?select=*&is_active=eq.true'
+  if (onlyId) q += `&id=eq.${onlyId}`
+  const subs = (await supabaseFetch(q)) || []
+
+  // The cron sends at most one email per subscriber per day; an admin "Send now" ignores that
+  const dayAgo = Date.now() - 20 * 60 * 60 * 1000
+  const due = onlyId ? subs : subs.filter(s => !s.last_sent_at || new Date(s.last_sent_at).getTime() < dayAgo)
+
+  const transporter = getTransporter()
+  const results = { subscriptions: due.length, emailed: 0, homes: 0, errors: [] }
+  for (const sub of due) {
+    try {
+      const n = await sendAlertFor(sub, transporter)
+      if (n) { results.emailed++; results.homes += n }
+    } catch (e) {
+      console.error('[send-alerts]', sub.id, e.message)
+      results.errors.push({ id: sub.id, error: e.message })
+    }
+  }
+  return res.status(200).json({ success: true, ...results })
+}
+
+// ─── Action: unsubscribe (link in every alert email) ──────────────────────────
+async function handleUnsubscribe(req, res) {
+  const token = String(req.query?.token || '')
+  let ok = false
+  if (/^[0-9a-f-]{36}$/i.test(token)) {
+    const rows = await supabaseFetch(`property_alert_subscriptions?unsubscribe_token=eq.${token}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ is_active: false, unsubscribed_at: new Date().toISOString() }),
+    })
+    ok = !!rows?.length
+  }
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  return res.status(ok ? 200 : 400).send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>USAHUDhomes.com alerts</title></head>
+    <body style="font-family:Arial,sans-serif;max-width:520px;margin:60px auto;padding:0 16px;color:#111827;text-align:center">
+      <h1 style="color:#1e40af">${ok ? 'You are unsubscribed' : 'Link not recognized'}</h1>
+      <p>${ok ? 'You will no longer receive HUD home alert emails.' : 'This unsubscribe link is invalid or was already used.'}</p>
+      <p><a href="${SITE_URL}/alerts">Create a new alert</a> · <a href="${SITE_URL}">USAHUDhomes.com</a></p>
+    </body></html>`)
+}
+
+// The daily alert run sends one email per subscriber, so allow more than the 10s default
+export const config = { maxDuration: 60 }
+
 // ─── Main router ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   if (req.method === 'OPTIONS') return res.status(200).end()
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const action = req.query?.action
+
+  // GET actions: the daily Vercel cron and the unsubscribe link in alert emails
+  if (req.method === 'GET') {
+    try {
+      if (action === 'send-alerts') return await handleSendAlerts(req, res)
+      if (action === 'unsubscribe') return await handleUnsubscribe(req, res)
+    } catch (err) {
+      console.error(`[notifications/${action}] Error:`, err.message)
+      return res.status(500).json({ success: false, error: err.message })
+    }
+  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
     if (action === 'lead')        return await handleLeadNotification(req, res)
@@ -622,11 +830,13 @@ export default async function handler(req, res) {
     if (action === 'lead-sms')    return await handleLeadSms(req, res)
     if (action === 'consultation-request') return await handleConsultationRequest(req, res)
     if (action === 'agent-invite') return await handleAgentInvite(req, res)
+    if (action === 'lead-submitted') return await handleLeadSubmitted(req, res)
+    if (action === 'send-alerts') return await handleSendAlerts(req, res)
 
     return res.status(400).json({
       success: false,
       error: 'Missing or unknown ?action= parameter',
-      valid_actions: ['lead', 'sms', 'agent-email', 'agent-verify', 'agent-resend-verification', 'lead-email', 'lead-sms', 'consultation-request', 'agent-invite'],
+      valid_actions: ['lead', 'sms', 'agent-email', 'agent-verify', 'agent-resend-verification', 'lead-email', 'lead-sms', 'consultation-request', 'agent-invite', 'lead-submitted', 'send-alerts', 'unsubscribe'],
     })
   } catch (err) {
     console.error(`[notifications/${action}] Error:`, err.message)

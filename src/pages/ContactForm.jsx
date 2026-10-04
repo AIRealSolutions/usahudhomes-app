@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
+import { notifyLeadSubmitted } from '../services/leadMessaging';
 import { Home, Phone, Mail, MapPin, DollarSign, Calendar, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function ContactForm() {
@@ -126,6 +127,8 @@ export default function ContactForm() {
         });
 
       if (eventError) console.error('Error creating lead event:', eventError);
+
+      notifyLeadSubmitted(leadData.id);
 
       const data = leadData;
       const error = null;

@@ -13,6 +13,7 @@ import {
   ShieldCheck
 } from 'lucide-react'
 import { supabase } from '../config/supabase'
+import { notifyLeadSubmitted } from '../services/leadMessaging'
 
 const states = [
   'North Carolina', 'South Carolina', 'Virginia', 'Georgia', 'Florida', 'Alabama',
@@ -132,6 +133,22 @@ export default function BuyerAlerts() {
       })
 
       if (eventError) console.error('Could not record alert event:', eventError)
+
+      // The subscription drives the daily matching-homes email
+      const { error: subError } = await supabase.from('property_alert_subscriptions').insert({
+        lead_id: lead.id,
+        email: form.email.trim().toLowerCase(),
+        first_name: form.firstName.trim(),
+        state: form.state,
+        areas: form.areas.split(/[,;\n]+/).map(a => a.trim()).filter(Boolean),
+        budget_min: form.budgetMin ? Number(form.budgetMin) : null,
+        budget_max: form.budgetMax ? Number(form.budgetMax) : null,
+        bedrooms_min: form.bedrooms ? Number(form.bedrooms) : null,
+        buyer_type: form.buyerType || null
+      })
+      if (subError) console.error('Could not save alert subscription:', subError)
+
+      notifyLeadSubmitted(lead.id)
 
       setSuccess(true)
       window.scrollTo({ top: 0, behavior: 'smooth' })
