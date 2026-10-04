@@ -4,22 +4,23 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../config/supabase'
 
 export default function Login() {
-  const [isSignUp, setIsSignUp] = useState(false)
+  const [searchParams] = useSearchParams()
+  const [isSignUp, setIsSignUp] = useState(searchParams.get('signup') === '1')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [searchParams] = useSearchParams()
   const [resetMode, setResetMode] = useState(searchParams.get('reset') === '1')
   const [resetSent, setResetSent] = useState(false)
   const navigate = useNavigate()
   const { initialized, isAuthenticated, signIn, signUp } = useAuth()
 
   useEffect(() => {
-    // If user is already authenticated, redirect to dashboard
+    // If user is already authenticated, return to the page that sent them here (?next=), else the dashboard
     if (isAuthenticated && initialized) {
-      navigate('/dashboard', { replace: true })
+      const next = searchParams.get('next') || ''
+      navigate(next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard', { replace: true })
     }
   }, [isAuthenticated, initialized])
 
