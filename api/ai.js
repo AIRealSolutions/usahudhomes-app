@@ -4,12 +4,13 @@
  * Proxies OpenAI chat completions so the API key never ships to the browser.
  * Signed-in brokers/admins only (Supabase Bearer token).
  *
- * Env: OPENAI_API_KEY (falls back to VITE_OPENAI_API_KEY), SUPABASE_URL, SUPABASE_SERVICE_KEY
+ * Env: OPENAI_API_KEY (server-only — never prefix it with VITE_, which ships it to the browser),
+ *      SUPABASE_URL, SUPABASE_SERVICE_KEY
  */
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 const MAX_TOKENS_CAP = 4000
 
 async function requireStaff(req) {
