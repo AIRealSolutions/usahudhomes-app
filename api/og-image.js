@@ -197,11 +197,20 @@ export default async function handler(req, res) {
     });
     const png = resvg.render().asPng();
 
-    // Respond with the PNG
-    res.setHeader('Content-Type', 'image/png');
+    // JPEG keeps photo cards small (~150 KB vs ~2 MB PNG) so WhatsApp/iMessage show them
+    let body = Buffer.from(png), type = 'image/png';
+    try {
+      const sharp = (await import('sharp')).default;
+      body = await sharp(body).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+      type = 'image/jpeg';
+    } catch (e) {
+      console.warn('[og-image] JPEG conversion skipped:', e.message);
+    }
+
+    res.setHeader('Content-Type', type);
     res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400');
-    res.setHeader('Content-Length', png.length);
-    return res.status(200).send(Buffer.from(png));
+    res.setHeader('Content-Length', body.length);
+    return res.status(200).send(body);
 
   } catch (err) {
     console.error('[og-image] Generation error:', err);

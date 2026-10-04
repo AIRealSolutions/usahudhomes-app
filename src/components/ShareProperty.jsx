@@ -109,7 +109,7 @@ export default function ShareProperty({ property, className = '' }) {
             <button onClick={copy} className="inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50">
               {copied ? <Check className="h-4 w-4 text-green-600" /> : <LinkIcon className="h-4 w-4" />} {copied ? 'Copied' : 'Copy link'}
             </button>
-            <a href={imageUrl} download={`hud-home-${property.case_number}.png`} className="inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50"
+            <a href={imageUrl} download={`hud-home-${property.case_number}.jpg`} className="inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50"
               title="For Instagram or anywhere you post a picture">
               <Download className="h-4 w-4" /> Image
             </a>
