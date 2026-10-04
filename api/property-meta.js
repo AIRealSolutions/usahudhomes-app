@@ -115,6 +115,7 @@ export default async function handler(req, res) {
 
     // Build meta tag values
     const propertyUrl = `https://www.usahudhomes.com/property/${property.case_number}`;
+    const underContract = String(property.status || '').toUpperCase() === 'UNDER CONTRACT';
     const location = [property.city, property.state].filter(Boolean).join(', ');
     const priceStr = property.price ? '$' + Number(property.price).toLocaleString() : 'Price Available';
     const bedsStr  = property.beds  != null ? `${property.beds} bed` + (property.beds !== 1 ? 's' : '') : null;
@@ -138,7 +139,6 @@ export default async function handler(req, res) {
     // v= changes when the listing changes, so social sites refetch a fresh card
     const imageVersion = encodeURIComponent(String(property.updated_at || '').replace(/\D/g, '').slice(0, 14));
     const ogImageUrl = `https://www.usahudhomes.com/api/og-image?caseNumber=${encodeURIComponent(property.case_number)}&v=${imageVersion}`;
-    const underContract = String(property.status || '').toUpperCase() === 'UNDER CONTRACT';
 
     // Give search engines structured listing facts without requiring JavaScript rendering.
     const structuredData = JSON.stringify({
