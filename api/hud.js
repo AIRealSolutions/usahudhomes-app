@@ -172,8 +172,6 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
   const scrapedCaseNumbers = new Set(properties.map(p => p.case_number).filter(Boolean))
   let newCount = 0, updatedCount = 0, restoredCount = 0, errorCount = 0
   const errors = []
-  const statusEvents = [] // under contract / back on market, for property_status_events
-  const restoredCases = []
 
   if (!dry_run) {
     // Batch upsert in chunks of 50 to avoid URL length limits
@@ -183,17 +181,13 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
       // Count new vs updated
       const caseNums = chunk.map(p => p.case_number).filter(Boolean)
       const { data: existingChunk } = await supabase
-        .from('properties').select('id, case_number, is_active').in('case_number', caseNums)
+        .from('properties').select('case_number, is_active').in('case_number', caseNums)
       const existingMap = new Map((existingChunk || []).map(p => [p.case_number, p]))
       for (const prop of chunk) {
         if (!prop.case_number) continue
         const ex = existingMap.get(prop.case_number)
         if (!ex) newCount++
-        else if (!ex.is_active) {
-          restoredCount++
-          restoredCases.push(prop.case_number)
-          statusEvents.push({ case_number: prop.case_number, property_id: ex.id, state: stateCode, event: 'back_on_market', list_price: prop.list_price })
-        }
+        else if (!ex.is_active) restoredCount++
         else updatedCount++
       }
       // Batch upsert (skip rows missing NOT NULL columns: address, city, price)
@@ -213,7 +207,7 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
     let markedCount = 0
     try {
       const { data: activeProps } = await supabase
-        .from('properties').select('id, case_number, price').eq('state', stateCode).eq('is_active', true)
+        .from('properties').select('case_number').eq('state', stateCode).eq('is_active', true)
       if (activeProps) {
         const toMark = activeProps.filter(p => !scrapedCaseNumbers.has(p.case_number))
         if (toMark.length > 0) {
@@ -227,27 +221,12 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
               .in('case_number', slice)
           }
           markedCount = toMark.length
-          for (const p of toMark) {
-            statusEvents.push({ case_number: p.case_number, property_id: p.id, state: stateCode, event: 'under_contract', list_price: p.price })
-          }
         }
       }
     } catch (e) { console.warn('[hud/import] mark-under-contract failed:', e.message) }
 
-    // Contract history: log status changes; a relisted home's open accepted offer fell through
-    try {
-      if (statusEvents.length) {
-        for (let i = 0; i < statusEvents.length; i += 200) {
-          const { error: evErr } = await supabase.from('property_status_events').insert(statusEvents.slice(i, i + 200))
-          if (evErr) console.warn('[hud/import] status events failed:', evErr.message)
-        }
-      }
-      for (let i = 0; i < restoredCases.length; i += 200) {
-        await supabase.from('accepted_offers')
-          .update({ outcome: 'fell_through', updated_at: new Date().toISOString() })
-          .in('case_number', restoredCases.slice(i, i + 200)).eq('outcome', 'pending')
-      }
-    } catch (e) { console.warn('[hud/import] contract history failed:', e.message) }
+    // Price, status and contract history is logged by database triggers on properties
+    // (database/migrations/add_property_activity_and_saved_homes.sql)
 
     // Log to hud_sync_runs
     try {

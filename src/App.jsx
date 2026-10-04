@@ -34,8 +34,10 @@ import AddressRevealGate from './components/AddressRevealGate'
 import PropertyRequestForm from './components/PropertyRequestForm'
 import AgentRequestForm from './components/AgentRequestForm'
 import SearchFilters from './components/SearchFilters'
-import { BidHistorySummary, BidHistoryPanel } from './components/BidHistory'
-import { fetchOffersByCase, isUnderContract } from './services/acceptedOffers'
+import { BidHistorySummary, PropertyHistoryPanel } from './components/BidHistory'
+import SaveHomeButton from './components/SaveHomeButton'
+import { SavedHomesProvider } from './contexts/SavedHomesContext'
+import { fetchOffersByCase, isUnderContract, priceChange } from './services/acceptedOffers'
 import RoleSelector from './components/RoleSelector'
 
 // Error Boundary Component
@@ -370,6 +372,7 @@ function BenefitsSection() {
 // Property Card Component (offers/signedIn add the bid-history line in search results)
 function PropertyCard({ property, offers, signedIn }) {
   const underContract = isUnderContract(property)
+  const change = priceChange(property)
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow">
       <div className="h-48 bg-gray-200 relative overflow-hidden">
@@ -378,6 +381,7 @@ function PropertyCard({ property, offers, signedIn }) {
             Under Contract
           </span>
         )}
+        <SaveHomeButton property={property} className="absolute top-3 right-3 z-10" />
         {property.main_image ? (
           <img 
             src={property.main_image} 
@@ -406,6 +410,11 @@ function PropertyCard({ property, offers, signedIn }) {
           <span className="text-2xl font-bold text-blue-600">
             ${property.price?.toLocaleString()}
           </span>
+          {change && change.amount < 0 && (
+            <span className="text-sm font-semibold text-green-700" title={`First listed at $${Number(property.original_list_price).toLocaleString()}`}>
+              ↓ ${Math.abs(change.amount).toLocaleString()} ({Math.abs(change.percent)}%)
+            </span>
+          )}
         </div>
         <div className="text-sm text-gray-600 mb-4">
           {property.beds || 'N/A'} bed • {property.baths || 'N/A'} bath • {property.sq_ft ? property.sq_ft.toLocaleString() + ' sqft' : 'N/A'}
@@ -1007,7 +1016,7 @@ function PropertyDetailPage() {
           </p>
 
           {/* Price and Status */}
-          <div className="flex items-center gap-4 mb-8">
+          <div className="flex flex-wrap items-center gap-4 mb-8">
             <span className="text-4xl font-bold text-blue-600">
               ${property.price?.toLocaleString()}
             </span>
@@ -1017,6 +1026,7 @@ function PropertyDetailPage() {
             }`}>
               {isUnderContract(property) ? 'Under Contract' : property.status}
             </span>
+            <SaveHomeButton property={property} variant="button" className="ml-auto" />
           </div>
 
           {/* Key Features */}
@@ -1070,8 +1080,8 @@ function PropertyDetailPage() {
             </div>
           </div>
 
-          {/* Accepted offers / contract history (signed-in buyers) */}
-          <BidHistoryPanel property={property} signedIn={!!user} onUnlock={() => setShowAddressGate(true)} />
+          {/* Price changes, status changes and accepted offers (terms for signed-in buyers) */}
+          <PropertyHistoryPanel property={property} signedIn={!!user} />
 
           {/* Description */}
           {property.description && (
@@ -1208,6 +1218,7 @@ export default function App() {
     <ErrorBoundary>
       <HelmetProvider>
       <AuthProvider>
+      <SavedHomesProvider>
         <Router>
         <div className="min-h-screen flex flex-col">
           <Header />
@@ -1244,6 +1255,7 @@ export default function App() {
           <Footer />
         </div>
         </Router>
+      </SavedHomesProvider>
       </AuthProvider>
       </HelmetProvider>
     </ErrorBoundary>

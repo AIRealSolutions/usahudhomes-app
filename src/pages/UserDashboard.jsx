@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Mail, Phone, MapPin, DollarSign, Calendar, Home as HomeIcon } from 'lucide-react'
+import SavedHomesSection from '../components/SavedHomesSection'
 
 export default function UserDashboard({ user }) {
   const [inquiries, setInquiries] = useState([])
@@ -136,6 +137,9 @@ export default function UserDashboard({ user }) {
           </div>
         </div>
       </div>
+
+      {/* Homes the buyer saved, with price and contract activity */}
+      <SavedHomesSection />
 
       {/* Inquiries List */}
       <div className="bg-white rounded-lg shadow">
