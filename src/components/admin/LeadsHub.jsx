@@ -90,16 +90,26 @@ function NewLeadsTab({ onNavigate }) {
   const [stateFilter, setStateFilter] = useState('all')
   const [agents, setAgents] = useState([])
   const [assigning, setAssigning] = useState(null)
+  const [assignedIds, setAssignedIds] = useState(new Set())
 
   const fetchLeads = useCallback(async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('leads')
-        .select('*')
-        .order('created_at', { ascending: false })
+      const [{ data, error }, { data: assignedEvents }] = await Promise.all([
+        supabase
+          .from('leads')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        // Intakes may link a customer up front, so "assigned" is tracked by the
+        // assignment event rather than by customer_id.
+        supabase
+          .from('lead_events')
+          .select('lead_id')
+          .eq('event_type', 'assigned_to_agent'),
+      ])
       if (error) throw error
       setLeads(data || [])
+      setAssignedIds(new Set((assignedEvents || []).map(e => e.lead_id)))
     } catch (e) {
       console.error('LeadsHub fetchLeads:', e)
     } finally {
@@ -135,7 +145,11 @@ function NewLeadsTab({ onNavigate }) {
   }
 
   const updateStatus = async (leadId, newStatus) => {
-    await supabase.from('leads').update({ status: newStatus }).eq('id', leadId)
+    const { error } = await supabase
+      .from('leads')
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq('id', leadId)
+    if (error) alert('Failed to update status: ' + error.message)
     await fetchLeads()
   }
 
@@ -269,11 +283,11 @@ function NewLeadsTab({ onNavigate }) {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 flex-wrap">
                         {/* Assign broker dropdown */}
-                        {agents.length > 0 && !lead.customer_id && (
+                        {agents.length > 0 && !assignedIds.has(lead.id) && (
                           <select
                             disabled={assigning === lead.id}
                             onChange={e => assignAgent(lead.id, e.target.value)}
-                            defaultValue=""
+                            value=""
                             className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                           >
                             <option value="" disabled>Assign broker…</option>
@@ -282,7 +296,7 @@ function NewLeadsTab({ onNavigate }) {
                             ))}
                           </select>
                         )}
-                        {lead.customer_id && (
+                        {assignedIds.has(lead.id) && (
                           <span className="text-xs text-green-600 font-medium flex items-center gap-1">
                             <CheckCircle className="w-3 h-3" /> Assigned
                           </span>

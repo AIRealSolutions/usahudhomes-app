@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../config/supabase'
 import {
   Save, Plus, Trash2, Copy, ChevronDown, ChevronUp, Eye,
   Palette, Type, Layout, Bell, Film, Check, X, GripVertical,
@@ -269,7 +269,9 @@ export default function VideoTemplateBuilder() {
 
   const handleSelect = (tmpl) => {
     setSelected(tmpl)
-    setForm({ ...DEFAULT_TEMPLATE, ...tmpl })
+    // DB nulls would make inputs uncontrolled — fall back to defaults / empty strings
+    const clean = Object.fromEntries(Object.entries(tmpl).filter(([, v]) => v !== null && v !== undefined))
+    setForm({ ...DEFAULT_TEMPLATE, description: '', logo_url: '', ...clean })
     setActiveSlide('hero')
     setSaved(false)
   }
@@ -287,10 +289,14 @@ export default function VideoTemplateBuilder() {
     setSaving(true)
     setError(null)
     try {
-      const payload = { ...form }
+      if (!form.name?.trim()) throw new Error('Template name is required.')
+      const payload = { ...form, updated_at: new Date().toISOString() }
       delete payload.id
       delete payload.created_at
-      delete payload.updated_at
+      // Empty number inputs parse to NaN — store the defaults instead
+      for (const k of ['subscribe_overlay_start_sec', 'subscribe_overlay_duration_sec', 'slide_duration_sec', 'transition_duration_sec']) {
+        if (!Number.isFinite(payload[k])) payload[k] = DEFAULT_TEMPLATE[k]
+      }
 
       if (selected?.id) {
         const { error } = await supabase.from('video_templates').update(payload).eq('id', selected.id)
@@ -310,16 +316,22 @@ export default function VideoTemplateBuilder() {
   }
 
   const handleDuplicate = async (tmpl) => {
+    // eslint-disable-next-line no-unused-vars
     const { id, created_at, updated_at, is_default, ...rest } = tmpl
+    setError(null)
     const { data, error } = await supabase.from('video_templates')
       .insert({ ...rest, name: `${rest.name} (Copy)`, is_default: false })
       .select().single()
-    if (!error) { await loadTemplates(); handleSelect(data) }
+    if (error) { setError(`Duplicate failed: ${error.message}`); return }
+    await loadTemplates()
+    handleSelect(data)
   }
 
   const handleDelete = async (tmpl) => {
     if (!window.confirm(`Delete template "${tmpl.name}"?`)) return
-    await supabase.from('video_templates').delete().eq('id', tmpl.id)
+    setError(null)
+    const { error } = await supabase.from('video_templates').delete().eq('id', tmpl.id)
+    if (error) { setError(`Delete failed: ${error.message}`); return }
     if (selected?.id === tmpl.id) { setSelected(null); setForm(DEFAULT_TEMPLATE) }
     await loadTemplates()
   }

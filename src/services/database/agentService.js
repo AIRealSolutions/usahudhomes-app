@@ -5,6 +5,7 @@
 
 import { supabase, TABLES, formatSupabaseResponse } from '../../config/supabase'
 import { agentInvitationService } from '../agentInvitationService'
+import { agentApplicationService } from '../agentApplicationService'
 
 class AgentService {
   /**
@@ -21,7 +22,8 @@ class AgentService {
         .order('created_at', { ascending: false })
 
       if (filters.state) {
-        query = query.contains('states_covered', [filters.state])
+        // states_covered is jsonb, so pass a JSON array (a JS array would be sent as a Postgres array literal)
+        query = query.contains('states_covered', JSON.stringify([filters.state]))
       }
 
       const { data, error } = await query
@@ -81,11 +83,13 @@ class AgentService {
    */
   async searchAgents(searchTerm) {
     try {
+      // Commas and parentheses would break the PostgREST or() filter
+      const term = String(searchTerm).replace(/[,()]/g, ' ').trim()
       const { data, error } = await supabase
         .from(TABLES.AGENTS)
         .select('*')
         .eq('is_active', true)
-        .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,company.ilike.%${searchTerm}%`)
+        .or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%,company.ilike.%${term}%,phone.ilike.%${term}%,license_state.ilike.%${term}%`)
         .order('created_at', { ascending: false })
 
       return formatSupabaseResponse(data, error)
@@ -100,41 +104,45 @@ class AgentService {
    * @param {Object} agentData - Agent information
    * @returns {Promise<Object>} Created agent
    */
-  async addAgent(agentData) {
+  async addAgent(agentData, { invite = true } = {}) {
     try {
+      // Accept both the form's camelCase shape and snake_case rows (e.g. an Export backup)
+      const pick = (camel, snake) => agentData[camel] ?? agentData[snake]
+      const email = pick('email', 'email')
       const { data, error } = await supabase
         .from(TABLES.AGENTS)
         .insert([{
-          first_name: agentData.firstName,
-          last_name: agentData.lastName,
-          email: agentData.email,
-          phone: agentData.phone,
-          company: agentData.company,
-          license_number: agentData.licenseNumber,
-          license_state: agentData.licenseState,
-          specialties: agentData.specialties || [],
-          states_covered: agentData.statesCovered || [],
-          years_experience: agentData.yearsExperience,
-          bio: agentData.bio,
-          profile_image: agentData.profileImage,
-          is_admin: agentData.isAdmin || false,
+          first_name: pick('firstName', 'first_name'),
+          last_name: pick('lastName', 'last_name'),
+          email,
+          phone: pick('phone', 'phone'),
+          company: pick('company', 'company'),
+          license_number: pick('licenseNumber', 'license_number'),
+          license_state: pick('licenseState', 'license_state'),
+          specialties: pick('specialties', 'specialties') || [],
+          states_covered: pick('statesCovered', 'states_covered') || [],
+          years_experience: pick('yearsExperience', 'years_experience'),
+          bio: pick('bio', 'bio'),
+          profile_image: pick('profileImage', 'profile_image'),
+          is_admin: pick('isAdmin', 'is_admin') || false,
           is_active: true,
-          total_listings: 0,
-          total_sales: 0
+          status: 'approved',
+          total_listings: pick('totalListings', 'total_listings') || 0,
+          total_sales: pick('totalSales', 'total_sales') || 0
         }])
         .select()
         .single()
 
       const response = formatSupabaseResponse(data, error)
-      
-      // If agent was created successfully, send invitation email
-      if (response.success && data) {
+
+      // If agent was created successfully, create their login and give them broker access
+      if (response.success && data && invite) {
         const inviteResult = await agentInvitationService.sendInvitation({
-          email: agentData.email,
-          firstName: agentData.firstName,
-          lastName: agentData.lastName
+          email,
+          firstName: data.first_name,
+          lastName: data.last_name
         })
-        
+
         if (!inviteResult.success) {
           console.warn('Agent created but invitation email failed:', inviteResult.error)
           // Still return success for agent creation, but note the email issue
@@ -143,8 +151,11 @@ class AgentService {
         } else {
           response.invitationSent = true
         }
+
+        const roleResult = await agentApplicationService.grantBrokerRole(data)
+        if (!roleResult.success) console.warn('Agent created but broker role not granted:', roleResult.error)
       }
-      
+
       return response
     } catch (error) {
       console.error('Error adding agent:', error)
@@ -166,13 +177,13 @@ class AgentService {
       if (updates.lastName) updateData.last_name = updates.lastName
       if (updates.email) updateData.email = updates.email
       if (updates.phone) updateData.phone = updates.phone
-      if (updates.company) updateData.company = updates.company
-      if (updates.licenseNumber) updateData.license_number = updates.licenseNumber
+      if (updates.company !== undefined) updateData.company = updates.company
+      if (updates.licenseNumber !== undefined) updateData.license_number = updates.licenseNumber
       if (updates.licenseState) updateData.license_state = updates.licenseState
       if (updates.specialties) updateData.specialties = updates.specialties
       if (updates.statesCovered) updateData.states_covered = updates.statesCovered
       if (updates.yearsExperience !== undefined) updateData.years_experience = updates.yearsExperience
-      if (updates.bio) updateData.bio = updates.bio
+      if (updates.bio !== undefined) updateData.bio = updates.bio
       if (updates.profileImage) updateData.profile_image = updates.profileImage
       if (updates.isAdmin !== undefined) updateData.is_admin = updates.isAdmin
       if (updates.isActive !== undefined) updateData.is_active = updates.isActive

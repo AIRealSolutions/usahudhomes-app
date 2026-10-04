@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../config/supabase'
 import {
   Play, Square, CheckSquare, Filter, Search, RefreshCw,
   Film, Loader2, CheckCircle2, XCircle, Clock, AlertCircle,
@@ -123,31 +123,35 @@ export default function VideoBulkGenerator() {
   }
 
   const loadProperties = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('properties')
       .select('id, case_number, address, city, state, county, price, beds, baths, status, main_image, bids_open, listing_period, image_url')
       .eq('is_active', true)
       .order('created_at', { ascending: false })
+    if (error) setError(`Failed to load properties: ${error.message}`)
     setProperties(data || [])
   }
 
   const loadTemplates = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('video_templates')
       .select('id, name, is_default, color_primary, color_accent, video_format')
       .order('is_default', { ascending: false })
+    if (error) setError(`Failed to load templates: ${error.message}`)
     setTemplates(data || [])
-    if (data?.length > 0 && !selectedTemplate) {
-      setSelectedTemplate(data.find(t => t.is_default) || data[0])
-    }
+    // Keep the current selection if it still exists, otherwise pick the default
+    setSelectedTemplate(prev =>
+      (prev && data?.find(t => t.id === prev.id)) || data?.find(t => t.is_default) || data?.[0] || null
+    )
   }
 
   const loadJobs = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('video_jobs')
       .select('*, properties(city, state, address)')
       .order('created_at', { ascending: false })
       .limit(50)
+    if (error) { setError(`Failed to load video jobs: ${error.message}`); return }
     setJobs(data || [])
   }
 
@@ -221,7 +225,17 @@ export default function VideoBulkGenerator() {
     setQueueing(true)
     setError(null)
     try {
-      const selectedProps = properties.filter(p => selectedIds.has(p.id))
+      // Skip properties that already have a queued/processing job to avoid duplicates
+      const { data: active, error: activeErr } = await supabase
+        .from('video_jobs')
+        .select('property_id')
+        .in('status', ['queued', 'processing'])
+      if (activeErr) throw activeErr
+      const alreadyActive = new Set((active || []).map(j => j.property_id))
+      const selectedProps = properties.filter(p => selectedIds.has(p.id) && !alreadyActive.has(p.id))
+      if (selectedProps.length === 0) {
+        throw new Error('All selected properties already have a queued or processing video.')
+      }
       const rows = selectedProps.map(p => ({
         property_id: p.id,
         template_id: selectedTemplate.id,
@@ -248,9 +262,10 @@ export default function VideoBulkGenerator() {
   }
 
   const getImageUrl = (p) => {
-    if (p.main_image) return p.main_image
-    if (p.image_url) return p.image_url
-    if (p.case_number) return `https://lpqjndfjbenolhneqzec.supabase.co/storage/v1/object/public/property-images/${p.case_number.replace('-', '_')}.jpg`
+    const BUCKET_BASE = 'https://lpqjndfjbenolhneqzec.supabase.co/storage/v1/object/public/USAHUDhomes'
+    const img = p.main_image || p.image_url
+    if (img) return /^https?:\/\//.test(img) ? img : `${BUCKET_BASE}/${img}`
+    if (p.case_number) return `${BUCKET_BASE}/${p.case_number.replace('-', '_')}.jpg`
     return null
   }
 
@@ -395,7 +410,7 @@ export default function VideoBulkGenerator() {
                     {p.beds} / {p.baths}
                   </div>
                   <div className="col-span-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.status === 'BIDS OPEN' ? 'bg-green-100 text-green-700' : p.status === 'NEW LISTING' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.status?.toUpperCase() === 'BIDS OPEN' ? 'bg-green-100 text-green-700' : p.status?.toUpperCase() === 'NEW LISTING' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
                       {p.status}
                     </span>
                   </div>
@@ -434,8 +449,10 @@ export default function VideoBulkGenerator() {
             </div>
             <p className="text-xs text-amber-600 mt-2">
               <Info className="w-3 h-3 inline mr-1" />
-              First-time setup: add <code className="bg-amber-100 px-1 rounded">SUPABASE_SERVICE_KEY=...</code> to <code className="bg-amber-100 px-1 rounded">hud-pipeline/.env</code>.
-              Get the key from: Supabase Dashboard → Project Settings → API → service_role.
+              First-time setup: paste your key into <code className="bg-amber-100 px-1 rounded">SUPABASE_SERVICE_KEY = "..."</code> at the top of <code className="bg-amber-100 px-1 rounded">hud-pipeline/scripts/4_video_worker.py</code> and
+              install deps (<code className="bg-amber-100 px-1 rounded">pip install -r requirements.txt</code>).
+              Get the key from: Supabase Dashboard → Project Settings → API → service_role. There is no cloud render worker — jobs stay
+              &quot;queued&quot; until this script runs.
             </p>
           </div>
         </div>

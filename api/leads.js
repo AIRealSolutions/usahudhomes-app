@@ -25,14 +25,63 @@ function getSupabase() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+// Every action below runs with the service key, so the caller's Supabase session
+// token (Authorization: Bearer <access_token>) is verified and their role checked.
+async function getCaller(req, supabase) {
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
+  if (!token) return null
+  const { data: { user } = {}, error } = await supabase.auth.getUser(token)
+  if (error || !user) return null
+  const { data: row } = await supabase
+    .from('users').select('id, email, role').eq('id', user.id).maybeSingle()
+  return { id: user.id, email: user.email, role: row?.role || 'end_user' }
+}
+
+async function requireRole(req, res, supabase, roles) {
+  const caller = await getCaller(req, supabase)
+  if (!caller) {
+    res.status(401).json({ success: false, error: 'Please sign in again.' })
+    return null
+  }
+  if (!roles.includes(caller.role)) {
+    res.status(403).json({ success: false, error: 'You do not have permission to do that.' })
+    return null
+  }
+  return caller
+}
+
+// Brokers may only act on referrals assigned to their own agent record.
+async function canActForAgent(supabase, caller, agentId) {
+  if (caller.role === 'admin') return true
+  if (agentId === caller.id) return true
+  const { data } = await supabase
+    .from('agents').select('id').eq('id', agentId).ilike('email', caller.email || '').maybeSingle()
+  return !!data
+}
+
+// activities has no consultation_id column; the consultation goes in metadata.
+async function logActivity(supabase, consultation, agentId, activityType, description, metadata = {}) {
+  if (!consultation?.customer_id) return
+  const { error } = await supabase.from('activities').insert([{
+    customer_id: consultation.customer_id,
+    agent_id: agentId || null,
+    activity_type: activityType,
+    description,
+    metadata: { consultation_id: consultation.id, ...metadata },
+  }])
+  if (error) console.warn(`[leads] activity log (${activityType}) failed:`, error.message)
+}
+
 // ─── Action: delete ───────────────────────────────────────────────────────────
 async function handleDelete(req, res) {
+  const supabase = getSupabase()
+  if (!(await requireRole(req, res, supabase, ['admin']))) return
   const { ids, id } = req.body || {}
   const toDelete = ids || (id ? [id] : [])
   if (!toDelete.length) {
     return res.status(400).json({ success: false, error: 'Provide id or ids array' })
   }
-  const supabase = getSupabase()
   const { error } = await supabase
     .from('consultations')
     .update({ is_deleted: true, deleted_at: new Date().toISOString() })
@@ -43,79 +92,82 @@ async function handleDelete(req, res) {
 
 // ─── Action: assign ───────────────────────────────────────────────────────────
 async function handleAssign(req, res) {
+  const supabase = getSupabase()
+  if (!(await requireRole(req, res, supabase, ['admin']))) return
   const { consultationId, agentId } = req.body || {}
   if (!consultationId || !agentId) {
     return res.status(400).json({ success: false, error: 'consultationId and agentId required' })
   }
-  const supabase = getSupabase()
   const now        = new Date().toISOString()
   const expiresAt  = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
   const { data, error } = await supabase
     .from('consultations')
-    .update({ assigned_broker_id: agentId, assigned_at: now, referral_expires_at: expiresAt, status: 'referred' })
+    .update({ assigned_broker_id: agentId, assigned_at: now, referred_at: now, referral_expires_at: expiresAt, status: 'referred', updated_at: now })
     .eq('id', consultationId)
-    .select('*, agents(*)')
+    .select('*')
     .single()
   if (error) throw error
-  await supabase.from('activities').insert([{
-    consultation_id: consultationId, agent_id: agentId,
-    activity_type: 'referral_assigned', description: 'Referral assigned',
-  }]).catch(() => {})
-  return res.status(200).json({ success: true, data })
+  const { data: agent } = await supabase.from('agents').select('*').eq('id', agentId).maybeSingle()
+  await logActivity(supabase, data, agentId, 'referral_assigned', 'Referral assigned')
+  return res.status(200).json({ success: true, data: { ...data, agents: agent } })
 }
 
 // ─── Action: accept ───────────────────────────────────────────────────────────
 async function handleAccept(req, res) {
+  const supabase = getSupabase()
+  const caller = await requireRole(req, res, supabase, ['admin', 'broker'])
+  if (!caller) return
   const { consultationId, agentId, notes } = req.body || {}
   if (!consultationId || !agentId) {
     return res.status(400).json({ success: false, error: 'consultationId and agentId required' })
   }
-  const supabase = getSupabase()
+  if (!(await canActForAgent(supabase, caller, agentId))) {
+    return res.status(403).json({ success: false, error: 'You can only accept your own referrals.' })
+  }
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('consultations')
-    .update({ accepted_at: now, status: 'accepted', ...(notes ? { notes } : {}) })
+    .update({ accepted_at: now, status: 'accepted', updated_at: now, ...(notes ? { notes } : {}) })
     .eq('id', consultationId)
     .eq('assigned_broker_id', agentId)
     .select().single()
   if (error) throw error
-  await supabase.from('activities').insert([{
-    consultation_id: consultationId, agent_id: agentId,
-    activity_type: 'referral_accepted', description: 'Referral accepted',
-  }]).catch(() => {})
+  await logActivity(supabase, data, agentId, 'referral_accepted', 'Referral accepted')
   return res.status(200).json({ success: true, data })
 }
 
 // ─── Action: decline ──────────────────────────────────────────────────────────
 async function handleDecline(req, res) {
+  const supabase = getSupabase()
+  const caller = await requireRole(req, res, supabase, ['admin', 'broker'])
+  if (!caller) return
   const { consultationId, agentId, reason, notes } = req.body || {}
   if (!consultationId || !agentId) {
     return res.status(400).json({ success: false, error: 'consultationId and agentId required' })
   }
-  const supabase = getSupabase()
+  if (!(await canActForAgent(supabase, caller, agentId))) {
+    return res.status(403).json({ success: false, error: 'You can only decline your own referrals.' })
+  }
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('consultations')
-    .update({ declined_at: now, decline_reason: reason, decline_notes: notes, status: 'declined' })
+    .update({ declined_at: now, decline_reason: reason, decline_notes: notes, status: 'declined', updated_at: now })
     .eq('id', consultationId)
     .eq('assigned_broker_id', agentId)
     .select().single()
   if (error) throw error
-  await supabase.from('activities').insert([{
-    consultation_id: consultationId, agent_id: agentId,
-    activity_type: 'referral_declined', description: 'Referral declined',
-    metadata: { reason, notes },
-  }]).catch(() => {})
+  await logActivity(supabase, data, agentId, 'referral_declined', 'Referral declined', { reason, notes })
   return res.status(200).json({ success: true, data })
 }
 
 // ─── Action: outcome ──────────────────────────────────────────────────────────
 async function handleOutcome(req, res) {
+  const supabase = getSupabase()
+  if (!(await requireRole(req, res, supabase, ['admin', 'broker']))) return
   const { consultationId, outcome, notes } = req.body || {}
   if (!consultationId || !outcome) {
     return res.status(400).json({ success: false, error: 'consultationId and outcome required' })
   }
-  const supabase = getSupabase()
   const { data, error } = await supabase
     .from('consultations')
     .update({ outcome, outcome_notes: notes, updated_at: new Date().toISOString() })
@@ -127,13 +179,19 @@ async function handleOutcome(req, res) {
 
 // ─── Action: referrals (GET) ──────────────────────────────────────────────────
 async function handleGetReferrals(req, res) {
+  const supabase = getSupabase()
+  const caller = await requireRole(req, res, supabase, ['admin', 'broker'])
+  if (!caller) return
   const agentId = req.query?.agentId
   if (!agentId) return res.status(400).json({ success: false, error: 'agentId query param required' })
-  const supabase = getSupabase()
+  if (!(await canActForAgent(supabase, caller, agentId))) {
+    return res.status(403).json({ success: false, error: 'You can only view your own referrals.' })
+  }
   const { data, error } = await supabase
     .from('consultations')
     .select('*, customers(*), properties(*)')
     .eq('assigned_broker_id', agentId)
+    .eq('is_deleted', false)
     .order('assigned_at', { ascending: false })
   if (error) throw error
   return res.status(200).json({ success: true, data: data || [] })
@@ -148,9 +206,36 @@ async function handleGetReferrals(req, res) {
  * dry_run=false → fetches IDs, then deletes in chunks of 25 to avoid
  *                 PostgreSQL "stack depth limit exceeded" on large deletes
  */
+async function requireAdminForPurge(req, res, supabase) {
+  const token = (req.headers?.authorization || '').replace(/^Bearer\s+/i, '')
+  if (!token) {
+    res.status(401).json({ success: false, error: 'Not signed in' })
+    return false
+  }
+  const { data: { user } = {}, error } = await supabase.auth.getUser(token)
+  if (error || !user) {
+    res.status(401).json({ success: false, error: 'Invalid or expired session' })
+    return false
+  }
+  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle()
+  if (profile?.role !== 'admin') {
+    res.status(403).json({ success: false, error: 'Admin access required' })
+    return false
+  }
+  return true
+}
+
 async function handlePurgeUnderContract(req, res) {
-  const { dry_run = false, days = 60 } = req.body || {}
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, error: 'Method not allowed' })
+  }
+  const { dry_run = false } = req.body || {}
+  const days = Number(req.body?.days ?? 60)
+  if (!Number.isFinite(days) || days < 1) {
+    return res.status(400).json({ success: false, error: 'days must be a number >= 1' })
+  }
   const supabase = getSupabase()
+  if (!(await requireAdminForPurge(req, res, supabase))) return
 
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
@@ -237,6 +322,7 @@ async function handlePurgeUnderContract(req, res) {
 // ─── Action: process-expired ──────────────────────────────────────────────────
 async function handleProcessExpired(req, res) {
   const supabase = getSupabase()
+  if (!(await requireRole(req, res, supabase, ['admin']))) return
   const now = new Date().toISOString()
   const { data: expired, error } = await supabase
     .from('consultations').select('*').eq('status', 'referred').lt('referral_expires_at', now).is('accepted_at', null)
@@ -245,11 +331,13 @@ async function handleProcessExpired(req, res) {
     return res.status(200).json({ success: true, data: { expired: 0 } })
   }
   for (const c of expired) {
-    await supabase.from('consultations').update({ expired_at: now, status: 'expired' }).eq('id', c.id).catch(() => {})
-    await supabase.from('activities').insert([{
-      consultation_id: c.id, agent_id: c.assigned_broker_id,
-      activity_type: 'referral_expired', description: 'Referral expired',
-    }]).catch(() => {})
+    const { error: updErr } = await supabase
+      .from('consultations').update({ expired_at: now, status: 'expired', updated_at: now }).eq('id', c.id)
+    if (updErr) {
+      console.warn('[leads/process-expired] update failed:', c.id, updErr.message)
+      continue
+    }
+    await logActivity(supabase, c, c.assigned_broker_id, 'referral_expired', 'Referral expired')
   }
   return res.status(200).json({ success: true, data: { expired: expired.length } })
 }

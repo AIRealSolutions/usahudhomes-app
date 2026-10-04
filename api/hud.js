@@ -25,6 +25,33 @@ function getSupabase() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
+// ─── Auth: caller must be a logged-in admin (Bearer <supabase access token>) ──
+async function requireAdmin(req, res) {
+  const token = (req.headers?.authorization || '').replace(/^Bearer\s+/i, '')
+  if (!token) {
+    res.status(401).json({ success: false, error: 'Not signed in' })
+    return false
+  }
+  const supabase = getSupabase()
+  const { data: { user } = {}, error } = await supabase.auth.getUser(token)
+  if (error || !user) {
+    res.status(401).json({ success: false, error: 'Invalid or expired session' })
+    return false
+  }
+  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle()
+  if (profile?.role !== 'admin') {
+    res.status(403).json({ success: false, error: 'Admin access required' })
+    return false
+  }
+  return true
+}
+
+function toIsoOrNull(value) {
+  if (!value) return null
+  const d = new Date(value)
+  return isNaN(d.getTime()) ? null : d.toISOString()
+}
+
 // ─── HUD Scrape helpers ───────────────────────────────────────────────────────
 const HUD_BASE_URL    = 'https://www.hudhomestore.gov'
 const CLOUDINARY_BASE = 'https://res.cloudinary.com/dkzfopaco/image/upload/'
@@ -107,7 +134,7 @@ function mapToDbRow(p) {
     property_type:  p.property_type,
     status:         p.property_status || 'Active',
     bids_open:      p.bid_open_date   || null,  // stored as varchar in DB, no Date conversion needed
-    bid_deadline:   p.period_deadline ? new Date(p.period_deadline).toISOString() : null,
+    bid_deadline:   toIsoOrNull(p.period_deadline),
     listing_period: p.listing_period,
     main_image:     p.main_image,
     image_url:      p.main_image,      // also populate image_url column
@@ -160,12 +187,15 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
         else if (!ex.is_active) restoredCount++
         else updatedCount++
       }
-      // Batch upsert
-      const rows = chunk.filter(p => p.case_number).map(mapToDbRow)
+      // Batch upsert (skip rows missing NOT NULL columns: address, city, price)
+      const valid = chunk.filter(p => p.case_number && p.address && p.city && p.list_price != null)
+      errorCount += chunk.filter(p => p.case_number).length - valid.length
+      const rows = valid.map(mapToDbRow)
+      if (rows.length === 0) continue
       const { error: upsertErr } = await supabase
         .from('properties').upsert(rows, { onConflict: 'case_number' })
       if (upsertErr) {
-        errorCount += chunk.length
+        errorCount += rows.length
         errors.push({ chunk: i, error: upsertErr.message })
       }
     }
@@ -193,7 +223,7 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
 
     // Log to hud_sync_runs
     try {
-      await supabase.from('hud_sync_runs').insert([{
+      const { error: logErr } = await supabase.from('hud_sync_runs').insert([{
         job_id:                 job_id || `manual-${Date.now()}`,
         state:                  stateCode,
         dry_run:                false,
@@ -205,6 +235,7 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
         errors:                 errorCount,
         ran_at:                 new Date().toISOString(),
       }])
+      if (logErr) console.warn('[hud/import] run log failed:', logErr.message)
     } catch (e) { console.warn('[hud/import] run log failed:', e.message) }
 
     return {
@@ -345,7 +376,7 @@ async function handleSchedules(req, res) {
   if (req.method === 'POST') {
     const { label, title, states, cron_expression, dry_run, enabled } = req.body || {}
     const scheduleLabel = label || title  // accept either field name
-    if (!scheduleLabel || !states || !cron_expression) {
+    if (!scheduleLabel || !Array.isArray(states) || states.length === 0 || !cron_expression) {
       return res.status(400).json({ success: false, error: 'label, states, and cron_expression are required' })
     }
     const { data, error } = await supabase.from('hud_sync_schedules')
@@ -356,7 +387,12 @@ async function handleSchedules(req, res) {
   }
   if (req.method === 'PATCH') {
     if (!scheduleId) return res.status(400).json({ success: false, error: 'id query param required' })
-    const updates = req.body || {}
+    // Only allow known columns to be patched
+    const body = req.body || {}
+    const updates = {}
+    for (const k of ['label', 'states', 'cron_expression', 'dry_run', 'enabled']) {
+      if (body[k] !== undefined) updates[k] = body[k]
+    }
     const { data, error } = await supabase.from('hud_sync_schedules')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', scheduleId).select().single()
@@ -381,6 +417,8 @@ export default async function handler(req, res) {
 
   const action = req.query?.action || ''
   try {
+    // Every action (DB writes, run history, HUD proxy) is admin-only
+    if (!(await requireAdmin(req, res))) return
     switch (action) {
       case 'scrape':            return await handleScrape(req, res)
       case 'scrape-and-import': return await handleScrapeAndImport(req, res)

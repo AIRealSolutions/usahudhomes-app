@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { sendLeadEmail, sendLeadText } from '../services/leadMessaging';
+import { assignLeadToAgent } from '../services/database/leadService';
 import { 
   ArrowLeft, Phone, Mail, MessageSquare, Calendar, MapPin, 
   DollarSign, Home, User, Clock, FileText, Send, X, Check,
@@ -27,6 +28,8 @@ export default function LeadDetailsPage() {
   const [emailBody, setEmailBody] = useState('');
   const [callResult, setCallResult] = useState('');
   const [textMessage, setTextMessage] = useState('');
+  const [agents, setAgents] = useState([]);
+  const [assigning, setAssigning] = useState(false);
 
   const STATUS_OPTIONS = [
     { value: 'new_lead', label: 'New Lead', color: 'yellow' },
@@ -43,7 +46,37 @@ export default function LeadDetailsPage() {
     fetchLeadDetails();
     fetchEvents();
     fetchEmailTemplates();
+    fetchAgents();
   }, [id]);
+
+  const fetchAgents = async () => {
+    const { data } = await supabase
+      .from('agents')
+      .select('id, first_name, last_name')
+      .eq('status', 'approved')
+      .eq('is_active', true)
+      .order('first_name');
+    setAgents(data || []);
+  };
+
+  const handleAssign = async (agentId) => {
+    if (!agentId) return;
+    const agent = agents.find(a => a.id === agentId);
+    if (!confirm(`Assign this lead to ${agent?.first_name || ''} ${agent?.last_name || ''}?`)) return;
+    setAssigning(true);
+    try {
+      const { customerId } = await assignLeadToAgent(lead, agentId);
+      setLead({ ...lead, customer_id: customerId, status: 'under_review' });
+      setNewStatus('under_review');
+      await fetchEvents();
+      alert('Lead assigned. It now appears under Assigned Leads.');
+    } catch (error) {
+      console.error('Error assigning lead:', error);
+      alert('Failed to assign lead: ' + error.message);
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   const fetchLeadDetails = async () => {
     try {
@@ -104,9 +137,8 @@ export default function LeadDetailsPage() {
         });
 
       if (error) throw error;
+    } finally {
       await fetchEvents();
-    } catch (error) {
-      console.error('Error logging event:', error);
     }
   };
 
@@ -114,7 +146,7 @@ export default function LeadDetailsPage() {
     try {
       const { error } = await supabase
         .from('leads')
-        .update({ status: newStatus })
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq('id', id);
 
       if (error) throw error;
@@ -148,7 +180,7 @@ export default function LeadDetailsPage() {
       if (error) throw error;
 
       alert('Lead deleted successfully!');
-      navigate('/admin/leads');
+      navigate('/admin');
     } catch (error) {
       console.error('Error deleting lead:', error);
       alert('Failed to delete lead: ' + error.message);
@@ -308,7 +340,7 @@ export default function LeadDetailsPage() {
       {/* Header */}
       <div className="mb-6">
         <button
-          onClick={() => navigate('/admin/leads')}
+          onClick={() => navigate('/admin')}
           className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -451,7 +483,7 @@ export default function LeadDetailsPage() {
                       {lead.property_price && (
                         <div className="text-gray-600 flex items-center mt-1">
                           <DollarSign className="h-4 w-4 mr-1" />
-                          {lead.property_price.toLocaleString()}
+                          {Number(lead.property_price).toLocaleString()}
                         </div>
                       )}
                       {lead.property_case_number && (
@@ -471,7 +503,7 @@ export default function LeadDetailsPage() {
                     <div className="flex items-center">
                       <DollarSign className="h-5 w-5 text-gray-400 mr-3" />
                       <span className="text-gray-700">
-                        Budget: ${lead.budget_min.toLocaleString()} - ${lead.budget_max.toLocaleString()}
+                        Budget: ${Number(lead.budget_min).toLocaleString()} - ${Number(lead.budget_max).toLocaleString()}
                       </span>
                     </div>
                   )}
@@ -551,7 +583,7 @@ export default function LeadDetailsPage() {
                     lead.source === 'facebook' ? 'bg-purple-100 text-purple-800' :
                     'bg-gray-100 text-gray-800'
                   }`}>
-                    {lead.source.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                    {(lead.source || 'unknown').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                   </span>
                 </div>
               </div>
@@ -589,13 +621,27 @@ export default function LeadDetailsPage() {
                 <Send className="h-4 w-4 mr-2" />
                 Send Opt-In Request
               </button>
-              <button
-                onClick={() => navigate('/admin/leads')}
-                className="w-full px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 text-left flex items-center"
-              >
-                <User className="h-4 w-4 mr-2" />
-                Assign to Broker
-              </button>
+              {events.some(e => e.event_type === 'assigned_to_agent') ? (
+                <div className="w-full px-4 py-2 bg-green-50 text-green-700 rounded-lg flex items-center">
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Assigned to a broker
+                </div>
+              ) : (
+                <label className="w-full px-4 py-2 bg-gray-50 text-gray-700 rounded-lg flex items-center gap-2">
+                  <User className="h-4 w-4 flex-shrink-0" />
+                  <select
+                    value=""
+                    disabled={assigning || agents.length === 0}
+                    onChange={(e) => handleAssign(e.target.value)}
+                    className="flex-1 bg-transparent text-sm focus:outline-none disabled:opacity-50"
+                  >
+                    <option value="" disabled>{assigning ? 'Assigning…' : 'Assign to Broker…'}</option>
+                    {agents.map(a => (
+                      <option key={a.id} value={a.id}>{a.first_name} {a.last_name}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
           </div>
         </div>

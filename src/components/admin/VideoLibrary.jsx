@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../config/supabase'
+import { getAIClient } from '../../services/openai/proxyClient'
 import {
   Download, Youtube, Sparkles, RefreshCw, Film, CheckCircle2,
   XCircle, Clock, Loader2, ExternalLink, Trash2, AlertCircle,
-  Search, Filter, Eye
+  Search, RotateCcw
 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { Badge } from '../ui/badge'
 import { Card, CardContent } from '../ui/card'
 
 const STATUS_CONFIG = {
@@ -17,7 +17,7 @@ const STATUS_CONFIG = {
   error:      { label: 'Error',      color: 'bg-red-100 text-red-700',     icon: XCircle },
 }
 
-function VideoCard({ job, onDelete, onGenerateMeta, onUploadYouTube }) {
+function VideoCard({ job, onDelete, onRetry, onGenerateMeta, onUploadYouTube }) {
   const [expanded, setExpanded] = useState(false)
   const cfg = STATUS_CONFIG[job.status] || STATUS_CONFIG.queued
   const Icon = cfg.icon
@@ -108,6 +108,21 @@ function VideoCard({ job, onDelete, onGenerateMeta, onUploadYouTube }) {
             </a>
           )}
 
+          {/* Actions for queued / failed jobs */}
+          {(job.status === 'queued' || job.status === 'error') && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {job.status === 'error' && (
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onRetry(job)}>
+                  <RotateCcw className="w-3 h-3 mr-1" /> Retry
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" className="h-7 text-xs text-red-500 hover:text-red-700"
+                onClick={() => onDelete(job)}>
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            </div>
+          )}
+
           {/* Actions */}
           {job.status === 'done' && (
             <div className="flex flex-wrap gap-1.5 pt-1">
@@ -156,11 +171,12 @@ export default function VideoLibrary() {
 
   const loadJobs = async () => {
     setLoading(true)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('video_jobs')
       .select('*, properties(city, state, address, price, county, beds, baths, status, bids_open, listing_period)')
       .order('created_at', { ascending: false })
-    setJobs(data || [])
+    if (error) setError(`Failed to load videos: ${error.message}`)
+    else setJobs(data || [])
     setLoading(false)
   }
 
@@ -171,45 +187,68 @@ export default function VideoLibrary() {
 
   const handleDelete = async (job) => {
     if (!window.confirm(`Delete video job for ${job.case_number}?`)) return
-    await supabase.from('video_jobs').delete().eq('id', job.id)
+    const { error } = await supabase.from('video_jobs').delete().eq('id', job.id)
+    if (error) { setError(`Delete failed: ${error.message}`); return }
     setJobs(prev => prev.filter(j => j.id !== job.id))
     notify('Job deleted.')
+  }
+
+  const handleRetry = async (job) => {
+    const reset = { status: 'queued', progress: 0, error_message: null, started_at: null, completed_at: null }
+    const { error } = await supabase.from('video_jobs').update(reset).eq('id', job.id)
+    if (error) { setError(`Retry failed: ${error.message}`); return }
+    setJobs(prev => prev.map(j => j.id === job.id ? { ...j, ...reset } : j))
+    notify('Job re-queued. Run the local video worker to process it.')
+  }
+
+  const buildFallbackMeta = (prop) => {
+    const title = `HUD Home ${prop?.city || ''}, ${prop?.state || ''} — $${prop?.price?.toLocaleString() || ''} | ${prop?.beds || ''}bd/${prop?.baths || ''}ba | USAHUDhomes.com`
+    const description = `HUD Home for sale in ${prop?.county || ''} County, ${prop?.state || ''}.\n\nListing Price: $${prop?.price?.toLocaleString() || ''}\nBedrooms: ${prop?.beds || '—'} | Bathrooms: ${prop?.baths || '—'}\nStatus: ${prop?.status || '—'}\nBids Open: ${prop?.bids_open || '—'}\n\n✅ $100 Down FHA Loan available\n✅ HUD pays up to 3% closing costs\n✅ 203k repair escrow up to $35,000\n\nVisit USAHUDhomes.com to search all HUD homes.\nCall Lightkeeper Realty: 910.363.6147\n\n#HUDhomes #${prop?.state || ''}RealEstate #FHAloan #HUDhome #AffordableHousing #USAHUDhomes`
+    return { title, description }
   }
 
   const handleGenerateMeta = async (job) => {
     setGeneratingMeta(job.id)
     setError(null)
+    const prop = job.properties
+    let meta = null
+    let usedAI = false
     try {
-      const prop = job.properties
-      // Call the Supabase edge function (or fallback to client-side placeholder)
-      const { data, error } = await supabase.functions.invoke('generate-video-metadata', {
-        body: {
-          job_id: job.id,
-          city: prop?.city,
-          state: prop?.state,
-          county: prop?.county,
-          price: prop?.price,
-          beds: prop?.beds,
-          baths: prop?.baths,
-          status: prop?.status,
-          bids_open: prop?.bids_open,
-          listing_period: prop?.listing_period,
-          case_number: job.case_number,
-        }
+      // OpenAI via the /api/ai serverless proxy (key stays server-side)
+      const resp = await getAIClient().chat.completions.create({
+        model: 'gpt-4o-mini',
+        response_format: { type: 'json_object' },
+        max_tokens: 400,
+        messages: [{
+          role: 'user',
+          content: `You are an SEO expert for real estate YouTube Shorts/Reels. Generate a YouTube title and description for a HUD home listing video.
+Location: ${prop?.city || ''}, ${prop?.state || ''} (County: ${prop?.county || ''})
+Price: $${prop?.price?.toLocaleString() || ''}
+Beds/Baths: ${prop?.beds || '—'} bed / ${prop?.baths || '—'} bath
+Status: ${prop?.status || ''}
+Bids Open: ${prop?.bids_open || ''}
+Rules: do NOT include the street address; highlight owner-occupant incentives ($100 down FHA, 3% closing costs, $35K 203k); title max 70 characters with price and location; description 3-4 sentences with a call to action for USAHUDhomes.com, ending with "Call Marc Spencer at 910.363.6147 | Lightkeeper Realty — Registered HUD Buyer's Agency".
+Return JSON only: {"title": "...", "description": "..."}`,
+        }],
       })
-      if (error) throw error
-      // Update local state
-      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, youtube_title: data.title, youtube_description: data.description } : j))
-      notify('AI metadata generated!')
+      const parsed = JSON.parse(resp?.choices?.[0]?.message?.content || '{}')
+      if (parsed.title && parsed.description) {
+        meta = { title: parsed.title, description: parsed.description }
+        usedAI = true
+      }
     } catch (e) {
-      // Fallback: generate a basic title/description locally
-      const prop = job.properties
-      const title = `HUD Home ${prop?.city || ''}, ${prop?.state || ''} — $${prop?.price?.toLocaleString() || ''} | ${prop?.beds || ''}bd/${prop?.baths || ''}ba | USAHUDhomes.com`
-      const description = `HUD Home for sale in ${prop?.county || ''} County, ${prop?.state || ''}.\n\nListing Price: $${prop?.price?.toLocaleString() || ''}\nBedrooms: ${prop?.beds || '—'} | Bathrooms: ${prop?.baths || '—'}\nStatus: ${prop?.status || '—'}\nBids Open: ${prop?.bids_open || '—'}\n\n✅ $100 Down FHA Loan available\n✅ HUD pays up to 3% closing costs\n✅ 203k repair escrow up to $35,000\n\nVisit USAHUDhomes.com to search all HUD homes.\nCall Lightkeeper Realty: 910.363.6147\n\n#HUDhomes #${prop?.state || ''}RealEstate #FHAloan #HUDhome #AffordableHousing #USAHUDhomes`
+      console.warn('AI metadata failed, using template fallback:', e.message)
+    }
+    if (!meta) meta = buildFallbackMeta(prop)
 
-      await supabase.from('video_jobs').update({ youtube_title: title, youtube_description: description }).eq('id', job.id)
-      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, youtube_title: title, youtube_description: description } : j))
-      notify('AI metadata generated (local fallback)!')
+    const { error } = await supabase.from('video_jobs')
+      .update({ youtube_title: meta.title, youtube_description: meta.description })
+      .eq('id', job.id)
+    if (error) {
+      setError(`Could not save metadata: ${error.message}`)
+    } else {
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, youtube_title: meta.title, youtube_description: meta.description } : j))
+      notify(usedAI ? 'AI metadata generated!' : 'Metadata generated from template (AI unavailable).')
     }
     setGeneratingMeta(null)
   }
@@ -222,10 +261,12 @@ export default function VideoLibrary() {
         body: { job_id: job.id }
       })
       if (error) throw error
+      if (!data?.youtube_url) throw new Error('Unexpected response from upload service')
       setJobs(prev => prev.map(j => j.id === job.id ? { ...j, uploaded_to_youtube: true, youtube_url: data.youtube_url, youtube_video_id: data.video_id } : j))
       notify('Video uploaded to YouTube!')
     } catch (e) {
-      setError(`YouTube upload failed: ${e.message}. Ensure YouTube API credentials are configured in Supabase secrets.`)
+      // No "upload-to-youtube" Edge Function / YouTube OAuth credentials are deployed for this project.
+      setError(`YouTube upload is not available from the browser (${e.message}). The upload service is not set up — download the MP4 and upload it manually, or run hud-pipeline/scripts/3_bulk_upload.py locally with your YouTube OAuth credentials.`)
     }
     setUploadingYT(null)
   }
@@ -329,6 +370,7 @@ export default function VideoLibrary() {
               key={job.id}
               job={{ ...job, ...(generatingMeta === job.id ? { status: 'processing' } : {}), ...(uploadingYT === job.id ? { status: 'processing' } : {}) }}
               onDelete={handleDelete}
+              onRetry={handleRetry}
               onGenerateMeta={handleGenerateMeta}
               onUploadYouTube={handleUploadYouTube}
             />

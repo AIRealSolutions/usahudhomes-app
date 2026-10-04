@@ -50,10 +50,12 @@ const AgentApplicationsAdmin = () => {
     }
 
     setProcessing(true)
-    const result = await agentApplicationService.approveApplication(application.id, user.id)
+    const result = await agentApplicationService.approveApplication(application.id)
     
     if (result.success) {
-      alert('Application approved successfully! The agent will receive an email with login credentials.')
+      alert(result.warnings?.length
+        ? 'Application approved, with some follow-ups needed:\n- ' + result.warnings.join('\n- ')
+        : 'Application approved! The agent was emailed a link to set their password and now has broker access.')
       loadApplications()
       setShowDetailModal(false)
     } else {
@@ -77,7 +79,7 @@ const AgentApplicationsAdmin = () => {
     setProcessing(true)
     const result = await agentApplicationService.rejectApplication(
       selectedApplication.id,
-      user.id,
+      user?.id,
       rejectionReason
     )
 

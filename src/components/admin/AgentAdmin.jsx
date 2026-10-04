@@ -211,8 +211,9 @@ function AgentAdmin() {
         try {
           const data = JSON.parse(event.target.result)
           let successCount = 0
+          // Restoring a backup shouldn't email every agent an invitation
           for (const agent of data.agents || data) {
-            const result = await agentService.addAgent(agent)
+            const result = await agentService.addAgent(agent, { invite: false })
             if (result.success) successCount++
           }
           loadAgents()
@@ -264,13 +265,13 @@ function AgentAdmin() {
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <label>
-            <Button variant="outline" as="span">
+          <Button variant="outline" asChild>
+            <label className="cursor-pointer">
               <Upload className="h-4 w-4 mr-2" />
               Import
-            </Button>
-            <input type="file" accept=".json" onChange={handleImport} className="hidden" />
-          </label>
+              <input type="file" accept=".json" onChange={handleImport} className="hidden" />
+            </label>
+          </Button>
           <Button onClick={handleAdd}>
             <Plus className="h-4 w-4 mr-2" />
             Add Agent

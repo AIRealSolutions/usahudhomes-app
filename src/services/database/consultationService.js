@@ -295,9 +295,14 @@ class ConsultationService {
     try {
       // Route through the serverless API so the service-role key is used,
       // bypassing the anon-key RLS restriction on the consultations table.
+      // The API is admin-only, so the request carries the Supabase access token.
+      const { data: { session } } = await supabase.auth.getSession()
       const r = await fetch('/api/leads?action=delete', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ id }),
       })
       const result = await r.json()

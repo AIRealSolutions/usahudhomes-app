@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../config/supabase'
 import {
   Download, Upload, RefreshCw, CheckCircle, AlertCircle, Loader2,
   Home, MapPin, Clock, Trash2,
@@ -9,16 +9,31 @@ import {
 
 // ─── All API calls go to Vercel serverless functions (same origin) ────────────
 // No separate Flask server needed — works in production on Vercel.
+// /api/hud is admin-only, so every request carries the Supabase access token.
+async function hudFetch(query, { method = 'GET', body } = {}) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const headers = {}
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`
+  const res = await fetch(`/api/hud?${query}`, {
+    method, headers, body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+  // Normalise non-JSON failures (e.g. Vercel timeout HTML page) into { success:false, error }
+  return {
+    json: async () => (await res.json().catch(() => null)) || { success: false, error: `Server error (HTTP ${res.status})` },
+  }
+}
+
 const api = {
-  scrape:          (state)        => fetch('/api/hud?action=scrape',            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state }) }),
-  scrapeAndImport: (state, opts)  => fetch('/api/hud?action=scrape-and-import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state, ...opts }) }),
-  history:         (limit = 50)   => fetch(`/api/hud?action=history&limit=${limit}`),
-  queueMedia:(body)          => fetch('/api/hud?action=queue-media',  { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  scrape:          (state)        => hudFetch('action=scrape',            { method: 'POST', body: { state } }),
+  scrapeAndImport: (state, opts)  => hudFetch('action=scrape-and-import', { method: 'POST', body: { state, ...opts } }),
+  history:         (limit = 50)   => hudFetch(`action=history&limit=${limit}`),
+  queueMedia:      (body)         => hudFetch('action=queue-media',       { method: 'POST', body }),
   schedules: {
-    list:   ()       => fetch('/api/hud?action=schedules'),
-    create: (body)   => fetch('/api/hud?action=schedules',          { method: 'POST',   headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-    update: (id, b)  => fetch(`/api/hud?action=schedules&id=${id}`, { method: 'PATCH',  headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }),
-    delete: (id)     => fetch(`/api/hud?action=schedules&id=${id}`, { method: 'DELETE' }),
+    list:   ()       => hudFetch('action=schedules'),
+    create: (body)   => hudFetch('action=schedules',          { method: 'POST',   body }),
+    update: (id, b)  => hudFetch(`action=schedules&id=${id}`, { method: 'PATCH',  body: b }),
+    delete: (id)     => hudFetch(`action=schedules&id=${id}`, { method: 'DELETE' }),
   },
 }
 
@@ -224,8 +239,9 @@ function ScrapeTab() {
       const res  = await api.scrapeAndImport(job.state, { dry_run: dryRun })
       const data = await res.json()
       if (data.success) {
+        // A dry run only previews counts — leave the job ready for the real import
         setJobs(prev => prev.map(j => j.jobId === jobId ? {
-          ...j, importStatus: 'done', importStats: data.stats,
+          ...j, importStatus: dryRun ? null : 'done', importStats: data.stats, importDryRun: dryRun,
         } : j))
       } else {
         setJobs(prev => prev.map(j => j.jobId === jobId ? {
@@ -422,6 +438,9 @@ function JobCard({ job, onImport, onQueueMedia, onRemove, onToggleExpand }) {
       )}
 
       {/* Import stats */}
+      {job.importStats && job.importDryRun && (
+        <p className="mx-5 mb-1 text-xs font-semibold text-yellow-700">Dry run preview — no database changes were made</p>
+      )}
       {job.importStats && (
         <div className="mx-5 mb-3 grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
@@ -494,20 +513,29 @@ function ScheduleTab() {
       const res  = await api.schedules.list()
       const data = await res.json()
       if (data.success) setSchedules(data.schedules)
-    } catch (_) {}
+      else setError(data.error)
+    } catch (e) { setError(e.message) }
     setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
 
   const toggleEnabled = async (id, current) => {
-    await api.schedules.update(id, { enabled: !current })
+    setError(null)
+    try {
+      const data = await (await api.schedules.update(id, { enabled: !current })).json()
+      if (!data.success) setError(data.error)
+    } catch (e) { setError(e.message) }
     load()
   }
 
   const deleteSchedule = async (id) => {
     if (!confirm('Delete this schedule?')) return
-    await api.schedules.delete(id)
+    setError(null)
+    try {
+      const data = await (await api.schedules.delete(id)).json()
+      if (!data.success) setError(data.error)
+    } catch (e) { setError(e.message) }
     load()
   }
 

@@ -13,6 +13,7 @@
  *   POST ?action=lead-email — broker/admin emails a lead via Gmail (Bearer token required)
  *   POST ?action=lead-sms   — broker/admin texts a lead via Twilio (Bearer token required)
  *   POST ?action=consultation-request — signed-in buyer asks for an agent callback (saved as a lead)
+ *   POST ?action=agent-invite — admin creates an agent login (invite email, or reset link if it exists)
  *
  * agent-email and sms also require a broker/admin Bearer token.
  *
@@ -540,6 +541,67 @@ async function handleAgentEmail(req, res) {
   return res.status(200).json({ success: true, type })
 }
 
+// ─── Action: agent invite (admins only) ───────────────────────────────────────
+// Creating auth users needs the service key, so the browser can't call auth.admin.
+// New email -> Supabase invite ("set your password" link). Existing account -> password
+// reset link, so "resend" always gives the agent a way in.
+async function handleAgentInvite(req, res) {
+  const caller = await getCaller(req)
+  if (caller?.role !== 'admin') return res.status(401).json({ success: false, error: 'Sign in as an admin to invite agents.' })
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ success: false, error: 'Server is not configured.' })
+
+  const email = String(req.body?.email || '').trim().toLowerCase()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ success: false, error: 'A valid email is required.' })
+  }
+  const str = (v) => (v ? String(v).trim().slice(0, 80) : '')
+  const firstName = str(req.body?.firstName)
+  const lastName  = str(req.body?.lastName)
+  const redirectTo = /^https?:\/\/[^\s]+$/.test(String(req.body?.redirectTo || ''))
+    ? String(req.body.redirectTo)
+    : `${SITE_URL}/broker-dashboard`
+  const authHeaders = {
+    apikey: SUPABASE_SERVICE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+    'Content-Type': 'application/json',
+  }
+  const qs = `?redirect_to=${encodeURIComponent(redirectTo)}`
+
+  const invite = await fetch(`${SUPABASE_URL}/auth/v1/invite${qs}`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({
+      email,
+      data: { first_name: firstName, last_name: lastName, full_name: `${firstName} ${lastName}`.trim() },
+    }),
+  })
+  if (invite.ok) return res.status(200).json({ success: true, mode: 'invite', message: `Invitation email sent to ${email}` })
+
+  const inviteErr = await invite.json().catch(() => ({}))
+  const msg = inviteErr.msg || inviteErr.message || inviteErr.error_description || ''
+  const alreadyExists = invite.status === 422 || /already/i.test(msg)
+  if (!alreadyExists) {
+    console.error('[agent-invite] invite failed:', invite.status, msg)
+    return res.status(502).json({ success: false, error: msg || 'Could not send the invitation.' })
+  }
+
+  const recover = await fetch(`${SUPABASE_URL}/auth/v1/recover${qs}`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ email }),
+  })
+  if (!recover.ok) {
+    const e = await recover.json().catch(() => ({}))
+    console.error('[agent-invite] recover failed:', recover.status, e)
+    return res.status(502).json({ success: false, error: e.msg || e.message || 'Could not send a password setup link.' })
+  }
+  return res.status(200).json({
+    success: true,
+    mode: 'recovery',
+    message: `${email} already has an account; a password reset link was sent instead.`,
+  })
+}
+
 // ─── Main router ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -559,11 +621,12 @@ export default async function handler(req, res) {
     if (action === 'lead-email')  return await handleLeadEmail(req, res)
     if (action === 'lead-sms')    return await handleLeadSms(req, res)
     if (action === 'consultation-request') return await handleConsultationRequest(req, res)
+    if (action === 'agent-invite') return await handleAgentInvite(req, res)
 
     return res.status(400).json({
       success: false,
       error: 'Missing or unknown ?action= parameter',
-      valid_actions: ['lead', 'sms', 'agent-email', 'agent-verify', 'agent-resend-verification', 'lead-email', 'lead-sms', 'consultation-request'],
+      valid_actions: ['lead', 'sms', 'agent-email', 'agent-verify', 'agent-resend-verification', 'lead-email', 'lead-sms', 'consultation-request', 'agent-invite'],
     })
   } catch (err) {
     console.error(`[notifications/${action}] Error:`, err.message)

@@ -17,21 +17,27 @@ export async function assignLeadToAgent(lead, agentId) {
   // Find or create customer
   let customerId = lead.customer_id
   if (!customerId && lead.email) {
+    // customers.email is unique, so reuse any existing row (including inactive
+    // or soft-deleted ones, which are brought back) instead of failing the insert.
     const { data: existing } = await supabase
       .from('customers')
-      .select('id')
-      .eq('email', lead.email)
-      .eq('is_active', true)
+      .select('id, is_deleted')
+      .ilike('email', lead.email.trim().replace(/[\\%_]/g, '\\$&'))
       .limit(1)
-    if (existing?.length) customerId = existing[0].id
+    if (existing?.length) {
+      customerId = existing[0].id
+      if (existing[0].is_deleted) {
+        await supabase.rpc('restore_customer', { customer_id: customerId })
+      }
+    }
   }
   if (!customerId) {
-    const { data: newCust } = await supabase
+    const { data: newCust, error: custError } = await supabase
       .from('customers')
       .insert([{
         first_name: lead.first_name,
         last_name: lead.last_name,
-        email: lead.email,
+        email: lead.email || null,
         phone: lead.phone,
         state: lead.state,
         lead_source: lead.source || 'website',
@@ -40,7 +46,8 @@ export async function assignLeadToAgent(lead, agentId) {
       }])
       .select('id')
       .single()
-    if (newCust) customerId = newCust.id
+    if (custError) throw custError
+    customerId = newCust.id
   }
 
   const { error: leadError } = await supabase

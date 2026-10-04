@@ -13,13 +13,22 @@ import {
   Trash2, Search, AlertTriangle, CheckCircle, RefreshCw,
   Home, Calendar, DollarSign, MapPin, Info,
 } from 'lucide-react'
+import { supabase } from '../../config/supabase'
 
-const API = (body) =>
-  fetch('/api/leads?action=purge-under-contract', {
+const API = async (body) => {
+  const { data: { session } } = await supabase.auth.getSession()
+  const r = await fetch('/api/leads?action=purge-under-contract', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    },
     body: JSON.stringify(body),
-  }).then(r => r.json())
+  })
+  const data = await r.json().catch(() => null)
+  if (!data) throw new Error(`Server error (HTTP ${r.status})`)
+  return data
+}
 
 function fmt(n) {
   return n != null ? `$${Number(n).toLocaleString()}` : '—'
@@ -207,7 +216,7 @@ export default function PurgeUnderContract() {
             {preview.count > 0 && (
               <div className="flex gap-2">
                 <button
-                  onClick={() => setConfirm(false)}
+                  onClick={() => { setConfirm(false); setPreview(null) }}
                   className="px-4 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancel
