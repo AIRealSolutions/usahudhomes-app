@@ -20,6 +20,8 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { customerService } from '../../services/database'
+import { createLead } from '../../services/database/leadService'
+import AddLeadModal from './AddLeadModal'
 
 function CustomerAdmin() {
   const navigate = useNavigate()
@@ -28,6 +30,7 @@ function CustomerAdmin() {
   const [showForm, setShowForm] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState(null)
   const [formData, setFormData] = useState(getEmptyFormData())
+  const [showAddLead, setShowAddLead] = useState(false)
 
   useEffect(() => {
     loadCustomers()
@@ -64,22 +67,29 @@ function CustomerAdmin() {
     }
   }
 
+  // New people are always added as leads; assigning the lead to a broker
+  // creates their customer record.
   function handleAdd() {
-    setEditingCustomer(null)
-    setFormData(getEmptyFormData())
-    setShowForm(true)
+    setShowAddLead(true)
+  }
+
+  function handleLeadCreated(lead) {
+    setShowAddLead(false)
+    if (confirm('Lead added to New Leads. Assign it to a broker to create the customer record.\n\nOpen the lead now?')) {
+      navigate(`/admin/leads/${lead.id}`)
+    }
   }
 
   function handleEdit(customer) {
     setEditingCustomer(customer)
     setFormData({
-      name: customer.name,
-      email: customer.email,
-      phone: customer.phone,
+      name: customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
+      email: customer.email || '',
+      phone: customer.phone || '',
       state: customer.state || 'NC',
       propertyId: customer.propertyId || '',
       status: customer.status || 'new',
-      source: customer.source || 'website',
+      source: customer.lead_source || customer.source || 'website',
       notes: customer.notes || []
     })
     setShowForm(true)
@@ -87,7 +97,7 @@ function CustomerAdmin() {
 
   async function handleDelete(customer) {
     // Get customer name for display
-    const customerName = customer.name || `${customer.first_name} ${customer.last_name}` || customer.email
+    const customerName = customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || customer.email
     
     // First confirmation with warning
     const firstConfirm = confirm(
@@ -149,18 +159,23 @@ function CustomerAdmin() {
       return
     }
 
-    let result
-    if (editingCustomer) {
-      result = await customerService.updateCustomer(editingCustomer.id, formData)
-      if (result.success) {
-        alert('Customer updated successfully!')
-      }
-    } else {
-      result = await customerService.createCustomer(formData)
-      if (result.success) {
-        alert('Customer added successfully!')
-      }
+    if (!editingCustomer) return
+
+    const [firstName, ...rest] = formData.name.trim().split(/\s+/)
+    const result = await customerService.updateCustomer(editingCustomer.id, {
+      firstName,
+      lastName: rest.join(' '),
+      email: formData.email,
+      phone: formData.phone,
+      state: formData.state,
+      status: formData.status,
+      leadSource: formData.source,
+    })
+    if (!result.success) {
+      alert('Failed to update customer: ' + (result.error || 'Unknown error'))
+      return
     }
+    alert('Customer updated successfully!')
 
     setShowForm(false)
     setFormData(getEmptyFormData())
@@ -194,15 +209,27 @@ function CustomerAdmin() {
       reader.onload = async (event) => {
         try {
           const data = JSON.parse(event.target.result)
-          // Import each customer
-          let successCount = 0
-          for (const customer of data.customers || data) {
-            const result = await customerService.createCustomer(customer)
-            if (result.success) successCount++
+          // People are imported as leads (New Leads), like every other intake
+          let added = 0
+          const skipped = []
+          for (const c of data.customers || data) {
+            const [first, ...rest] = String(c.name || '').trim().split(/\s+/)
+            try {
+              await createLead({
+                firstName: c.first_name || c.firstName || first,
+                lastName: c.last_name || c.lastName || rest.join(' '),
+                email: c.email,
+                phone: c.phone,
+                state: c.state,
+                source: c.lead_source || c.source || 'import',
+                message: typeof c.notes === 'string' ? c.notes : null,
+              })
+              added++
+            } catch (err) {
+              skipped.push(`${c.email || c.phone || 'row'}: ${err.message}`)
+            }
           }
-          loadCustomers()
-          alert(`Imported ${successCount} customers successfully!`)
-          alert('Customers imported successfully!')
+          alert(`Imported ${added} as new leads.` + (skipped.length ? `\nSkipped ${skipped.length}:\n- ${skipped.slice(0, 10).join('\n- ')}` : ''))
         } catch (error) {
           alert('Error importing customers: ' + error.message)
         }
@@ -236,23 +263,23 @@ function CustomerAdmin() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Customer Management</h2>
-          <p className="text-gray-600">Add, edit, and manage customer records</p>
+          <p className="text-gray-600">Customers are created when a lead is assigned to a broker. Add new people as leads.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <label>
-            <Button variant="outline" as="span">
+          <Button variant="outline" asChild>
+            <label className="cursor-pointer" title="Import people as new leads">
               <Upload className="h-4 w-4 mr-2" />
-              Import
-            </Button>
-            <input type="file" accept=".json" onChange={handleImport} className="hidden" />
-          </label>
+              Import as Leads
+              <input type="file" accept=".json" onChange={handleImport} className="hidden" />
+            </label>
+          </Button>
           <Button onClick={handleAdd}>
             <Plus className="h-4 w-4 mr-2" />
-            Add Customer
+            Add Lead
           </Button>
         </div>
       </div>
@@ -267,7 +294,7 @@ function CustomerAdmin() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{stats.newCustomersThisWeek}</div>
+            <div className="text-2xl font-bold">{stats.newThisWeek}</div>
             <p className="text-sm text-gray-600">This Week</p>
           </CardContent>
         </Card>
@@ -305,14 +332,16 @@ function CustomerAdmin() {
         )}
       </div>
 
+      {showAddLead && (
+        <AddLeadModal onClose={() => setShowAddLead(false)} onCreated={handleLeadCreated} />
+      )}
+
       {/* Customer Form Modal */}
       {showForm && (
         <Card className="border-2 border-blue-500">
           <CardHeader>
-            <CardTitle>{editingCustomer ? 'Edit Customer' : 'Add New Customer'}</CardTitle>
-            <CardDescription>
-              {editingCustomer ? 'Update customer information' : 'Enter customer details'}
-            </CardDescription>
+            <CardTitle>Edit Customer</CardTitle>
+            <CardDescription>Update customer information</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -413,7 +442,7 @@ function CustomerAdmin() {
                 </Button>
                 <Button type="submit">
                   <Save className="h-4 w-4 mr-2" />
-                  {editingCustomer ? 'Update' : 'Add'} Customer
+                  Update Customer
                 </Button>
               </div>
             </form>
@@ -434,7 +463,7 @@ function CustomerAdmin() {
                   <div className="flex-1">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <h3 className="text-lg font-bold">{customer.name}</h3>
+                        <h3 className="text-lg font-bold">{customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || customer.email}</h3>
                         <div className="flex gap-4 text-sm text-gray-600 mt-1">
                           <div className="flex items-center gap-1">
                             <Mail className="h-4 w-4" />
@@ -457,7 +486,7 @@ function CustomerAdmin() {
                       </div>
                       <div>
                         <span className="text-gray-600">Source:</span>
-                        <div className="font-semibold">{customer.source || 'N/A'}</div>
+                        <div className="font-semibold">{customer.lead_source || customer.source || 'N/A'}</div>
                       </div>
                       <div>
                         <span className="text-gray-600">Property:</span>

@@ -111,3 +111,70 @@ export async function assignLeadToAgent(lead, agentId) {
 
   return { customerId, consultation }
 }
+
+/**
+ * Add a lead by hand (admin). New people always enter as leads; their customer
+ * record is created when the lead is assigned to an agent.
+ * @param {Object} input - { firstName, lastName, email, phone, state, propertyCaseNumber, source, message }
+ * @returns {Promise<Object>} The created lead row
+ */
+export async function createLead(input) {
+  const clean = (v) => (typeof v === 'string' ? v.trim() : v) || null
+  const email = clean(input.email)?.toLowerCase() || null
+  const phone = clean(input.phone)
+  if (!clean(input.firstName)) throw new Error('First name is required.')
+  if (!email && !phone) throw new Error('Enter an email or a phone number.')
+
+  if (email) {
+    const { data: existing } = await supabase
+      .from('leads')
+      .select('id, first_name, last_name')
+      .ilike('email', email.replace(/[\\%_]/g, '\\$&'))
+      .limit(1)
+    if (existing?.length) {
+      const name = `${existing[0].first_name || ''} ${existing[0].last_name || ''}`.trim()
+      const err = new Error(`A lead with this email already exists${name ? ` (${name})` : ''}.`)
+      err.existingLeadId = existing[0].id
+      throw err
+    }
+  }
+
+  const caseNumber = clean(input.propertyCaseNumber)
+  let property = null
+  if (caseNumber) {
+    const { data } = await supabase
+      .from('properties')
+      .select('id, address, city, state, price')
+      .eq('case_number', caseNumber)
+      .maybeSingle()
+    property = data
+  }
+
+  const { data: lead, error } = await supabase
+    .from('leads')
+    .insert({
+      first_name: clean(input.firstName),
+      last_name: clean(input.lastName),
+      email,
+      phone,
+      state: clean(input.state)?.toUpperCase() || null,
+      property_case_number: caseNumber,
+      property_id: property?.id || null,
+      property_address: property ? [property.address, property.city, property.state].filter(Boolean).join(', ') : null,
+      property_price: property?.price ?? null,
+      message: clean(input.message),
+      source: clean(input.source) || 'manual',
+      status: 'new_lead',
+    })
+    .select()
+    .single()
+  if (error) throw error
+
+  await supabase.from('lead_events').insert({
+    lead_id: lead.id,
+    event_type: 'lead_received',
+    event_data: { source: lead.source, form_type: 'admin_manual' },
+  })
+
+  return lead
+}

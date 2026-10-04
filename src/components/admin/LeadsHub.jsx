@@ -16,6 +16,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../config/supabase'
 import { assignLeadToAgent } from '../../services/database/leadService'
+import AddLeadModal from './AddLeadModal'
 import {
   Search, Filter, Eye, Calendar, MapPin, DollarSign, Home,
   AlertCircle, Phone, Mail, User, Clock, CheckCircle,
@@ -91,6 +92,7 @@ function NewLeadsTab({ onNavigate }) {
   const [agents, setAgents] = useState([])
   const [assigning, setAssigning] = useState(null)
   const [assignedIds, setAssignedIds] = useState(new Set())
+  const [showAddLead, setShowAddLead] = useState(false)
 
   const fetchLeads = useCallback(async () => {
     setLoading(true)
@@ -179,6 +181,22 @@ function NewLeadsTab({ onNavigate }) {
 
   return (
     <div className="space-y-5">
+      {showAddLead && (
+        <AddLeadModal
+          onClose={() => setShowAddLead(false)}
+          onCreated={() => { setShowAddLead(false); fetchLeads() }}
+        />
+      )}
+
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowAddLead(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+        >
+          <UserPlus className="w-4 h-4" /> Add Lead
+        </button>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <StatCard label="Total Leads"  value={stats.total}     color="text-gray-900" />
