@@ -34,6 +34,8 @@ import AddressRevealGate from './components/AddressRevealGate'
 import PropertyRequestForm from './components/PropertyRequestForm'
 import AgentRequestForm from './components/AgentRequestForm'
 import SearchFilters from './components/SearchFilters'
+import { BidHistorySummary, BidHistoryPanel } from './components/BidHistory'
+import { fetchOffersByCase, isUnderContract } from './services/acceptedOffers'
 import RoleSelector from './components/RoleSelector'
 
 // Error Boundary Component
@@ -365,11 +367,17 @@ function BenefitsSection() {
   )
 }
 
-// Property Card Component
-function PropertyCard({ property }) {
+// Property Card Component (offers/signedIn add the bid-history line in search results)
+function PropertyCard({ property, offers, signedIn }) {
+  const underContract = isUnderContract(property)
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow">
       <div className="h-48 bg-gray-200 relative overflow-hidden">
+        {underContract && (
+          <span className="absolute top-3 left-3 z-10 bg-amber-500 text-white text-xs font-bold uppercase tracking-wide px-2.5 py-1 rounded shadow">
+            Under Contract
+          </span>
+        )}
         {property.main_image ? (
           <img 
             src={property.main_image} 
@@ -402,6 +410,7 @@ function PropertyCard({ property }) {
         <div className="text-sm text-gray-600 mb-4">
           {property.beds || 'N/A'} bed • {property.baths || 'N/A'} bath • {property.sq_ft ? property.sq_ft.toLocaleString() + ' sqft' : 'N/A'}
         </div>
+        {signedIn !== undefined && <BidHistorySummary property={property} offers={offers} signedIn={signedIn} />}
         <Link
           to={`/property/${property.case_number}`}
           className="block w-full bg-blue-600 text-white text-center py-2 rounded-lg hover:bg-blue-700 font-semibold"
@@ -508,14 +517,18 @@ function HomePage() {
 }
 
 // Search Page with Filters
-const SEARCH_FILTER_KEYS = ['state', 'city', 'minPrice', 'maxPrice', 'bedrooms', 'bathrooms', 'status']
+const SEARCH_FILTER_KEYS = ['state', 'city', 'minPrice', 'maxPrice', 'bedrooms', 'bathrooms', 'status', 'contract']
 const SEARCH_PAGE_SIZE = 24
+// Under-contract homes stay in results this long after HUD takes them off the market
+const UNDER_CONTRACT_DAYS = 120
 
 function SearchPage() {
   // Filters live in the URL so the homepage search, state links and shared links all work
   const [searchParams, setSearchParams] = useSearchParams()
   const filters = Object.fromEntries(SEARCH_FILTER_KEYS.map(k => [k, searchParams.get(k) || '']))
   const filterKey = SEARCH_FILTER_KEYS.map(k => filters[k]).join('|')
+  const { user } = useAuth()
+  const [offersByCase, setOffersByCase] = useState(new Map())
 
   const [properties, setProperties] = useState([])
   const [total, setTotal] = useState(0)
@@ -551,7 +564,16 @@ function SearchPage() {
       let query = supabase
         .from('properties')
         .select('*', { count: 'exact' })
-        .eq('is_active', true)
+
+      // Active listings plus recently under-contract ones (unless hidden or a status is picked)
+      const contractSince = new Date(Date.now() - UNDER_CONTRACT_DAYS * 86400000).toISOString()
+      if (filters.status === 'UNDER CONTRACT') {
+        query = query.eq('status', 'UNDER CONTRACT').gte('under_contract_at', contractSince)
+      } else if (filters.status || filters.contract === 'hide') {
+        query = query.eq('is_active', true)
+      } else {
+        query = query.or(`is_active.eq.true,and(status.eq."UNDER CONTRACT",under_contract_at.gte."${contractSince}")`)
+      }
 
       let minPrice = parseFloat(filters.minPrice)
       let maxPrice = parseFloat(filters.maxPrice)
@@ -565,10 +587,11 @@ function SearchPage() {
       if (Number.isFinite(maxPrice)) query = query.lte('price', maxPrice)
       if (filters.bedrooms) query = query.gte('beds', parseInt(filters.bedrooms))
       if (filters.bathrooms) query = query.gte('baths', parseFloat(filters.bathrooms))
-      if (filters.status) query = query.eq('status', filters.status)
+      if (filters.status && filters.status !== 'UNDER CONTRACT') query = query.eq('status', filters.status)
 
       const from = pageIndex * SEARCH_PAGE_SIZE
       query = query
+        .order('is_active', { ascending: false }) // available homes first
         .order('price', { ascending: true })
         .order('case_number', { ascending: true })
         .range(from, from + SEARCH_PAGE_SIZE - 1)
@@ -589,6 +612,17 @@ function SearchPage() {
       }
     }
   }
+
+  // Signed-in buyers see what HUD accepted before on each home in the results
+  const caseKey = user ? properties.map(p => p.case_number).join(',') : ''
+  useEffect(() => {
+    if (!caseKey) { setOffersByCase(new Map()); return }
+    let cancelled = false
+    fetchOffersByCase(caseKey.split(','))
+      .then(m => { if (!cancelled) setOffersByCase(m) })
+      .catch(err => console.error('Error loading bid history:', err))
+    return () => { cancelled = true }
+  }, [caseKey])
 
   const hasFilters = SEARCH_FILTER_KEYS.some(k => filters[k])
 
@@ -638,7 +672,7 @@ function SearchPage() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {properties.map(property => (
-                <PropertyCard key={property.id} property={property} />
+                <PropertyCard key={property.id} property={property} signedIn={!!user} offers={offersByCase.get(property.case_number)} />
               ))}
             </div>
             {properties.length < total && (
@@ -978,9 +1012,10 @@ function PropertyDetailPage() {
               ${property.price?.toLocaleString()}
             </span>
             <span className={`px-4 py-2 rounded-full text-sm font-semibold ${
+              isUnderContract(property) ? 'bg-amber-500 text-white' :
               property.status === 'AVAILABLE' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
             }`}>
-              {property.status}
+              {isUnderContract(property) ? 'Under Contract' : property.status}
             </span>
           </div>
 
@@ -1034,6 +1069,9 @@ function PropertyDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Accepted offers / contract history (signed-in buyers) */}
+          <BidHistoryPanel property={property} signedIn={!!user} onUnlock={() => setShowAddressGate(true)} />
 
           {/* Description */}
           {property.description && (

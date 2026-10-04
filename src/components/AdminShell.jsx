@@ -15,6 +15,7 @@
  *   agents            → AgentAdmin
  *   applications      → AgentApplicationsAdmin
  *   bid-results       → BidResultsAdmin
+ *   accepted-offers   → AcceptedOffersAdmin
  *   video-studio      → VideoStudio
  *   bulk-generator    → VideoBulkGenerator
  *   video-library     → VideoLibrary
@@ -31,7 +32,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Home, Database, Search,
   MessageSquare, Users, GitMerge, PhoneCall, Mail,
-  UserCog, FileText, DollarSign,
+  UserCog, FileText, DollarSign, Gavel,
   Film, Zap, BookOpen, Layout,
   Facebook, Bot, HardDrive, Trash2,
   LogOut, ChevronLeft, ChevronRight, Menu, X,
@@ -51,6 +52,7 @@ const EmailTemplateEditor = lazy(() => import('./admin/EmailTemplateEditor'))
 const AgentAdmin          = lazy(() => import('./admin/AgentAdmin'))
 const AgentApplicationsAdmin = lazy(() => import('./admin/AgentApplicationsAdmin'))
 const BidResultsAdmin     = lazy(() => import('./admin/BidResultsAdmin'))
+const AcceptedOffersAdmin = lazy(() => import('./admin/AcceptedOffersAdmin'))
 const VideoStudio         = lazy(() => import('./admin/VideoStudio'))
 const VideoBulkGenerator  = lazy(() => import('./admin/VideoBulkGenerator'))
 const VideoLibrary        = lazy(() => import('./admin/VideoLibrary'))
@@ -75,6 +77,7 @@ const NAV = [
       { id: 'property-manage',  label: 'Manage Listings',   icon: Home,          color: 'text-blue-500' },
       { id: 'hud-scraper',      label: 'HUD Scraper',       icon: Database,      color: 'text-blue-700', badge: 'LIVE' },
       { id: 'property-search',  label: 'Property Search',   icon: Search,        color: 'text-gray-500' },
+      { id: 'accepted-offers',  label: 'Accepted Offers',   icon: Gavel,         color: 'text-amber-600', badge: 'NEW' },
       { id: 'purge-contracts',  label: 'Purge Under Contract', icon: Trash2,     color: 'text-red-500' },
     ]
   },
@@ -128,6 +131,7 @@ const COMPONENT_MAP = {
   'agents':            AgentAdmin,
   'applications':      AgentApplicationsAdmin,
   'bid-results':       BidResultsAdmin,
+  'accepted-offers':   AcceptedOffersAdmin,
   'video-studio':      VideoStudio,
   'bulk-generator':    VideoBulkGenerator,
   'video-library':     VideoLibrary,

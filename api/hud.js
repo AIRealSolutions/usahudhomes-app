@@ -13,6 +13,8 @@
  *   POST ?action=schedules         — create a schedule
  *   PATCH ?action=schedules        — update a schedule
  *   DELETE ?action=schedules       — delete a schedule
+ *   GET/POST ?action=accepted-offers-sync — daily cron (CRON_SECRET) or an admin: record HUD accepted
+ *                                    offers (bidresults) for every state into accepted_offers
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -139,6 +141,7 @@ function mapToDbRow(p) {
     main_image:     p.main_image,
     image_url:      p.main_image,      // also populate image_url column
     is_active:      true,
+    under_contract_at: null,           // listed again, so not under contract
     updated_at:     new Date().toISOString(),
     // Extended HUD fields (added via migration add_hud_extended_fields.sql)
     latitude:       p.latitude       || null,
@@ -169,6 +172,8 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
   const scrapedCaseNumbers = new Set(properties.map(p => p.case_number).filter(Boolean))
   let newCount = 0, updatedCount = 0, restoredCount = 0, errorCount = 0
   const errors = []
+  const statusEvents = [] // under contract / back on market, for property_status_events
+  const restoredCases = []
 
   if (!dry_run) {
     // Batch upsert in chunks of 50 to avoid URL length limits
@@ -178,13 +183,17 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
       // Count new vs updated
       const caseNums = chunk.map(p => p.case_number).filter(Boolean)
       const { data: existingChunk } = await supabase
-        .from('properties').select('case_number, is_active').in('case_number', caseNums)
+        .from('properties').select('id, case_number, is_active').in('case_number', caseNums)
       const existingMap = new Map((existingChunk || []).map(p => [p.case_number, p]))
       for (const prop of chunk) {
         if (!prop.case_number) continue
         const ex = existingMap.get(prop.case_number)
         if (!ex) newCount++
-        else if (!ex.is_active) restoredCount++
+        else if (!ex.is_active) {
+          restoredCount++
+          restoredCases.push(prop.case_number)
+          statusEvents.push({ case_number: prop.case_number, property_id: ex.id, state: stateCode, event: 'back_on_market', list_price: prop.list_price })
+        }
         else updatedCount++
       }
       // Batch upsert (skip rows missing NOT NULL columns: address, city, price)
@@ -204,22 +213,41 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
     let markedCount = 0
     try {
       const { data: activeProps } = await supabase
-        .from('properties').select('case_number').eq('state', stateCode).eq('is_active', true)
+        .from('properties').select('id, case_number, price').eq('state', stateCode).eq('is_active', true)
       if (activeProps) {
         const toMark = activeProps.filter(p => !scrapedCaseNumbers.has(p.case_number))
         if (toMark.length > 0) {
+          const now = new Date().toISOString()
           // Batch mark in chunks of 200 to avoid URL length limit
           const MARK_CHUNK = 200
           for (let i = 0; i < toMark.length; i += MARK_CHUNK) {
             const slice = toMark.slice(i, i + MARK_CHUNK).map(p => p.case_number)
             await supabase.from('properties')
-              .update({ status: 'UNDER CONTRACT', is_active: false, updated_at: new Date().toISOString() })
+              .update({ status: 'UNDER CONTRACT', is_active: false, under_contract_at: now, updated_at: now })
               .in('case_number', slice)
           }
           markedCount = toMark.length
+          for (const p of toMark) {
+            statusEvents.push({ case_number: p.case_number, property_id: p.id, state: stateCode, event: 'under_contract', list_price: p.price })
+          }
         }
       }
     } catch (e) { console.warn('[hud/import] mark-under-contract failed:', e.message) }
+
+    // Contract history: log status changes; a relisted home's open accepted offer fell through
+    try {
+      if (statusEvents.length) {
+        for (let i = 0; i < statusEvents.length; i += 200) {
+          const { error: evErr } = await supabase.from('property_status_events').insert(statusEvents.slice(i, i + 200))
+          if (evErr) console.warn('[hud/import] status events failed:', evErr.message)
+        }
+      }
+      for (let i = 0; i < restoredCases.length; i += 200) {
+        await supabase.from('accepted_offers')
+          .update({ outcome: 'fell_through', updated_at: new Date().toISOString() })
+          .in('case_number', restoredCases.slice(i, i + 200)).eq('outcome', 'pending')
+      }
+    } catch (e) { console.warn('[hud/import] contract history failed:', e.message) }
 
     // Log to hud_sync_runs
     try {
@@ -268,6 +296,118 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
       errors:               0,
     }
   }
+}
+
+// ─── Accepted offers (hudhomestore.gov/bidresults) ────────────────────────────
+// HUD publishes recently accepted bids per state as JSON behind its Bid Results page.
+// Each acceptance is kept as its own row, so a home that goes under contract, falls
+// through and sells again shows every round with its terms.
+const HUD_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME',
+  'MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','PR','RI','SC','SD',
+  'TN','TX','UT','VT','VA','VI','WA','WV','WI','WY','GU']
+const HUD_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+
+// The bid results endpoint needs the page's anti-forgery token and session cookies
+async function openBidResultsSession() {
+  const res = await fetch(`${HUD_BASE_URL}/bidresults`, { headers: { 'User-Agent': HUD_UA }, signal: AbortSignal.timeout(20000) })
+  if (!res.ok) throw new Error(`HUD bid results page returned HTTP ${res.status}`)
+  const html = await res.text()
+  const token = html.match(/name="request-verification-token"\s+value="([^"]+)"/i)?.[1]
+  if (!token) throw new Error('HUD bid results page changed: no verification token found')
+  const cookies = (res.headers.getSetCookie?.() || []).map(c => c.split(';')[0]).join('; ')
+  return { token, cookies }
+}
+
+async function fetchBidResults(session, stateCode) {
+  const res = await fetch(`${HUD_BASE_URL}/BidResults?handler=GetBidResults&citystate=${stateCode}`, {
+    method: 'POST',
+    headers: {
+      'User-Agent': HUD_UA,
+      'RequestVerificationToken': session.token,
+      'X-Requested-With': 'XMLHttpRequest',
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'Cookie': session.cookies,
+    },
+    signal: AbortSignal.timeout(20000),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const text = await res.text()
+  if (!text.trim()) return []
+  const rows = JSON.parse(text)
+  return Array.isArray(rows) ? rows.filter(r => r && !r.Error && r.CaseNumber && r.AcceptedDate) : []
+}
+
+const money = v => { const n = parseFloat(String(v ?? '').replace(/[^0-9.]/g, '')); return Number.isFinite(n) ? n : null }
+const hudTime = v => (v && !String(v).startsWith('0001') ? String(v).slice(0, 19) : null)
+
+function mapAcceptedOffer(r) {
+  return {
+    case_number:     String(r.CaseNumber).trim(),
+    address:         r.Address || null,
+    city:            r.City || null,
+    county:          r.County || null,
+    state:           r.State || null,
+    zip_code:        r.Zipcode || null,
+    net_to_hud:      money(r.NetBidAmount),
+    purchaser_type:  r.OwnerTypeDesc || r.OwnerType || null,
+    broker_name:     r.BidderName || null,
+    bid_received_at: hudTime(r.BidReceivedDate),
+    bid_opened_on:   hudTime(r.BidOpenDate)?.slice(0, 10) || null,
+    accepted_at:     hudTime(r.AcceptedDate),
+    raw:             r,
+  }
+}
+
+async function syncAcceptedOffers(supabase, states) {
+  const session = await openBidResultsSession()
+  const offers = []
+  const errors = []
+  // A few states at a time keeps it quick without hammering HUD
+  for (let i = 0; i < states.length; i += 6) {
+    const batch = states.slice(i, i + 6)
+    const results = await Promise.allSettled(batch.map(st => fetchBidResults(session, st)))
+    results.forEach((r, j) => {
+      if (r.status === 'fulfilled') offers.push(...r.value.map(mapAcceptedOffer).filter(o => o.accepted_at))
+      else errors.push({ state: batch[j], error: r.reason?.message || String(r.reason) })
+    })
+  }
+
+  // Only insert acceptances we have not seen; existing rows keep their outcome and first-seen price
+  const caseNumbers = [...new Set(offers.map(o => o.case_number))]
+  const seen = new Set()
+  const props = new Map()
+  for (let i = 0; i < caseNumbers.length; i += 200) {
+    const slice = caseNumbers.slice(i, i + 200)
+    const [{ data: existing }, { data: propRows }] = await Promise.all([
+      supabase.from('accepted_offers').select('case_number, accepted_at').in('case_number', slice),
+      supabase.from('properties').select('id, case_number, price').in('case_number', slice),
+    ])
+    for (const e of existing || []) seen.add(`${e.case_number}|${String(e.accepted_at).slice(0, 19)}`)
+    for (const p of propRows || []) props.set(p.case_number, p)
+  }
+  const fresh = offers
+    .filter(o => !seen.has(`${o.case_number}|${o.accepted_at}`))
+    .map(o => ({ ...o, property_id: props.get(o.case_number)?.id || null, list_price_at_acceptance: props.get(o.case_number)?.price ?? null }))
+
+  let inserted = 0
+  for (let i = 0; i < fresh.length; i += 200) {
+    const { data, error } = await supabase.from('accepted_offers')
+      .upsert(fresh.slice(i, i + 200), { onConflict: 'case_number,accepted_at', ignoreDuplicates: true })
+      .select('id')
+    if (error) errors.push({ insert: i, error: error.message })
+    else inserted += data?.length || 0
+  }
+  return { states: states.length, fetched: offers.length, new_offers: inserted, errors }
+}
+
+async function handleAcceptedOffersSync(req, res, trigger) {
+  const supabase = getSupabase()
+  const requested = [].concat(req.body?.states || req.query?.state || []).map(s => String(s).trim().toUpperCase())
+  const states = requested.length ? requested.filter(s => HUD_STATES.includes(s)) : HUD_STATES
+  const stats = await syncAcceptedOffers(supabase, states)
+  const { error: logErr } = await supabase.from('accepted_offer_runs').insert([{ trigger, ...stats }])
+  if (logErr) console.warn('[hud/accepted-offers] run log failed:', logErr.message)
+  return res.status(200).json({ success: true, ...stats })
 }
 
 // ─── Action handlers ──────────────────────────────────────────────────────────
@@ -417,9 +557,15 @@ export default async function handler(req, res) {
 
   const action = req.query?.action || ''
   try {
+    // The daily cron may run the accepted-offer sync; everything else is admin-only
+    const bearer = (req.headers?.authorization || '').replace(/^Bearer\s+/i, '')
+    if (action === 'accepted-offers-sync' && process.env.CRON_SECRET && bearer === process.env.CRON_SECRET) {
+      return await handleAcceptedOffersSync(req, res, 'cron')
+    }
     // Every action (DB writes, run history, HUD proxy) is admin-only
     if (!(await requireAdmin(req, res))) return
     switch (action) {
+      case 'accepted-offers-sync': return await handleAcceptedOffersSync(req, res, 'admin')
       case 'scrape':            return await handleScrape(req, res)
       case 'scrape-and-import': return await handleScrapeAndImport(req, res)
       case 'import':            return await handleImport(req, res)
@@ -427,7 +573,7 @@ export default async function handler(req, res) {
       case 'queue-media':       return await handleQueueMedia(req, res)
       case 'schedules':         return await handleSchedules(req, res)
       default:
-        return res.status(400).json({ success: false, error: `Unknown action: "${action}". Valid: scrape, scrape-and-import, import, history, queue-media, schedules` })
+        return res.status(400).json({ success: false, error: `Unknown action: "${action}". Valid: scrape, scrape-and-import, import, history, queue-media, schedules, accepted-offers-sync` })
     }
   } catch (err) {
     console.error(`[hud/${action}] Error:`, err)

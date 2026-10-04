@@ -177,9 +177,24 @@ const SearchFilters = ({ filters, onFilterChange, onSearch }) => {
               {STATUS_OPTIONS.map(status => (
                 <option key={status} value={status}>{status}</option>
               ))}
+              <option value="UNDER CONTRACT">Under Contract</option>
             </select>
             <ChevronDown className="absolute right-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
           </div>
+        </div>
+
+        {/* Under-contract homes are shown by default */}
+        <div className="flex items-end">
+          <label className="flex items-center gap-2 text-sm text-gray-700 py-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filters.contract !== 'hide'}
+              disabled={!!filters.status}
+              onChange={(e) => handleFilterChange('contract', e.target.checked ? '' : 'hide')}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            Include under-contract homes
+          </label>
         </div>
 
         {/* Clear Button */}

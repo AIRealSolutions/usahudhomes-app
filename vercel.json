@@ -12,6 +12,10 @@
     {
       "path": "/api/notifications?action=send-alerts",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/hud?action=accepted-offers-sync",
+      "schedule": "0 15 * * *"
     }
   ]
 }
