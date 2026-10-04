@@ -7,7 +7,6 @@ function EnvDiagnostic() {
   const envVars = {
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
-    VITE_OPENAI_API_KEY: 'server-side only (/api/ai)',
   }
 
   const hasSupabaseUrl = envVars.VITE_SUPABASE_URL && envVars.VITE_SUPABASE_URL !== 'YOUR_SUPABASE_URL'
@@ -56,9 +55,9 @@ function EnvDiagnostic() {
             )}
           </li>
           <li style={{ padding: '10px' }}>
-            <strong>VITE_OPENAI_API_KEY:</strong> {' '}
-            <span style={{ color: envVars.VITE_OPENAI_API_KEY ? '#10b981' : '#f59e0b' }}>
-              {envVars.VITE_OPENAI_API_KEY ? '✅ Configured' : '⚠️  Optional - Not set'}
+            <strong>OPENAI_API_KEY:</strong> {' '}
+            <span style={{ color: '#6b7280' }}>
+              Kept on the server for /api/ai — never visible in the browser
             </span>
           </li>
         </ul>
