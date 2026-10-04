@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { sendLeadEmail } from '../../services/leadMessaging'
 import { useAuth } from '../../contexts/AuthContext'
 import { consultationService } from '../../services/database/consultationService'
+import { listTemplates, applyTemplate } from '../../services/emailTemplates'
 import { X, Mail, Send, FileText, Sparkles } from 'lucide-react'
 
 const EmailComposer = ({ consultation, customer, property, onSend, onCancel }) => {
@@ -25,6 +26,14 @@ const EmailComposer = ({ consultation, customer, property, onSend, onCancel }) =
   const [body, setBody] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [sending, setSending] = useState(false)
+  const [savedTemplates, setSavedTemplates] = useState([])
+
+  // Templates managed in Admin → Email Templates
+  useEffect(() => {
+    listTemplates({ activeOnly: true })
+      .then(setSavedTemplates)
+      .catch(err => console.error('Error loading saved templates:', err))
+  }, [])
 
   const templates = [
     {
@@ -174,6 +183,25 @@ ${sender.email}`
   ]
 
   const handleTemplateSelect = (templateId) => {
+    const saved = savedTemplates.find(t => `saved:${t.id}` === templateId)
+    if (saved) {
+      const filled = applyTemplate(saved, {
+        lead: {
+          ...consultation,
+          ...customer,
+          email: customer.email || consultation?.customer_email || consultation?.email,
+          phone: customer.phone || consultation?.customer_phone || consultation?.phone,
+          property_address: property.address,
+          property_case_number: property.case_number,
+          property_price: property.list_price ?? property.price,
+        },
+        sender: { name: sender.full, phone: sender.phone, email: sender.email },
+      })
+      setSubject(filled.subject)
+      setBody(filled.body)
+      setSelectedTemplate(templateId)
+      return
+    }
     const template = templates.find(t => t.id === templateId)
     if (template) {
       setSubject(template.subject)
@@ -281,6 +309,13 @@ ${sender.email}`
                     {template.name}
                   </option>
                 ))}
+                {savedTemplates.length > 0 && (
+                  <optgroup label="Saved templates">
+                    {savedTemplates.map(t => (
+                      <option key={t.id} value={`saved:${t.id}`}>{t.name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
 

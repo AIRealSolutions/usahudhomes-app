@@ -11,6 +11,7 @@
  *   customers         → CustomerAdmin
  *   referrals         → ReferralManagement
  *   consultations     → ConsultationAdmin
+ *   email-templates   → EmailTemplateEditor
  *   agents            → AgentAdmin
  *   applications      → AgentApplicationsAdmin
  *   bid-results       → BidResultsAdmin
@@ -29,7 +30,7 @@ import { supabase } from '../config/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Home, Database, Search,
-  MessageSquare, Users, GitMerge, PhoneCall,
+  MessageSquare, Users, GitMerge, PhoneCall, Mail,
   UserCog, FileText, DollarSign,
   Film, Zap, BookOpen, Layout,
   Facebook, Bot, HardDrive, Trash2,
@@ -46,6 +47,7 @@ const LeadAdmin           = lazy(() => import('./admin/LeadsHub'))
 const CustomerAdmin       = lazy(() => import('./admin/CustomerAdmin'))
 const ReferralManagement  = lazy(() => import('./admin/ReferralManagement'))
 const ConsultationAdmin   = lazy(() => import('./admin/ConsultationAdmin'))
+const EmailTemplateEditor = lazy(() => import('./admin/EmailTemplateEditor'))
 const AgentAdmin          = lazy(() => import('./admin/AgentAdmin'))
 const AgentApplicationsAdmin = lazy(() => import('./admin/AgentApplicationsAdmin'))
 const BidResultsAdmin     = lazy(() => import('./admin/BidResultsAdmin'))
@@ -83,6 +85,7 @@ const NAV = [
       { id: 'customers',        label: 'Customers',         icon: Users,         color: 'text-blue-500' },
       { id: 'referrals',        label: 'Referrals',         icon: GitMerge,      color: 'text-purple-500' },
       { id: 'consultations',    label: 'Assigned Leads', icon: PhoneCall,     color: 'text-green-500' },
+      { id: 'email-templates',  label: 'Email Templates', icon: Mail,         color: 'text-sky-500' },
     ]
   },
   {
@@ -121,6 +124,7 @@ const COMPONENT_MAP = {
   'customers':         CustomerAdmin,
   'referrals':         ReferralManagement,
   'consultations':     ConsultationAdmin,
+  'email-templates':   EmailTemplateEditor,
   'agents':            AgentAdmin,
   'applications':      AgentApplicationsAdmin,
   'bid-results':       BidResultsAdmin,

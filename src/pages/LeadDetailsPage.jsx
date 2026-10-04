@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { sendLeadEmail, sendLeadText } from '../services/leadMessaging';
 import { assignLeadToAgent } from '../services/database/leadService';
+import { listTemplates, applyTemplate } from '../services/emailTemplates';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   ArrowLeft, Phone, Mail, MessageSquare, Calendar, MapPin, 
   DollarSign, Home, User, Clock, FileText, Send, X, Check,
@@ -12,6 +14,12 @@ import {
 export default function LeadDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { profile, user } = useAuth();
+  const sender = {
+    name: [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.name || '',
+    phone: profile?.phone || '',
+    email: profile?.email || user?.email || '',
+  };
   const [lead, setLead] = useState(null);
   const [events, setEvents] = useState([]);
   const [emailTemplates, setEmailTemplates] = useState([]);
@@ -113,14 +121,7 @@ export default function LeadDetailsPage() {
 
   const fetchEmailTemplates = async () => {
     try {
-      const { data, error } = await supabase
-        .from('email_templates')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      setEmailTemplates(data || []);
+      setEmailTemplates(await listTemplates({ activeOnly: true }));
     } catch (error) {
       console.error('Error fetching templates:', error);
     }
@@ -281,16 +282,9 @@ export default function LeadDetailsPage() {
 
   const handleTemplateSelect = (template) => {
     setSelectedTemplate(template);
-    setEmailSubject(template.subject);
-    
-    // Replace merge fields
-    let body = template.body;
-    body = body.replace(/\{\{first_name\}\}/g, lead.first_name || '');
-    body = body.replace(/\{\{last_name\}\}/g, lead.last_name || '');
-    body = body.replace(/\{\{email\}\}/g, lead.email || '');
-    body = body.replace(/\{\{state\}\}/g, lead.state || '');
-    body = body.replace(/\{\{property_address\}\}/g, lead.property_address || '');
-    
+    // Fills merge fields and turns older HTML templates into plain text (emails are sent as text)
+    const { subject, body } = applyTemplate(template, { lead, sender });
+    setEmailSubject(subject);
     setEmailBody(body);
   };
 
