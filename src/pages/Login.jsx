@@ -153,7 +153,7 @@ export default function Login() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">USAHUDhomes</h1>
-          <p className="text-gray-600">Broker & Admin Portal</p>
+          <p className="text-gray-600">Save homes, see bid history and get HUD home alerts</p>
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           {isSignUp ? 'Create your account' : 'Sign in to your account'}
