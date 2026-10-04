@@ -3,13 +3,11 @@
  *
  * Dynamic Open Graph image generator for USAHUDhomes.com property listings.
  *
- * Generates a 1200×630px PNG image for each property that includes:
- *  - The property photo (left 65%)
- *  - USAHUDhomes.com logo & branding (right panel)
- *  - Price, address, city/state
- *  - Beds, baths, sq ft stats
- *  - Owner-occupant incentive CTA banner
- *  - HUD HOME badge and case number
+ * Generates a 1200×630px PNG image for each property:
+ *  - The property's main photo as the full background
+ *  - HUD HOME (and UNDER CONTRACT) badges, USAHUDhomes.com branding
+ *  - Price, city/state/county (never the street address), beds/baths/sq ft
+ *  - Buyer incentives and phone number
  *
  * Usage: GET /api/og-image?caseNumber=387-111612
  *
@@ -87,331 +85,61 @@ async function fetchImageAsDataUri(url) {
 }
 
 // ── OG image layout builder ──────────────────────────────────────────────────
+// The property's main photo fills the whole card; details sit on a dark gradient.
+// Never shows the street address (shared links go outside the login).
+const el = (type, style, children) => ({ type, props: { style: { display: 'flex', ...style }, children } })
 
-function buildElement({ city, state, county, price, beds, baths, sqft, imageDataUri, caseNumber }) {
-  const displayPrice    = formatPrice(price);
-  const displayCity     = truncate(city || 'HUD Property', 28);
-  const displayState    = state || '';
-  const displayCounty   = county ? truncate(county, 30) : null;
-  const displayBeds     = beds  != null ? String(beds)  : '—';
-  const displayBaths    = baths != null ? String(baths) : '—';
-  const displaySqft     = sqft  ? Number(sqft).toLocaleString() : null;
+function buildElement({ city, state, county, price, beds, baths, sqft, imageDataUri, underContract }) {
+  const displayPrice  = formatPrice(price)
+  const displayPlace  = [truncate(city || 'HUD Home', 30), state].filter(Boolean).join(', ')
+  const stats = [
+    beds  != null ? `${beds} bd`  : null,
+    baths != null ? `${baths} ba` : null,
+    sqft ? `${Number(sqft).toLocaleString()} sq ft` : null,
+  ].filter(Boolean)
 
-  return {
-    type: 'div',
-    props: {
-      style: {
-        width: '1200px',
-        height: '630px',
-        display: 'flex',
-        fontFamily: 'Inter',
-        position: 'relative',
-        overflow: 'hidden',
-        background: '#0f2744',
-      },
-      children: [
+  const pill = (text, bg, color = '#ffffff') =>
+    el('div', { background: bg, color, fontSize: '22px', fontWeight: 700, letterSpacing: '2px', padding: '10px 20px', borderRadius: '8px' }, text)
 
-        // ── Left: property photo ────────────────────────────────────────────
-        {
-          type: 'div',
-          props: {
-            style: {
-              position: 'absolute',
-              top: 0, left: 0,
-              width: '780px', height: '630px',
-              overflow: 'hidden',
-              display: 'flex',
-            },
-            children: imageDataUri ? [
-              {
-                type: 'img',
-                props: {
-                  src: imageDataUri,
-                  style: { width: '780px', height: '630px', objectFit: 'cover', objectPosition: 'center' },
-                },
-              },
-              // Gradient overlay for smooth transition to the right panel
-              {
-                type: 'div',
-                props: {
-                  style: {
-                    position: 'absolute', top: 0, left: 0,
-                    width: '100%', height: '100%',
-                    background: 'linear-gradient(to right, rgba(0,0,0,0.05) 0%, rgba(15,39,68,0.9) 100%)',
-                    display: 'flex',
-                  },
-                },
-              },
-            ] : [
-              // Fallback when no image is available
-              {
-                type: 'div',
-                props: {
-                  style: {
-                    width: '780px', height: '630px',
-                    background: 'linear-gradient(135deg, #1a4a8a 0%, #0f2744 100%)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  },
-                  children: {
-                    type: 'div',
-                    props: {
-                      style: { color: 'rgba(255,255,255,0.25)', fontSize: '120px', display: 'flex' },
-                      children: '🏠',
-                    },
-                  },
-                },
-              },
-            ],
-          },
-        },
+  return el('div', { width: '1200px', height: '630px', position: 'relative', overflow: 'hidden', fontFamily: 'Inter', background: '#0f2744' }, [
+    // Background: main photo (or brand gradient)
+    imageDataUri
+      ? { type: 'img', props: { src: imageDataUri, style: { position: 'absolute', top: 0, left: 0, width: '1200px', height: '630px', objectFit: 'cover' } } }
+      : el('div', { position: 'absolute', top: 0, left: 0, width: '1200px', height: '630px', background: 'linear-gradient(135deg, #1d4ed8 0%, #0f2744 100%)' }),
+    // Readability: darken top and bottom
+    el('div', { position: 'absolute', top: 0, left: 0, width: '1200px', height: '630px',
+      background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 28%, rgba(0,0,0,0) 42%, rgba(8,20,40,0.92) 100%)' }),
 
-        // ── Right: dark info panel ──────────────────────────────────────────
-        {
-          type: 'div',
-          props: {
-            style: {
-              position: 'absolute',
-              top: 0, right: 0,
-              width: '460px', height: '630px',
-              background: 'linear-gradient(180deg, #0f2744 0%, #1a3a6b 100%)',
-              display: 'flex', flexDirection: 'column',
-              padding: '32px 36px 28px 36px',
-              boxSizing: 'border-box',
-            },
-            children: [
+    // Top bar: badges + brand
+    el('div', { position: 'absolute', top: '32px', left: '40px', right: '40px', justifyContent: 'space-between', alignItems: 'center' }, [
+      el('div', { gap: '12px' }, [
+        pill('HUD HOME', '#1d4ed8'),
+        underContract ? pill('UNDER CONTRACT', '#f59e0b') : null,
+      ].filter(Boolean)),
+      el('div', { alignItems: 'center', gap: '12px' }, [
+        appIconBase64 ? { type: 'img', props: { src: appIconBase64, style: { width: '52px', height: '52px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.6)' } } } : null,
+        el('div', { color: '#ffffff', fontSize: '26px', fontWeight: 700 }, 'USAHUDhomes.com'),
+      ].filter(Boolean)),
+    ]),
 
-              // Logo row
-              {
-                type: 'div',
-                props: {
-                  style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' },
-                  children: [
-                    appIconBase64 ? {
-                      type: 'img',
-                      props: {
-                        src: appIconBase64,
-                        style: { width: '48px', height: '48px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.25)' },
-                      },
-                    } : null,
-                    {
-                      type: 'div',
-                      props: {
-                        style: { display: 'flex', flexDirection: 'column' },
-                        children: [
-                          {
-                            type: 'div',
-                            props: {
-                              style: { color: '#ffffff', fontSize: '19px', fontWeight: 700, letterSpacing: '-0.3px', display: 'flex' },
-                              children: 'USAHUDhomes.com',
-                            },
-                          },
-                          {
-                            type: 'div',
-                            props: {
-                              style: { color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 400, letterSpacing: '0.5px', textTransform: 'uppercase', display: 'flex' },
-                              children: 'HUD Home Listing',
-                            },
-                          },
-                        ],
-                      },
-                    },
-                  ].filter(Boolean),
-                },
-              },
-
-              // Price
-              {
-                type: 'div',
-                props: {
-                  style: { color: '#4ade80', fontSize: '44px', fontWeight: 700, letterSpacing: '-1px', lineHeight: 1.1, marginBottom: '14px', display: 'flex' },
-                  children: displayPrice,
-                },
-              },
-
-              // City + State — hero headline (replaces address)
-              {
-                type: 'div',
-                props: {
-                  style: { display: 'flex', flexDirection: 'column', marginBottom: '6px' },
-                  children: [
-                    {
-                      type: 'div',
-                      props: {
-                        style: { color: '#ffffff', fontSize: '28px', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.5px', display: 'flex' },
-                        children: displayCity + ', ' + displayState,
-                      },
-                    },
-                    displayCounty ? {
-                      type: 'div',
-                      props: {
-                        style: { color: 'rgba(255,255,255,0.55)', fontSize: '14px', fontWeight: 400, marginTop: '4px', display: 'flex' },
-                        children: displayCounty + ' County',
-                      },
-                    } : null,
-                  ].filter(Boolean),
-                },
-              },
-
-              // Divider
-              {
-                type: 'div',
-                props: {
-                  style: { width: '100%', height: '1px', background: 'rgba(255,255,255,0.15)', margin: '18px 0', display: 'flex' },
-                },
-              },
-
-              // Stats row: Beds / Baths / Sq Ft
-              {
-                type: 'div',
-                props: {
-                  style: { display: 'flex', gap: '12px', marginBottom: '18px' },
-                  children: [
-                    // Beds
-                    {
-                      type: 'div',
-                      props: {
-                        style: { display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,0.08)', borderRadius: '10px', padding: '10px 14px', flex: 1 },
-                        children: [
-                          { type: 'div', props: { style: { color: '#ffffff', fontSize: '26px', fontWeight: 700, lineHeight: 1, display: 'flex' }, children: displayBeds } },
-                          { type: 'div', props: { style: { color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px', display: 'flex' }, children: 'Beds' } },
-                        ],
-                      },
-                    },
-                    // Baths
-                    {
-                      type: 'div',
-                      props: {
-                        style: { display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,0.08)', borderRadius: '10px', padding: '10px 14px', flex: 1 },
-                        children: [
-                          { type: 'div', props: { style: { color: '#ffffff', fontSize: '26px', fontWeight: 700, lineHeight: 1, display: 'flex' }, children: displayBaths } },
-                          { type: 'div', props: { style: { color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px', display: 'flex' }, children: 'Baths' } },
-                        ],
-                      },
-                    },
-                    // Sq Ft (conditional)
-                    displaySqft ? {
-                      type: 'div',
-                      props: {
-                        style: { display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(255,255,255,0.08)', borderRadius: '10px', padding: '10px 10px', flex: 1 },
-                        children: [
-                          { type: 'div', props: { style: { color: '#ffffff', fontSize: '18px', fontWeight: 700, lineHeight: 1, display: 'flex' }, children: displaySqft } },
-                          { type: 'div', props: { style: { color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 400, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px', display: 'flex' }, children: 'Sq Ft' } },
-                        ],
-                      },
-                    } : null,
-                  ].filter(Boolean),
-                },
-              },
-
-              // Spacer
-              { type: 'div', props: { style: { flex: 1, display: 'flex' } } },
-
-              // ── Primary CTA button ──────────────────────────────────────────
-              {
-                type: 'div',
-                props: {
-                  style: {
-                    background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)',
-                    borderRadius: '10px',
-                    padding: '16px 20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '10px',
-                  },
-                  children: [
-                    {
-                      type: 'div',
-                      props: {
-                        style: { color: '#ffffff', fontSize: '17px', fontWeight: 700, letterSpacing: '-0.2px', display: 'flex' },
-                        children: 'View This Property',
-                      },
-                    },
-                    {
-                      type: 'div',
-                      props: {
-                        style: { color: 'rgba(255,255,255,0.9)', fontSize: '20px', fontWeight: 700, display: 'flex' },
-                        children: '→',
-                      },
-                    },
-                  ],
-                },
-              },
-
-              // ── Incentives strip ────────────────────────────────────────────
-              {
-                type: 'div',
-                props: {
-                  style: {
-                    background: 'rgba(255,255,255,0.07)',
-                    borderRadius: '8px',
-                    padding: '10px 14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '3px',
-                  },
-                  children: [
-                    {
-                      type: 'div',
-                      props: {
-                        style: { color: '#93c5fd', fontSize: '12px', fontWeight: 700, letterSpacing: '0.2px', display: 'flex' },
-                        children: '$100 Down FHA  ·  3% Closing Cost Allowance',
-                      },
-                    },
-                    {
-                      type: 'div',
-                      props: {
-                        style: { color: 'rgba(255,255,255,0.55)', fontSize: '11px', fontWeight: 400, display: 'flex' },
-                        children: 'Owner-Occupant Bidding Priority  ·  (910) 363-6147',
-                      },
-                    },
-                  ],
-                },
-              },
-
-            ],
-          },
-        },
-
-        // ── "HUD HOME" badge (top-left of photo) ────────────────────────────
-        {
-          type: 'div',
-          props: {
-            style: {
-              position: 'absolute',
-              top: '24px', left: '24px',
-              background: '#1d4ed8',
-              color: '#ffffff',
-              fontSize: '13px', fontWeight: 700,
-              letterSpacing: '1.5px', textTransform: 'uppercase',
-              padding: '6px 14px', borderRadius: '6px',
-              display: 'flex',
-            },
-            children: 'HUD HOME',
-          },
-        },
-
-        // ── "FREE to Search" badge (bottom-left of photo) ───────────────────
-        {
-          type: 'div',
-          props: {
-            style: {
-              position: 'absolute',
-              bottom: '24px', left: '24px',
-              background: 'rgba(0,0,0,0.6)',
-              color: 'rgba(255,255,255,0.85)',
-              fontSize: '12px', fontWeight: 600,
-              padding: '5px 12px', borderRadius: '5px',
-              display: 'flex',
-              letterSpacing: '0.2px',
-            },
-            children: 'USAHUDhomes.com  ·  Free to Search',
-          },
-        },
-
-      ].filter(Boolean),
-    },
-  };
+    // Bottom: price, place, stats, incentives
+    el('div', { position: 'absolute', left: '40px', right: '40px', bottom: '34px', flexDirection: 'column' }, [
+      el('div', { alignItems: 'flex-end', justifyContent: 'space-between' }, [
+        el('div', { flexDirection: 'column' }, [
+          el('div', { color: '#4ade80', fontSize: '76px', fontWeight: 700, lineHeight: 1, letterSpacing: '-2px' }, displayPrice),
+          el('div', { color: '#ffffff', fontSize: '40px', fontWeight: 700, marginTop: '10px' }, displayPlace),
+          county ? el('div', { color: 'rgba(255,255,255,0.75)', fontSize: '22px', marginTop: '4px' }, `${truncate(county, 30)} County`) : null,
+        ].filter(Boolean)),
+        stats.length ? el('div', { gap: '10px' }, stats.map(t =>
+          el('div', { color: '#ffffff', fontSize: '26px', fontWeight: 700, background: 'rgba(255,255,255,0.16)', border: '1px solid rgba(255,255,255,0.25)', padding: '10px 18px', borderRadius: '10px' }, t)
+        )) : null,
+      ].filter(Boolean)),
+      el('div', { marginTop: '22px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.25)', justifyContent: 'space-between', color: 'rgba(255,255,255,0.85)', fontSize: '21px' }, [
+        el('div', {}, '$100 down FHA  ·  Closing-cost help  ·  Owner-occupant priority'),
+        el('div', { fontWeight: 700, color: '#ffffff' }, '(910) 363-6147'),
+      ]),
+    ]),
+  ].filter(Boolean))
 }
 
 // ── Vercel serverless handler ────────────────────────────────────────────────
@@ -427,7 +155,7 @@ export default async function handler(req, res) {
     // Fetch property from Supabase
     const { data: property, error } = await supabase
       .from('properties')
-      .select('case_number, city, state, county, price, beds, baths, sq_ft, main_image')
+      .select('case_number, city, state, county, price, beds, baths, sq_ft, main_image, status, is_active')
       .eq('case_number', caseNumber)
       .single();
 
@@ -449,7 +177,7 @@ export default async function handler(req, res) {
       baths:        property.baths,
       sqft:         property.sq_ft,
       imageDataUri,
-      caseNumber:   property.case_number,
+      underContract: String(property.status || '').toUpperCase() === 'UNDER CONTRACT',
     });
 
     // Render SVG via satori
