@@ -26,14 +26,40 @@ export async function fetchOffersByCase(caseNumbers) {
   return byCase
 }
 
-/** Full contract history for one property */
-export async function fetchPropertyHistory(caseNumber) {
-  const [offers, events] = await Promise.all([
-    supabase.from('accepted_offers').select('*').eq('case_number', caseNumber).order('accepted_at', { ascending: false }),
-    supabase.from('property_status_events').select('event, list_price, occurred_at').eq('case_number', caseNumber).order('occurred_at', { ascending: false }),
+/**
+ * Price and activity history for one property. Activity (listing, price and status
+ * changes) is public; accepted offers come back only for signed-in users.
+ */
+export async function fetchPropertyHistory(caseNumber, { withOffers = false } = {}) {
+  const [activity, offers] = await Promise.all([
+    supabase.from('property_activity')
+      .select('id, event, list_price, previous_price, status, occurred_at')
+      .eq('case_number', caseNumber).order('occurred_at', { ascending: false }),
+    withOffers
+      ? supabase.from('accepted_offers').select('*').eq('case_number', caseNumber).order('accepted_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
   ])
-  if (offers.error) throw offers.error
-  return { offers: offers.data || [], events: events.error ? [] : events.data || [] }
+  if (activity.error) throw activity.error
+  return { activity: activity.data || [], offers: offers.error ? [] : offers.data || [] }
+}
+
+/** Newest-first timeline mixing activity events and accepted offers */
+export function buildTimeline({ activity = [], offers = [] }) {
+  const items = [
+    ...activity.map(a => ({ kind: a.event, at: a.occurred_at, ...a })),
+    ...offers.map(o => ({ kind: 'offer_accepted', at: o.accepted_at, offer: o, id: `offer-${o.id}` })),
+  ]
+  // An offer is accepted before HUD pulls the listing, so on ties show the offer below "under contract"
+  const rank = { back_on_market: 0, under_contract: 1, offer_accepted: 2 }
+  return items.sort((x, y) => (new Date(y.at) - new Date(x.at)) || ((rank[x.kind] ?? 3) - (rank[y.kind] ?? 3)))
+}
+
+/** Change from the first list price, e.g. { amount: -12000, percent: -8 } */
+export function priceChange(property) {
+  const orig = Number(property?.original_list_price)
+  const now = Number(property?.price)
+  if (!orig || !now || orig === now) return null
+  return { amount: now - orig, percent: Math.round(((now - orig) / orig) * 100) }
 }
 
 export const formatMoney = (n) => (n == null ? '—' : `$${Math.round(Number(n)).toLocaleString()}`)

@@ -1,14 +1,14 @@
 /**
  * Bid history shown to signed-in buyers: what HUD accepted on a home before.
  * BidHistorySummary — one line on a search result card
- * BidHistoryPanel   — the full contract history on the property page
+ * PropertyHistoryPanel — price summary and activity timeline on the property page
  */
 
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Gavel, Lock } from 'lucide-react'
+import { Gavel, Lock, Clock } from 'lucide-react'
 import {
-  fetchPropertyHistory, formatMoney, formatDate, percentOfList, isUnderContract, OUTCOME_LABELS,
+  fetchPropertyHistory, buildTimeline, priceChange, formatMoney, formatDate, percentOfList, isUnderContract, OUTCOME_LABELS,
 } from '../services/acceptedOffers'
 
 const signUpLink = (caseNumber) => `/login?signup=1&next=${encodeURIComponent(`/property/${caseNumber}`)}`
@@ -40,98 +40,144 @@ export function BidHistorySummary({ property, offers, signedIn }) {
   )
 }
 
-export function BidHistoryPanel({ property, signedIn, onUnlock }) {
+const EVENT_STYLE = {
+  listed:          { dot: 'bg-blue-500',    title: 'Listed by HUD' },
+  price_change:    { dot: 'bg-green-500',   title: 'Price change' },
+  status_change:   { dot: 'bg-gray-400',    title: 'Status update' },
+  under_contract:  { dot: 'bg-amber-500',   title: 'Went under contract' },
+  offer_accepted:  { dot: 'bg-amber-600',   title: 'Offer accepted by HUD' },
+  back_on_market:  { dot: 'bg-purple-500',  title: 'Back on the market' },
+}
+
+function TimelineDetail({ item, property, signedIn }) {
+  switch (item.kind) {
+    case 'listed':
+      return <>Listed at {formatMoney(item.list_price)}</>
+    case 'price_change': {
+      const diff = Number(item.list_price) - Number(item.previous_price)
+      const pct = item.previous_price ? Math.round((diff / Number(item.previous_price)) * 100) : null
+      return (
+        <>
+          {formatMoney(item.previous_price)} → <strong>{formatMoney(item.list_price)}</strong>{' '}
+          <span className={diff < 0 ? 'text-green-700' : 'text-red-700'}>
+            ({diff < 0 ? '−' : '+'}{formatMoney(Math.abs(diff))}{pct ? `, ${pct > 0 ? '+' : ''}${pct}%` : ''})
+          </span>
+        </>
+      )
+    }
+    case 'status_change':
+      return <>HUD status: {item.status}</>
+    case 'under_contract':
+      return <>Removed from HUD's available list at {formatMoney(item.list_price)}</>
+    case 'back_on_market':
+      return <>Relisted at {formatMoney(item.list_price)}; the previous contract did not close</>
+    case 'offer_accepted': {
+      if (!signedIn) {
+        return (
+          <Link to={signUpLink(property.case_number)} className="inline-flex items-center gap-1 text-blue-700 hover:underline">
+            <Lock className="h-3.5 w-3.5" /> Create a free account to see the accepted amount and buyer type
+          </Link>
+        )
+      }
+      const o = item.offer
+      const pct = percentOfList(o, property.price)
+      return (
+        <>
+          <strong>{formatMoney(o.net_to_hud)}</strong> net to HUD{pct ? ` (${pct}% of list)` : ''} · {o.purchaser_type || 'Buyer'}
+          {o.outcome !== 'pending' && <> · {OUTCOME_LABELS[o.outcome]}</>}
+        </>
+      )
+    }
+    default:
+      return null
+  }
+}
+
+/** Price summary plus a timeline of everything that has happened to the home */
+export function PropertyHistoryPanel({ property, signedIn }) {
   const [history, setHistory] = useState(null)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (!signedIn || !property?.case_number) return
+    if (!property?.case_number) return
     let cancelled = false
-    fetchPropertyHistory(property.case_number)
+    setHistory(null)
+    fetchPropertyHistory(property.case_number, { withOffers: signedIn })
       .then(h => { if (!cancelled) setHistory(h) })
       .catch(e => { if (!cancelled) setError(e.message) })
     return () => { cancelled = true }
   }, [signedIn, property?.case_number])
 
-  if (!signedIn) {
-    return (
-      <div className="bg-white border rounded-lg p-6 mb-8">
-        <h2 className="text-2xl font-bold mb-2 flex items-center gap-2"><Gavel className="h-6 w-6 text-amber-600" /> Bid History</h2>
-        <p className="text-gray-700 mb-4">
-          See what HUD accepted on this home: the net-to-HUD amount, buyer type, and every time it went under contract.
-          Bid history is free for registered buyers.
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <Link to={signUpLink(property.case_number)} className="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700">
-            Create free account
-          </Link>
-          {onUnlock && (
-            <button onClick={onUnlock} className="px-5 py-2 rounded-lg font-semibold border border-blue-600 text-blue-600 hover:bg-blue-50">
-              Unlock details
-            </button>
-          )}
-        </div>
-      </div>
-    )
+  const timeline = history ? buildTimeline(history) : []
+  // Visitors see that an offer was accepted when the home went under contract, without the terms
+  if (history && !signedIn && isUnderContract(property) && !timeline.some(t => t.kind === 'offer_accepted')) {
+    const uc = timeline.find(t => t.kind === 'under_contract')
+    if (uc) timeline.splice(timeline.indexOf(uc) + 1, 0, { kind: 'offer_accepted', at: uc.at, id: 'offer-locked' })
   }
-
-  const offers = history?.offers || []
-  const contractEvents = (history?.events || []).filter(e => e.event === 'under_contract').length
-  const relists = (history?.events || []).filter(e => e.event === 'back_on_market').length
+  const change = priceChange(property)
+  const contracts = timeline.filter(t => t.kind === 'under_contract').length
+  const reductions = timeline.filter(t => t.kind === 'price_change' && Number(t.list_price) < Number(t.previous_price)).length
 
   return (
     <div className="bg-white border rounded-lg p-6 mb-8">
-      <h2 className="text-2xl font-bold mb-1 flex items-center gap-2"><Gavel className="h-6 w-6 text-amber-600" /> Bid History</h2>
-      <p className="text-sm text-gray-500 mb-4">Accepted offers published by HUD for case #{property.case_number}.</p>
+      <h2 className="text-2xl font-bold mb-4 flex items-center gap-2"><Clock className="h-6 w-6 text-blue-600" /> Price &amp; Activity History</h2>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="bg-gray-50 rounded-lg p-3">
+          <p className="text-xs text-gray-500">First list price</p>
+          <p className="font-semibold">{formatMoney(property.original_list_price || property.price)}</p>
+        </div>
+        <div className="bg-gray-50 rounded-lg p-3">
+          <p className="text-xs text-gray-500">Current price</p>
+          <p className="font-semibold">{formatMoney(property.price)}</p>
+        </div>
+        <div className="bg-gray-50 rounded-lg p-3">
+          <p className="text-xs text-gray-500">Change</p>
+          <p className={`font-semibold ${change ? (change.amount < 0 ? 'text-green-700' : 'text-red-700') : ''}`}>
+            {change ? `${change.amount < 0 ? '−' : '+'}${formatMoney(Math.abs(change.amount))} (${change.percent}%)` : 'None'}
+          </p>
+        </div>
+        <div className="bg-gray-50 rounded-lg p-3">
+          <p className="text-xs text-gray-500">Times under contract</p>
+          <p className="font-semibold">{history ? contracts : '—'}</p>
+        </div>
+      </div>
 
       {error ? (
-        <p className="text-red-600 text-sm">Could not load bid history.</p>
+        <p className="text-red-600 text-sm">Could not load the history for this home.</p>
       ) : !history ? (
-        <p className="text-gray-500 text-sm">Loading bid history…</p>
-      ) : offers.length === 0 ? (
-        <p className="text-gray-600 text-sm">
-          No accepted offers on record for this home yet.
-          {isUnderContract(property) && ' It went under contract before we started tracking accepted bids; terms appear here once HUD publishes them.'}
-        </p>
+        <p className="text-gray-500 text-sm">Loading history…</p>
+      ) : timeline.length === 0 ? (
+        <p className="text-gray-600 text-sm">No activity recorded yet.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-500 border-b">
-                <th className="py-2 pr-4 font-medium">Accepted</th>
-                <th className="py-2 pr-4 font-medium">Net to HUD</th>
-                <th className="py-2 pr-4 font-medium">% of list</th>
-                <th className="py-2 pr-4 font-medium">Buyer type</th>
-                <th className="py-2 font-medium">Result</th>
-              </tr>
-            </thead>
-            <tbody>
-              {offers.map(o => {
-                const pct = percentOfList(o, property.price)
-                return (
-                  <tr key={o.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4 whitespace-nowrap">{formatDate(o.accepted_at)}</td>
-                    <td className="py-2 pr-4 font-semibold whitespace-nowrap">{formatMoney(o.net_to_hud)}</td>
-                    <td className="py-2 pr-4">{pct ? `${pct}%` : '—'}</td>
-                    <td className="py-2 pr-4">{o.purchaser_type || '—'}</td>
-                    <td className="py-2">{OUTCOME_LABELS[o.outcome] || o.outcome}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <ol className="relative border-l-2 border-gray-200 ml-2">
+          {timeline.map(item => {
+            const style = EVENT_STYLE[item.kind] || EVENT_STYLE.status_change
+            const title = item.kind === 'price_change' && Number(item.list_price) < Number(item.previous_price) ? 'Price reduced'
+              : item.kind === 'price_change' ? 'Price increased' : style.title
+            return (
+              <li key={item.id} className="ml-5 mb-5 last:mb-0">
+                <span className={`absolute -left-[7px] mt-1.5 h-3 w-3 rounded-full ring-4 ring-white ${style.dot}`} />
+                <p className="text-xs text-gray-500">{formatDate(item.at)}</p>
+                <p className="font-semibold text-gray-900">{title}</p>
+                <p className="text-sm text-gray-700"><TimelineDetail item={item} property={property} signedIn={signedIn} /></p>
+              </li>
+            )
+          })}
+        </ol>
       )}
 
-      {history && (contractEvents > 0 || relists > 0) && (
-        <p className="text-sm text-gray-600 mt-4">
-          Our listing sync has seen this home go under contract {contractEvents} {contractEvents === 1 ? 'time' : 'times'}
-          {relists > 0 && ` and return to market ${relists} ${relists === 1 ? 'time' : 'times'}`}.
+      {history && (reductions > 0 || contracts > 1) && (
+        <p className="text-sm text-gray-600 mt-5">
+          {reductions > 0 && `${reductions} price ${reductions === 1 ? 'reduction' : 'reductions'} recorded. `}
+          {contracts > 1 && `This home has gone under contract ${contracts} times.`}
         </p>
       )}
-      <p className="text-xs text-gray-400 mt-4">
-        Net to HUD is what HUD receives after any closing costs and commissions it agreed to pay, so the contract price is usually higher.
-      </p>
+      {signedIn && history?.offers?.length > 0 && (
+        <p className="text-xs text-gray-400 mt-4">
+          Net to HUD is what HUD receives after any closing costs and commissions it agreed to pay, so the contract price is usually higher.
+        </p>
+      )}
     </div>
   )
 }
