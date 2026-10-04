@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../config/supabase'
+import { US_STATES } from '../services/buyerProfile'
 
 export default function Login() {
   const [searchParams] = useSearchParams()
@@ -9,6 +10,8 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [signupState, setSignupState] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [resetMode, setResetMode] = useState(searchParams.get('reset') === '1')
@@ -35,8 +38,10 @@ export default function Login() {
         const result = await signUp({
           email,
           password,
-          firstName: fullName.split(' ')[0],
-          lastName: fullName.split(' ').slice(1).join(' '),
+          firstName: fullName.trim().split(/\s+/)[0],
+          lastName: fullName.trim().split(/\s+/).slice(1).join(' '),
+          phone: phone.trim() || null,
+          state: signupState || null,
           role: 'end_user'
         })
 
@@ -173,6 +178,38 @@ export default function Login() {
                     onChange={(e) => setFullName(e.target.value)}
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
+                </div>
+              </div>
+            )}
+
+            {isSignUp && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                    Phone <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    id="phone"
+                    type="tel"
+                    autoComplete="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="signupState" className="block text-sm font-medium text-gray-700">
+                    State <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <select
+                    id="signupState"
+                    value={signupState}
+                    onChange={(e) => setSignupState(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  >
+                    <option value="">Select</option>
+                    {Object.entries(US_STATES).map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                  </select>
                 </div>
               </div>
             )}

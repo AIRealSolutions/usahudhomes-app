@@ -22,9 +22,13 @@ class AuthService {
         email,
         password,
         options: {
+          // Saved to the profile by the on_auth_user_created trigger, even before email confirmation
           data: {
             first_name: firstName,
             last_name: lastName,
+            phone: phone || undefined,
+            state: state || undefined,
+            address: address || undefined,
             role: role
           }
         }
@@ -47,7 +51,11 @@ class AuthService {
           email,
           role,
           name: [firstName, lastName].filter(Boolean).join(' ') || null,
-          phone
+          first_name: firstName || null,
+          last_name: lastName || null,
+          phone,
+          state: state ? String(state).trim().toUpperCase().slice(0, 2) : null,
+          address: address || null
         })
         .select()
         .single()

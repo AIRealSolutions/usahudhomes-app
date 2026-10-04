@@ -4,25 +4,44 @@
  * Thorough form with required basics + optional detailed fields
  */
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { profileToForm, rememberProfileDetails, fillBlanks } from '../services/buyerProfile'
 import { postNotification } from '../services/leadMessaging'
 import { Phone, Mail, ChevronDown, CheckCircle, AlertCircle, Loader } from 'lucide-react'
 
+// This form's fields <-> profile columns
+const PROFILE_MAP = {
+  firstName: 'first_name', lastName: 'last_name', phone: 'phone', preferredContact: 'preferred_contact',
+  financingType: 'financing_type', downPayment: 'down_payment', creditScoreRange: 'credit_score_range',
+  timeline: 'timeline', buyerType: 'buyer_type', experienceLevel: 'experience_level',
+  priceRangeMin: 'price_range_min', priceRangeMax: 'price_range_max', propertyCondition: 'property_condition',
+  locationPreferences: 'location_preferences', hearAboutUs: 'hear_about_us',
+}
+
+function fromProfile(profile, user) {
+  const p = profileToForm(profile)
+  const out = { email: profile?.email || user?.email || '' }
+  for (const [formKey, col] of Object.entries(PROFILE_MAP)) out[formKey] = p[col] || ''
+  out.preApproved = profile?.pre_approved === true ? true : null
+  out.preferredContact = out.preferredContact || 'call'
+  return out
+}
+
 export default function AgentRequestForm({ property, onSuccess }) {
-  const { user, profile } = useAuth()
+  const { user, profile, applyProfile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState(null)
   const [expandOptional, setExpandOptional] = useState(false)
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     // Required
-    firstName: profile?.first_name || '',
-    lastName: profile?.last_name || '',
-    email: profile?.email || user?.email || '',
-    phone: profile?.phone || '',
-    preferredContact: 'call',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    preferredContact: '',
 
     // Optional - Financing
     financingType: '',
@@ -45,8 +64,16 @@ export default function AgentRequestForm({ property, onSuccess }) {
 
     // Optional - Questions
     questions: '',
-    hearAboutUs: ''
-  })
+    hearAboutUs: '',
+
+    // Pre-filled from the buyer's profile
+    ...Object.fromEntries(Object.entries(fromProfile(profile, user)).filter(([, v]) => v !== '' && v != null)),
+  }))
+
+  // The profile can arrive after the form mounts: fill whatever is still empty
+  useEffect(() => {
+    if (profile || user) setFormData(f => fillBlanks(f, fromProfile(profile, user)))
+  }, [profile, user])
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -103,6 +130,11 @@ export default function AgentRequestForm({ property, onSuccess }) {
       if (!result.success) {
         throw new Error(result.error || 'Failed to submit request')
       }
+
+      // Keep anything new they told us on their profile for next time
+      const values = Object.fromEntries(Object.entries(PROFILE_MAP).map(([k, col]) => [col, formData[k]]))
+      if (formData.preApproved) values.pre_approved = 'true'
+      rememberProfileDetails(user?.id, profile, values).then(applyProfile)
 
       setSubmitted(true)
       onSuccess?.(result.data)

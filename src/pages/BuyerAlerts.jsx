@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link } from 'react-router-dom'
 import {
@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '../config/supabase'
 import { notifyLeadSubmitted } from '../services/leadMessaging'
+import { useAuth } from '../contexts/AuthContext'
+import { stateName, rememberProfileDetails, TIMELINE_FROM_PROFILE, TIMELINE_TO_PROFILE } from '../services/buyerProfile'
 
 const states = [
   'North Carolina', 'South Carolina', 'Virginia', 'Georgia', 'Florida', 'Alabama',
@@ -44,16 +46,45 @@ const initialForm = {
   website: ''
 }
 
+// Alert-form values <-> buyer profile values
+function alertFieldsFromProfile(profile, user) {
+  if (!profile && !user) return {}
+  const p = profile || {}
+  const out = {
+    firstName: p.first_name || String(p.name || '').split(' ')[0] || '',
+    lastName: p.last_name || String(p.name || '').split(' ').slice(1).join(' ') || '',
+    email: p.email || user?.email || '',
+    phone: p.phone || '',
+    state: stateName(p.state),
+    areas: p.location_preferences || '',
+    budgetMin: p.price_range_min != null ? String(Math.round(p.price_range_min)) : '',
+    budgetMax: p.price_range_max != null ? String(Math.round(p.price_range_max)) : '',
+    buyerType: ['investor', 'fix_flip'].includes(p.buyer_type) ? 'investor' : p.buyer_type ? 'owner_occupant' : '',
+    financingStatus: p.pre_approved ? 'prequalified' : p.financing_type === 'cash' ? 'cash' : '',
+    bedrooms: p.bedrooms != null ? String(p.bedrooms) : '',
+    timeline: TIMELINE_FROM_PROFILE[p.timeline] || '',
+  }
+  return Object.fromEntries(Object.entries(out).filter(([, v]) => v))
+}
+
 const fieldClass =
   'mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-200'
 
 export default function BuyerAlerts() {
-  const [form, setForm] = useState(initialForm)
+  const { user, profile, applyProfile } = useAuth()
+  const [form, setForm] = useState(() => ({ ...initialForm, ...alertFieldsFromProfile(profile, user) }))
+  const touched = useRef(false)
+
+  // Signed-in buyers: fill the form from their profile (until they start typing)
+  useEffect(() => {
+    if (!touched.current) setForm(f => ({ ...f, ...alertFieldsFromProfile(profile, user) }))
+  }, [profile, user])
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
 
   const update = event => {
+    touched.current = true
     const { name, value, type, checked } = event.target
     setForm(current => ({ ...current, [name]: type === 'checkbox' ? checked : value }))
     setErrors(current => ({ ...current, [name]: '', submit: '' }))
@@ -149,6 +180,18 @@ export default function BuyerAlerts() {
       if (subError) console.error('Could not save alert subscription:', subError)
 
       notifyLeadSubmitted(lead.id)
+
+      // Keep these details on a signed-in buyer's profile for next time
+      if (user) {
+        rememberProfileDetails(user.id, profile, {
+          first_name: form.firstName, last_name: form.lastName, phone: form.phone, state: form.state,
+          location_preferences: form.areas, price_range_min: form.budgetMin, price_range_max: form.budgetMax,
+          bedrooms: form.bedrooms, timeline: TIMELINE_TO_PROFILE[form.timeline] || '',
+          buyer_type: form.buyerType === 'investor' ? 'investor' : '',
+          financing_type: form.financingStatus === 'cash' ? 'cash' : '',
+          pre_approved: form.financingStatus === 'prequalified' ? 'true' : '',
+        }).then(applyProfile)
+      }
 
       setSuccess(true)
       window.scrollTo({ top: 0, behavior: 'smooth' })

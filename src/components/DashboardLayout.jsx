@@ -40,6 +40,7 @@ export default function DashboardLayout({ children, currentRole }) {
 
   const navItems = [
     { id: 'overview', label: 'My Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { id: 'profile', label: 'My Profile', icon: User, path: '/profile' },
     { id: 'search', label: 'Search Homes', icon: Search, path: '/search' },
     { id: 'alerts', label: 'Home Alerts', icon: Bell, path: '/alerts' },
     ...(canAccessBroker ? [{ id: 'broker', label: 'Broker Portal', icon: Briefcase, path: '/broker-dashboard', workspace: true }] : []),

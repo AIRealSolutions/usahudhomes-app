@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Mail, Phone, MapPin, DollarSign, Calendar, Home as HomeIcon } from 'lucide-react'
 import SavedHomesSection from '../components/SavedHomesSection'
+import { useAuth } from '../contexts/AuthContext'
+import { PROFILE_KEYS, OPTIONS, stateName } from '../services/buyerProfile'
 
 export default function UserDashboard({ user }) {
   const [inquiries, setInquiries] = useState([])
@@ -138,6 +140,9 @@ export default function UserDashboard({ user }) {
         </div>
       </div>
 
+      {/* Profile: forms across the site fill in from it */}
+      <ProfileCard />
+
       {/* Homes the buyer saved, with price and contract activity */}
       <SavedHomesSection />
 
@@ -246,6 +251,34 @@ export default function UserDashboard({ user }) {
           </a>
         </div>
       </div>
+    </div>
+  )
+}
+
+// How much of the profile is filled in, with a link to edit it
+function ProfileCard() {
+  const { profile } = useAuth()
+  const filled = PROFILE_KEYS.filter(k => profile?.[k] != null && profile[k] !== '').length
+  const pct = Math.round((filled / PROFILE_KEYS.length) * 100)
+  const label = (key) => OPTIONS[key]?.find(o => o.value === String(profile?.[key]))?.label
+  const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.name
+  return (
+    <div className="bg-white rounded-lg shadow p-6 mb-8 flex flex-wrap items-center justify-between gap-4">
+      <div className="min-w-0">
+        <h2 className="text-xl font-semibold text-gray-900">{name || 'My Profile'}</h2>
+        <p className="text-sm text-gray-600 mt-1">
+          {[profile?.phone, stateName(profile?.state), label('buyer_type'), label('timeline')].filter(Boolean).join(' · ') || 'Add your details once and we fill them in on every form.'}
+        </p>
+        <div className="mt-3 flex items-center gap-3">
+          <div className="h-2 w-40 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-600" style={{ width: `${pct}%` }} />
+          </div>
+          <span className="text-xs text-gray-500">Profile {pct}% complete</span>
+        </div>
+      </div>
+      <Link to="/profile" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
+        {pct < 100 ? 'Complete my profile' : 'Edit my profile'}
+      </Link>
     </div>
   )
 }

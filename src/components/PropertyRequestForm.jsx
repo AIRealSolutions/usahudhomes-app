@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { propertyRequestService } from '../services/propertyRequestService'
 import { Send, CheckCircle, AlertCircle } from 'lucide-react'
@@ -112,12 +113,13 @@ export default function PropertyRequestForm({ property }) {
       {!hasRequested && (
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="flex justify-between text-sm font-medium text-gray-700 mb-1">
               Name
+              <Link to="/profile" className="text-xs font-normal text-blue-600 hover:underline">Edit my details</Link>
             </label>
             <input
               type="text"
-              value={`${profile?.first_name || ''} ${profile?.last_name || ''}`.trim()}
+              value={`${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || profile?.name || ''}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
               disabled
             />

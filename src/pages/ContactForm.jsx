@@ -1,12 +1,33 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { notifyLeadSubmitted } from '../services/leadMessaging';
+import { useAuth } from '../contexts/AuthContext';
+import { stateName, rememberProfileDetails, TIMELINE_FROM_PROFILE, TIMELINE_TO_PROFILE } from '../services/buyerProfile';
+
+// Signed-in buyers: these fields come from their profile
+function contactFieldsFromProfile(profile, user) {
+  if (!profile && !user) return {};
+  const p = profile || {};
+  const out = {
+    first_name: p.first_name || String(p.name || '').split(' ')[0] || '',
+    last_name: p.last_name || String(p.name || '').split(' ').slice(1).join(' ') || '',
+    email: p.email || user?.email || '',
+    phone: p.phone || '',
+    state: stateName(p.state),
+    budget_min: p.price_range_min != null ? String(Math.round(p.price_range_min)) : '',
+    budget_max: p.price_range_max != null ? String(Math.round(p.price_range_max)) : '',
+    timeline: TIMELINE_FROM_PROFILE[p.timeline] || '',
+  };
+  return Object.fromEntries(Object.entries(out).filter(([, v]) => v));
+}
 import { Home, Phone, Mail, MapPin, DollarSign, Calendar, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function ContactForm() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+  const { user, profile, applyProfile } = useAuth();
+  const touched = useRef(false);
+  const [formData, setFormData] = useState(() => ({
     first_name: '',
     last_name: '',
     email: '',
@@ -15,9 +36,15 @@ export default function ContactForm() {
     budget_min: '',
     budget_max: '',
     timeline: '',
-    message: ''
-  });
+    message: '',
+    ...contactFieldsFromProfile(profile, user)
+  }));
   const [errors, setErrors] = useState({});
+
+  // The profile can load after the page; fill in until they start typing
+  useEffect(() => {
+    if (!touched.current) setFormData(f => ({ ...f, ...contactFieldsFromProfile(profile, user) }));
+  }, [profile, user]);
   const [submitting, setSubmitting] = useState(false);
 
   const US_STATES = [
@@ -68,6 +95,7 @@ export default function ContactForm() {
   };
 
   const handleChange = (e) => {
+    touched.current = true;
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -129,6 +157,14 @@ export default function ContactForm() {
       if (eventError) console.error('Error creating lead event:', eventError);
 
       notifyLeadSubmitted(leadData.id);
+
+      if (user) {
+        rememberProfileDetails(user.id, profile, {
+          first_name: formData.first_name, last_name: formData.last_name, phone: formData.phone, state: formData.state,
+          price_range_min: formData.budget_min, price_range_max: formData.budget_max,
+          timeline: TIMELINE_TO_PROFILE[formData.timeline] || '',
+        }).then(applyProfile);
+      }
 
       const data = leadData;
       const error = null;
