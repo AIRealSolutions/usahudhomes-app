@@ -26,6 +26,10 @@ const CRAWLER_USER_AGENTS = [
   'TelegramBot',
   'Discordbot',
   'SkypeUriPreview',
+  'Pinterest',
+  'redditbot',
+  'Embedly',
+  'iMessage',
   // Search engine crawlers must receive listing-specific metadata too.
   'Googlebot',
   'bingbot',
@@ -69,6 +73,18 @@ function stripGenericMetaTags(html) {
   return html;
 }
 
+// The built app shell: bundled with the function (vercel.json includeFiles), else fetched
+async function loadIndexHtml(req) {
+  try {
+    return fs.readFileSync(path.join(__dirname, '..', 'dist', 'index.html'), 'utf-8');
+  } catch {
+    const host = req.headers['x-forwarded-host'] || req.headers.host || 'www.usahudhomes.com';
+    const res = await fetch(`https://${host}/index.html`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error(`index.html HTTP ${res.status}`);
+    return res.text();
+  }
+}
+
 export default async function handler(req, res) {
   const { caseNumber } = req.query;
   const userAgent = req.headers['user-agent'] || '';
@@ -76,8 +92,7 @@ export default async function handler(req, res) {
   // If not a crawler, serve the regular index.html
   if (!isCrawler(userAgent)) {
     try {
-      const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
-      const html = fs.readFileSync(indexPath, 'utf-8');
+      const html = await loadIndexHtml(req);
       res.setHeader('Content-Type', 'text/html');
       return res.status(200).send(html);
     } catch (error) {
@@ -108,7 +123,7 @@ export default async function handler(req, res) {
     const features = [bedsStr, bathsStr, sqftStr].filter(Boolean).join(' · ');
 
     // Title: Price — City, State | HUD Home (no street address)
-    const propertyTitle = escapeHtml(`${priceStr} — ${location} | HUD Home`);
+    const propertyTitle = escapeHtml(`${priceStr} — ${location} | HUD Home${underContract ? ' (Under Contract)' : ''}`);
 
     // Description: features + location + incentives (no street address)
     const propertyDescription = escapeHtml(
@@ -120,7 +135,10 @@ export default async function handler(req, res) {
     // ── Dynamic OG image URL ──────────────────────────────────────────────────
     // Points to /api/og-image which generates a branded 1200×630 PNG with the
     // property photo, price, city/state, beds/baths, and USAHUDhomes.com branding.
-    const ogImageUrl = `https://www.usahudhomes.com/api/og-image?caseNumber=${encodeURIComponent(property.case_number)}`;
+    // v= changes when the listing changes, so social sites refetch a fresh card
+    const imageVersion = encodeURIComponent(String(property.updated_at || '').replace(/\D/g, '').slice(0, 14));
+    const ogImageUrl = `https://www.usahudhomes.com/api/og-image?caseNumber=${encodeURIComponent(property.case_number)}&v=${imageVersion}`;
+    const underContract = String(property.status || '').toUpperCase() === 'UNDER CONTRACT';
 
     // Give search engines structured listing facts without requiring JavaScript rendering.
     const structuredData = JSON.stringify({
@@ -148,7 +166,7 @@ export default async function handler(req, res) {
           image: ogImageUrl,
           address: {
             '@type': 'PostalAddress',
-            streetAddress: property.address || undefined,
+            // No street address: shared links leave the login (address is for signed-in buyers)
             addressLocality: property.city || undefined,
             addressRegion: property.state || undefined,
             postalCode: property.zip_code || undefined,
@@ -193,8 +211,7 @@ export default async function handler(req, res) {
     }).replace(/</g, '\\u003c');
 
     // Read and strip the generic meta tags from index.html
-    const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
-    let html = fs.readFileSync(indexPath, 'utf-8');
+    let html = await loadIndexHtml(req);
     html = stripGenericMetaTags(html);
 
     // Inject property-specific meta tags at the top of <head>
@@ -215,6 +232,7 @@ export default async function handler(req, res) {
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:type" content="image/png">
+    <meta property="og:image:alt" content="${propertyTitle}">
     <meta property="fb:app_id" content="1993076721256699">
 
     <!-- Twitter Card -->

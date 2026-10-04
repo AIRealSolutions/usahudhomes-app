@@ -38,6 +38,7 @@ import AgentRequestForm from './components/AgentRequestForm'
 import SearchFilters from './components/SearchFilters'
 import { BidHistorySummary, PropertyHistoryPanel } from './components/BidHistory'
 import SaveHomeButton from './components/SaveHomeButton'
+import ShareProperty, { propertyShareText } from './components/ShareProperty'
 import { SavedHomesProvider } from './contexts/SavedHomesContext'
 import { fetchOffersByCase, isUnderContract, priceChange } from './services/acceptedOffers'
 import RoleSelector from './components/RoleSelector'
@@ -916,9 +917,10 @@ function PropertyDetailPage() {
   // Mask address for unauthenticated users
   const displayAddress = user ? property?.address : `HUD Home in ${property?.city}, ${property?.state}`
   const propertyUrl = property ? `https://www.usahudhomes.com/property/${property.case_number}` : ''
-  const propertyTitle = property ? `${property.address} - ${property.city}, ${property.state}` : 'Property Details'
-  const propertyDescription = property ? `$${property.list_price?.toLocaleString() || 'Price Available'} | ${property.beds || 0} beds | ${property.baths || 0} baths | HUD Home in ${property.city}, ${property.state}. Contact Lightkeeper Realty at 910-363-6147 for more information.` : ''
-  const propertyImage = property?.main_image || 'https://www.usahudhomes.com/us-map.png'
+  // Titles and share tags never include the street address (it stays behind the login)
+  const propertyTitle = property ? `${property.price ? `$${Number(property.price).toLocaleString()} — ` : ''}HUD Home in ${property.city}, ${property.state}` : 'Property Details'
+  const propertyDescription = property ? `${propertyShareText(property)}. Contact Lightkeeper Realty at 910-363-6147 for more information.` : ''
+  const propertyImage = property ? `https://www.usahudhomes.com/api/og-image?caseNumber=${encodeURIComponent(property.case_number)}` : 'https://www.usahudhomes.com/us-map.png'
 
   if (loading) {
     return (
@@ -1035,7 +1037,10 @@ function PropertyDetailPage() {
             }`}>
               {isUnderContract(property) ? 'Under Contract' : property.status}
             </span>
-            <SaveHomeButton property={property} variant="button" className="ml-auto" />
+            <div className="ml-auto flex gap-2">
+              <ShareProperty property={property} />
+              <SaveHomeButton property={property} variant="button" />
+            </div>
           </div>
 
           {/* Key Features */}

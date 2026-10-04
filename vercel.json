@@ -4,6 +4,17 @@
   "devCommand": "npm run dev",
   "rewrites": [
     {
+      "source": "/property/:caseNumber",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|TelegramBot|Discordbot|SkypeUriPreview|Pinterest|redditbot|Embedly|iMessage|Applebot|Googlebot|bingbot|DuckDuckBot|YandexBot|Baiduspider).*"
+        }
+      ],
+      "destination": "/api/property-meta?caseNumber=:caseNumber"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
@@ -17,5 +28,13 @@
       "path": "/api/hud?action=accepted-offers-sync",
       "schedule": "0 15 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "api/property-meta.js": {
+      "includeFiles": "dist/index.html"
+    },
+    "api/og-image.js": {
+      "includeFiles": "api/fonts/**"
+    }
+  }
 }
