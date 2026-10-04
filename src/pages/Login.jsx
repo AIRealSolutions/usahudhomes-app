@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../config/supabase'
 
@@ -10,6 +10,9 @@ export default function Login() {
   const [fullName, setFullName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [searchParams] = useSearchParams()
+  const [resetMode, setResetMode] = useState(searchParams.get('reset') === '1')
+  const [resetSent, setResetSent] = useState(false)
   const navigate = useNavigate()
   const { initialized, isAuthenticated, signIn, signUp } = useAuth()
 
@@ -56,7 +59,10 @@ export default function Login() {
         // This avoids race conditions with async state updates
       }
     } catch (error) {
-      const errorMsg = error.message || 'An unexpected error occurred'
+      const raw = error.message || 'An unexpected error occurred'
+      const errorMsg = /invalid login credentials/i.test(raw)
+        ? 'That email and password do not match. Check for typos, or use "Forgot password?" to set a new one.'
+        : raw
       console.error('Login error:', errorMsg)
       setError(errorMsg)
 
@@ -67,6 +73,73 @@ export default function Login() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Emails a link to /reset-password where a new password is chosen
+  const handleSendReset = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`
+    })
+    setLoading(false)
+    if (resetError) setError(resetError.message)
+    else setResetSent(true)
+  }
+
+  if (resetMode) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">USAHUDhomes</h1>
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Reset your password</h2>
+        </div>
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+            {resetSent ? (
+              <div className="space-y-4 text-center">
+                <p className="text-gray-700">
+                  If an account exists for <strong>{email.trim()}</strong>, a link to set a new password is on its way.
+                  Check your inbox (and spam folder) and open the link on this device.
+                </p>
+              </div>
+            ) : (
+              <form className="space-y-6" onSubmit={handleSendReset}>
+                <p className="text-sm text-gray-600">Enter the email you sign in with and we will send you a link to choose a new password.</p>
+                <div>
+                  <label htmlFor="reset-email" className="block text-sm font-medium text-gray-700">Email address</label>
+                  <input
+                    id="reset-email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+                {error && <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full flex justify-center py-2 px-4 rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {loading ? 'Sending…' : 'Send reset link'}
+                </button>
+              </form>
+            )}
+            <button
+              type="button"
+              onClick={() => { setResetMode(false); setResetSent(false); setError(null) }}
+              className="mt-6 w-full text-sm font-medium text-blue-600 hover:text-blue-500"
+            >
+              Back to sign in
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -137,6 +210,17 @@ export default function Login() {
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 />
               </div>
+              {!isSignUp && (
+                <div className="mt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => { setResetMode(true); setError(null) }}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-500"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
             </div>
 
             {error && (

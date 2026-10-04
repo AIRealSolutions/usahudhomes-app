@@ -559,7 +559,7 @@ async function handleAgentInvite(req, res) {
   const lastName  = str(req.body?.lastName)
   const redirectTo = /^https?:\/\/[^\s]+$/.test(String(req.body?.redirectTo || ''))
     ? String(req.body.redirectTo)
-    : `${SITE_URL}/broker-dashboard`
+    : `${SITE_URL}/reset-password`
   const authHeaders = {
     apikey: SUPABASE_SERVICE_KEY,
     Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
