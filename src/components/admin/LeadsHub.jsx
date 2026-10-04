@@ -17,11 +17,12 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../config/supabase'
 import { assignLeadToAgent } from '../../services/database/leadService'
 import AddLeadModal from './AddLeadModal'
+import AlertSignupsTab from './AlertSignupsTab'
 import {
   Search, Filter, Eye, Calendar, MapPin, DollarSign, Home,
   AlertCircle, Phone, Mail, User, Clock, CheckCircle,
   RefreshCw, Download, UserPlus, ArrowRight, MessageSquare,
-  Users, Inbox, ChevronDown, X
+  Users, Inbox, ChevronDown, X, Bell
 } from 'lucide-react'
 
 // ── Status helpers ────────────────────────────────────────────────────────────
@@ -608,12 +609,13 @@ export default function LeadsHub({ onNavigate }) {
     { id: 'leads',         label: 'New Leads',      icon: MessageSquare },
     { id: 'consultations', label: 'Assigned Leads', icon: Inbox },
     { id: 'customers',     label: 'Customers',      icon: Users },
+    { id: 'alerts',        label: 'Alert Sign-ups', icon: Bell },
   ]
 
   return (
     <div className="space-y-5">
       {/* Tab bar */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+      <div className="flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl w-fit">
         {TABS.map(t => {
           const Icon = t.icon
           return (
@@ -637,6 +639,7 @@ export default function LeadsHub({ onNavigate }) {
       {tab === 'leads'         && <NewLeadsTab onNavigate={onNavigate} />}
       {tab === 'consultations' && <ConsultationsTab />}
       {tab === 'customers'     && <CustomersTab />}
+      {tab === 'alerts'        && <AlertSignupsTab />}
     </div>
   )
 }

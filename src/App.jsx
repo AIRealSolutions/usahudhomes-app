@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async'
 import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import { supabase } from './config/supabase'
+import { notifyLeadSubmitted } from './services/leadMessaging'
 import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User, Menu } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
@@ -718,7 +719,7 @@ function InquiryFormModal({ property, onClose }) {
           message: formData.message,
           property_case_number: property.case_number,
           property_address: `${property.address}, ${property.city}, ${property.state}`,
-          property_price: property.list_price,
+          property_price: property.price ?? property.list_price,
           source: 'property_inquiry',
           status: 'new_lead'
         }]);
@@ -736,13 +737,14 @@ function InquiryFormModal({ property, onClose }) {
             form_type: 'property_inquiry',
             property_case_number: property.case_number,
             property_address: `${property.address}, ${property.city}, ${property.state}`,
-            property_price: property.list_price
+            property_price: property.price ?? property.list_price
           }
         });
 
       if (eventError) console.error('Error creating lead event:', eventError);
 
-      const error = null;
+      notifyLeadSubmitted(leadData.id)
+
       setSubmitted(true)
       setTimeout(() => onClose(), 2000)
     } catch (err) {

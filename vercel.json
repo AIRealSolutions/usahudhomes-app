@@ -7,5 +7,11 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/notifications?action=send-alerts",
+      "schedule": "0 13 * * *"
+    }
   ]
 }
