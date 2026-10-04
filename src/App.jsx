@@ -9,6 +9,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
+import Profile from './pages/Profile'
+import DashboardLayout from './components/DashboardLayout'
 import DashboardRouter from './components/DashboardRouter'
 import LeadDetail from './pages/LeadDetail'
 import LeadDetailsPage from './pages/LeadDetailsPage'
@@ -118,6 +120,10 @@ function Header() {
             )}
             {user && (
               <>
+                <Link to="/profile" className="text-gray-700 hover:text-blue-600 font-medium flex items-center">
+                  <User className="h-4 w-4 mr-1" />
+                  My Profile
+                </Link>
                 <RoleSelector />
                 <button
                   onClick={handleSignOut}
@@ -216,6 +222,9 @@ function Header() {
                 <>
                   <Link to="/dashboard" className="text-gray-700 hover:text-blue-600 font-medium">
                     My Dashboard
+                  </Link>
+                  <Link to="/profile" className="text-gray-700 hover:text-blue-600 font-medium">
+                    My Profile
                   </Link>
                   {canAccessBroker && (
                     <Link to="/broker-dashboard" className="text-gray-700 hover:text-blue-600 font-medium">
@@ -1235,6 +1244,7 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardRouter />} />
               <Route path="/admin" element={<DashboardRouter />} />
               <Route path="/broker-dashboard" element={<DashboardRouter />} />
+              <Route path="/profile" element={<ProtectedRoute><DashboardLayout><Profile /></DashboardLayout></ProtectedRoute>} />
               <Route path="/lead/:id" element={<LeadDetail />} />
               <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />
               <Route path="/hud-homes/:stateSlug" element={<HudHomesLanding />} />

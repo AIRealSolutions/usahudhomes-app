@@ -242,6 +242,13 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user])
 
+  // Use a profile row saved elsewhere (profile page, form autofill) everywhere at once
+  const applyProfile = useCallback((row) => {
+    if (!row) return
+    setProfile(row)
+    localStorage.setItem('userProfile', JSON.stringify(row))
+  }, [])
+
   // Reset password
   const resetPassword = useCallback(async (email) => {
     try {
@@ -313,6 +320,7 @@ export const AuthProvider = ({ children }) => {
     signIn,
     signOut,
     updateProfile,
+    applyProfile,
     resetPassword,
     updatePassword,
     hasRole,
