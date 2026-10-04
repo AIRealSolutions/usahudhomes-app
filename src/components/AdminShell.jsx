@@ -16,6 +16,7 @@
  *   applications      → AgentApplicationsAdmin
  *   bid-results       → BidResultsAdmin
  *   accepted-offers   → AcceptedOffersAdmin
+ *   broker-leads      → BrokerLeadsAdmin
  *   video-studio      → VideoStudio
  *   bulk-generator    → VideoBulkGenerator
  *   video-library     → VideoLibrary
@@ -53,6 +54,7 @@ const AgentAdmin          = lazy(() => import('./admin/AgentAdmin'))
 const AgentApplicationsAdmin = lazy(() => import('./admin/AgentApplicationsAdmin'))
 const BidResultsAdmin     = lazy(() => import('./admin/BidResultsAdmin'))
 const AcceptedOffersAdmin = lazy(() => import('./admin/AcceptedOffersAdmin'))
+const BrokerLeadsAdmin    = lazy(() => import('./admin/BrokerLeadsAdmin'))
 const VideoStudio         = lazy(() => import('./admin/VideoStudio'))
 const VideoBulkGenerator  = lazy(() => import('./admin/VideoBulkGenerator'))
 const VideoLibrary        = lazy(() => import('./admin/VideoLibrary'))
@@ -96,6 +98,7 @@ const NAV = [
     items: [
       { id: 'agents',           label: 'Manage Agents',     icon: UserCog,       color: 'text-indigo-500' },
       { id: 'applications',     label: 'Applications',      icon: FileText,      color: 'text-yellow-600' },
+      { id: 'broker-leads',     label: 'Broker Leads',      icon: Briefcase,     color: 'text-indigo-600', badge: 'NEW' },
       { id: 'bid-results',      label: 'Bid Results',       icon: DollarSign,    color: 'text-green-600' },
     ]
   },
@@ -132,6 +135,7 @@ const COMPONENT_MAP = {
   'applications':      AgentApplicationsAdmin,
   'bid-results':       BidResultsAdmin,
   'accepted-offers':   AcceptedOffersAdmin,
+  'broker-leads':      BrokerLeadsAdmin,
   'video-studio':      VideoStudio,
   'bulk-generator':    VideoBulkGenerator,
   'video-library':     VideoLibrary,
