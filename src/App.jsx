@@ -7,6 +7,7 @@ import { notifyLeadSubmitted } from './services/leadMessaging'
 import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User, Menu } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
+import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import DashboardRouter from './components/DashboardRouter'
 import LeadDetail from './pages/LeadDetail'
@@ -1179,6 +1180,8 @@ export default function App() {
               <Route path="/how-it-works" element={<HowItWorksGuide />} />
               <Route path="/alerts" element={<BuyerAlerts />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/forgot-password" element={<Navigate to="/login?reset=1" replace />} />
               {/* Role-based dashboard routing */}
               <Route path="/dashboard" element={<DashboardRouter />} />
               <Route path="/admin" element={<DashboardRouter />} />

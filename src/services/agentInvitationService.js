@@ -15,7 +15,7 @@ async function callInvite(body) {
         'Content-Type': 'application/json',
         ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
       },
-      body: JSON.stringify({ ...body, redirectTo: `${window.location.origin}/broker-dashboard` })
+      body: JSON.stringify({ ...body, redirectTo: `${window.location.origin}/reset-password` })
     })
     const result = await response.json().catch(() => ({}))
     if (!response.ok || !result.success) {
