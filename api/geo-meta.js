@@ -2,49 +2,25 @@ import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { US_STATES, stateSlug as slugify } from '../src/utils/states.js'
+import {
+  buildDirectorySeo,
+  buildGeoSeo,
+  fetchStateCounts,
+  fetchStateListings,
+  findStateBySlug,
+  jsonLdString
+} from '../src/utils/geoSeo.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const SITE_URL = 'https://www.usahudhomes.com'
-
-const STATES = {
-  al: ['AL', 'Alabama'], ak: ['AK', 'Alaska'], az: ['AZ', 'Arizona'],
-  ar: ['AR', 'Arkansas'], ca: ['CA', 'California'], co: ['CO', 'Colorado'],
-  ct: ['CT', 'Connecticut'], de: ['DE', 'Delaware'], dc: ['DC', 'District of Columbia'],
-  fl: ['FL', 'Florida'],
-  ga: ['GA', 'Georgia'], hi: ['HI', 'Hawaii'], id: ['ID', 'Idaho'],
-  il: ['IL', 'Illinois'], in: ['IN', 'Indiana'], ia: ['IA', 'Iowa'],
-  ks: ['KS', 'Kansas'], ky: ['KY', 'Kentucky'], la: ['LA', 'Louisiana'],
-  me: ['ME', 'Maine'], md: ['MD', 'Maryland'], ma: ['MA', 'Massachusetts'],
-  mi: ['MI', 'Michigan'], mn: ['MN', 'Minnesota'], ms: ['MS', 'Mississippi'],
-  mo: ['MO', 'Missouri'], mt: ['MT', 'Montana'], ne: ['NE', 'Nebraska'],
-  nv: ['NV', 'Nevada'], nh: ['NH', 'New Hampshire'], nj: ['NJ', 'New Jersey'],
-  nm: ['NM', 'New Mexico'], ny: ['NY', 'New York'], nc: ['NC', 'North Carolina'],
-  nd: ['ND', 'North Dakota'], oh: ['OH', 'Ohio'], ok: ['OK', 'Oklahoma'],
-  or: ['OR', 'Oregon'], pa: ['PA', 'Pennsylvania'], ri: ['RI', 'Rhode Island'],
-  sc: ['SC', 'South Carolina'], sd: ['SD', 'South Dakota'], tn: ['TN', 'Tennessee'],
-  tx: ['TX', 'Texas'], ut: ['UT', 'Utah'], vt: ['VT', 'Vermont'],
-  va: ['VA', 'Virginia'], wa: ['WA', 'Washington'], wv: ['WV', 'West Virginia'],
-  wi: ['WI', 'Wisconsin'], wy: ['WY', 'Wyoming']
-}
-
-const STATE_SLUGS = Object.fromEntries(
-  Object.values(STATES).map(([code, name]) => [slugify(name), [code, name]])
-)
 
 const CRAWLERS = [
   'Googlebot', 'bingbot', 'DuckDuckBot', 'Applebot', 'Baiduspider', 'YandexBot',
   'facebookexternalhit', 'Facebot', 'Twitterbot', 'LinkedInBot', 'WhatsApp',
-  'Slackbot', 'TelegramBot', 'Discordbot'
+  'Slackbot', 'TelegramBot', 'Discordbot', 'Pinterest', 'redditbot', 'Embedly',
+  'SkypeUriPreview', 'iMessage'
 ]
-
-function slugify(value = '') {
-  return String(value)
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-}
 
 function escapeHtml(value = '') {
   return String(value)
@@ -56,7 +32,8 @@ function escapeHtml(value = '') {
 }
 
 function isCrawler(userAgent = '') {
-  return CRAWLERS.some(crawler => userAgent.includes(crawler))
+  const ua = userAgent.toLowerCase()
+  return CRAWLERS.some(crawler => ua.includes(crawler.toLowerCase()))
 }
 
 function loadIndex() {
@@ -73,68 +50,123 @@ function stripGenericMetadata(html) {
     .replace(/<meta\s+(?:property|name)="twitter:[^"]*"[^>]*>/gi, '')
 }
 
-async function resolveCity(supabase, stateCode, citySlug) {
-  if (!citySlug) return { cityName: '', cities: [] }
-
-  const { data, error } = await supabase
-    .from('properties')
-    .select('city')
-    .eq('state', stateCode)
-    .eq('is_active', true)
-    .neq('status', 'UNDER CONTRACT')
-    .not('city', 'is', null)
-    .limit(1000)
-
-  if (error) throw error
-  const cities = [...new Set((data || []).map(row => row.city).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b))
-  return {
-    cityName: cities.find(city => slugify(city) === citySlug) || '',
-    cities
-  }
-}
-
-function stateLinks(excludeSlug) {
-  return Object.entries(STATE_SLUGS)
-    .filter(([slug]) => slug !== excludeSlug)
-    .sort(([, [, a]], [, [, b]]) => a.localeCompare(b))
-    .map(([slug, [, name]]) => `
-      <li><a href="/hud-homes/${slug}">HUD homes in ${escapeHtml(name)}</a></li>`)
-    .join('')
-}
-
-function renderStateDirectory(res) {
-  const canonicalUrl = `${SITE_URL}/hud-homes`
-  const title = 'HUD Homes for Sale by State | USAHUDhomes.com'
-  const description = 'Browse HUD homes for sale in all 50 states and Washington, DC. Pick a state to see current HUD-owned listings, prices, and cities, and get help from a HUD-registered broker.'
-
-  const metadata = `
+function headTags({ title, description, canonicalUrl, image, jsonLd, extra = '' }) {
+  return `
     <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeHtml(description)}">
     <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
-    <link rel="canonical" href="${canonicalUrl}">
+    <link rel="canonical" href="${canonicalUrl}">${extra}
     <meta property="og:type" content="website">
+    <meta property="og:site_name" content="USAHUDhomes.com">
+    <meta property="og:locale" content="en_US">
     <meta property="og:url" content="${canonicalUrl}">
     <meta property="og:title" content="${escapeHtml(title)}">
     <meta property="og:description" content="${escapeHtml(description)}">
-    <meta property="og:site_name" content="USAHUDhomes.com">`
+    <meta property="og:image" content="${escapeHtml(image)}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${escapeHtml(title)}">
+    <meta name="twitter:description" content="${escapeHtml(description)}">
+    <meta name="twitter:image" content="${escapeHtml(image)}">
+    <script type="application/ld+json">${jsonLdString(jsonLd)}</script>`
+}
 
-  const staticContent = `
+function sendPage(res, head, body, maxAge) {
+  let html = stripGenericMetadata(loadIndex())
+  html = html.replace('<head>', `<head>\n${head}`)
+  html = html.replace('<div id="root"></div>', `<div id="root">${body}</div>`)
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  res.setHeader('Cache-Control', `public, max-age=0, s-maxage=${maxAge}, stale-while-revalidate=86400`)
+  return res.status(200).send(html)
+}
+
+function stateLinks(counts = {}, excludeCode) {
+  return US_STATES
+    .filter(state => state.code !== excludeCode)
+    .map(state => `
+      <li><a href="/hud-homes/${slugify(state.name)}">HUD homes for sale in ${escapeHtml(state.name)}</a>${counts[state.code] ? ` (${counts[state.code]})` : ''}</li>`)
+    .join('')
+}
+
+function faqHtml(faqs) {
+  return faqs.map(faq => `
+          <h3>${escapeHtml(faq.question)}</h3>
+          <p>${escapeHtml(faq.answer)}</p>`).join('')
+}
+
+function createSupabase() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY
+    || process.env.SUPABASE_ANON_KEY
+    || process.env.VITE_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseKey) throw new Error('Supabase configuration missing')
+  return createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
+}
+
+async function renderDirectory(res, supabase) {
+  const counts = await fetchStateCounts(supabase)
+  const seo = buildDirectorySeo({ counts })
+
+  const body = `
       <main>
         <nav><a href="/">Home</a> / HUD Homes by State</nav>
         <h1>HUD Homes for Sale by State</h1>
-        <p>Choose a state to browse current HUD-owned properties, explore listings by city, and get help preparing and submitting a bid.</p>
-        <ul>${stateLinks()}</ul>
+        <p>${escapeHtml(seo.description)}</p>
+        <ul>${stateLinks(counts)}</ul>
         <p>USAHUDhomes.com is an independent real estate resource and is not a government agency or affiliated with HUD.</p>
       </main>`
 
-  let html = stripGenericMetadata(loadIndex())
-  html = html.replace('<head>', `<head>\n${metadata}`)
-  html = html.replace('<div id="root"></div>', `<div id="root">${staticContent}</div>`)
+  return sendPage(res, headTags(seo), body, 3600)
+}
 
-  res.setHeader('Content-Type', 'text/html; charset=utf-8')
-  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=86400, stale-while-revalidate=86400')
-  return res.status(200).send(html)
+async function renderGeoPage(res, supabase, state, citySlug) {
+  const stateListings = await fetchStateListings(supabase, state.code)
+  const seo = buildGeoSeo({ state, stateListings, citySlug })
+  if (!seo.found) return res.status(404).send('City not found')
+
+  const cityName = seo.city?.name || ''
+  const extra = `
+    <meta name="geo.region" content="US-${state.code}">
+    <meta name="geo.placename" content="${escapeHtml(cityName || state.name)}">`
+
+  const propertyCards = seo.listings.map(property => `
+        <article>
+          <h3><a href="/property/${encodeURIComponent(property.case_number)}">${escapeHtml(property.address)}</a></h3>
+          <p>${escapeHtml(property.city)}, ${escapeHtml(property.state)} ${escapeHtml(property.zip_code || '')}</p>
+          <p>${property.price ? '$' + Number(property.price).toLocaleString('en-US') : 'Price available'} · ${escapeHtml(property.beds ?? 'N/A')} beds · ${escapeHtml(property.baths ?? 'N/A')} baths${property.sq_ft ? ' · ' + Number(property.sq_ft).toLocaleString('en-US') + ' sq. ft.' : ''}</p>
+        </article>`).join('')
+
+  const cityLinks = !citySlug ? seo.cities.map(c => `
+          <li><a href="/hud-homes/${seo.stateSlug}/${c.slug}">HUD homes for sale in ${escapeHtml(c.name)}, ${escapeHtml(state.code)}</a> (${c.count})</li>`).join('') : ''
+
+  const crumbs = seo.breadcrumbs
+    .map((crumb, index) => index === seo.breadcrumbs.length - 1
+      ? escapeHtml(crumb.name)
+      : `<a href="${crumb.url.replace('https://www.usahudhomes.com', '') || '/'}">${escapeHtml(crumb.name)}</a>`)
+    .join(' / ')
+
+  const body = `
+      <main>
+        <nav>${crumbs}</nav>
+        <h1>${escapeHtml(seo.h1)}</h1>
+        <p>${escapeHtml(seo.intro)}</p>
+        <h2>${seo.count} active HUD ${seo.count === 1 ? 'home' : 'homes'} in ${escapeHtml(cityName ? `${cityName}, ${state.name}` : state.name)}</h2>
+        <section>${propertyCards || '<p>No active listings found today. <a href="/alerts">Get free HUD home alerts</a>.</p>'}</section>
+        ${cityLinks ? `<section><h2>Explore HUD homes by city in ${escapeHtml(state.name)}</h2><ul>${cityLinks}</ul></section>` : ''}
+        ${!citySlug ? `<section><h2>HUD homes in other states</h2><ul>${stateLinks({}, state.code)}</ul></section>` : ''}
+        <section>
+          <h2>How buying a HUD home works</h2>
+          <p>HUD homes are generally sold as-is through an electronic bidding process. A HUD-registered real estate broker submits the bid for the buyer. Owner-occupants may receive priority during designated listing periods.</p>
+          <h2>Prepare before bidding</h2>
+          <p>Arrange financing or proof of funds, review the property financing designation, understand earnest-money requirements, and plan for inspections and utility activation after an accepted bid.</p>
+        </section>
+        <section>
+          <h2>Questions about HUD homes in ${escapeHtml(cityName ? `${cityName}, ${state.name}` : state.name)}</h2>${faqHtml(seo.faqs)}
+        </section>
+        <p>USAHUDhomes.com is an independent real estate resource and is not a government agency or affiliated with HUD.</p>
+      </main>`
+
+  return sendPage(res, headTags({ ...seo, extra }), body, 900)
 }
 
 export default async function handler(req, res) {
@@ -145,121 +177,14 @@ export default async function handler(req, res) {
     return res.status(200).send(loadIndex())
   }
 
-  if (!stateSlug) return renderStateDirectory(res)
-
-  const stateInfo = STATE_SLUGS[stateSlug]
-  if (!stateInfo) return res.status(404).send('State not found')
+  const state = stateSlug ? findStateBySlug(stateSlug) : null
+  if (stateSlug && !state) return res.status(404).send('State not found')
 
   try {
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_KEY
-      || process.env.SUPABASE_ANON_KEY
-      || process.env.VITE_SUPABASE_ANON_KEY
-    if (!supabaseUrl || !supabaseKey) throw new Error('Supabase configuration missing')
-
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      auth: { persistSession: false }
-    })
-    const [stateCode, stateName] = stateInfo
-    const cityResolution = await resolveCity(supabase, stateCode, citySlug)
-    if (citySlug && !cityResolution.cityName) {
-      return res.status(404).send('City not found')
-    }
-
-    let query = supabase
-      .from('properties')
-      .select('case_number, address, city, state, zip_code, price, beds, baths, sq_ft, main_image, updated_at')
-      .eq('state', stateCode)
-      .eq('is_active', true)
-      .neq('status', 'UNDER CONTRACT')
-      .order('updated_at', { ascending: false })
-      .limit(60)
-
-    if (cityResolution.cityName) query = query.eq('city', cityResolution.cityName)
-    const { data: properties, error } = await query
-    if (error) throw error
-
-    let cities = cityResolution.cities
-    if (!citySlug) {
-      const cityResult = await resolveCity(supabase, stateCode, '__all__')
-      cities = cityResult.cities
-    }
-
-    const location = cityResolution.cityName || stateName
-    const canonicalPath = citySlug
-      ? `/hud-homes/${stateSlug}/${citySlug}`
-      : `/hud-homes/${stateSlug}`
-    const canonicalUrl = `${SITE_URL}${canonicalPath}`
-    const title = `HUD Homes for Sale in ${location} | USAHUDhomes.com`
-    const description = `Search ${properties?.length || 0} active HUD homes for sale in ${location}. Review prices and property details, and request help from a HUD-registered real estate broker.`
-
-    const itemList = (properties || []).map((property, index) => ({
-      '@type': 'ListItem',
-      position: index + 1,
-      url: `${SITE_URL}/property/${property.case_number}`,
-      name: `${property.address}, ${property.city}, ${property.state}`
-    }))
-
-    const structuredData = JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'CollectionPage',
-      name: title,
-      url: canonicalUrl,
-      description,
-      mainEntity: {
-        '@type': 'ItemList',
-        numberOfItems: itemList.length,
-        itemListElement: itemList
-      }
-    }).replace(/</g, '\\u003c')
-
-    const metadata = `
-    <title>${escapeHtml(title)}</title>
-    <meta name="description" content="${escapeHtml(description)}">
-    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
-    <link rel="canonical" href="${canonicalUrl}">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="${canonicalUrl}">
-    <meta property="og:title" content="${escapeHtml(title)}">
-    <meta property="og:description" content="${escapeHtml(description)}">
-    <meta property="og:site_name" content="USAHUDhomes.com">
-    <script type="application/ld+json">${structuredData}</script>`
-
-    const propertyCards = (properties || []).map(property => `
-      <article>
-        <h2><a href="/property/${encodeURIComponent(property.case_number)}">${escapeHtml(property.address)}</a></h2>
-        <p>${escapeHtml(property.city)}, ${escapeHtml(property.state)} ${escapeHtml(property.zip_code || '')}</p>
-        <p>${property.price ? '$' + Number(property.price).toLocaleString() : 'Price available'} · ${escapeHtml(property.beds ?? 'N/A')} beds · ${escapeHtml(property.baths ?? 'N/A')} baths${property.sq_ft ? ' · ' + Number(property.sq_ft).toLocaleString() + ' sq. ft.' : ''}</p>
-      </article>`).join('')
-
-    const cityLinks = !citySlug ? cities.map(city => `
-      <li><a href="/hud-homes/${stateSlug}/${slugify(city)}">HUD homes in ${escapeHtml(city)}, ${escapeHtml(stateName)}</a></li>`).join('') : ''
-
-    const staticContent = `
-      <main>
-        <nav><a href="/">Home</a> / <a href="/hud-homes">States</a> / ${citySlug ? `<a href="/hud-homes/${stateSlug}">${escapeHtml(stateName)}</a> / ${escapeHtml(location)}` : escapeHtml(stateName)}</nav>
-        <h1>HUD Homes for Sale in ${escapeHtml(location)}</h1>
-        <p>Browse current HUD-owned properties and get help understanding financing, inspections, bidding deadlines, and closing.</p>
-        <p>${properties?.length || 0} active HUD ${properties?.length === 1 ? 'home' : 'homes'} found.</p>
-        <section>${propertyCards || '<p>No active listings found today. Inventory changes regularly.</p>'}</section>
-        ${cityLinks ? `<section><h2>Explore HUD homes by city in ${escapeHtml(stateName)}</h2><ul>${cityLinks}</ul></section>` : ''}
-        ${!citySlug ? `<section><h2>HUD homes in other states</h2><ul>${stateLinks(stateSlug)}</ul></section>` : ''}
-        <section>
-          <h2>How buying a HUD home works</h2>
-          <p>HUD homes are generally sold as-is through an electronic bidding process. A HUD-registered real estate broker submits the bid for the buyer. Owner-occupants may receive priority during designated listing periods.</p>
-          <h2>Prepare before bidding</h2>
-          <p>Arrange financing or proof of funds, review the property financing designation, understand earnest-money requirements, and plan for inspections and utility activation after an accepted bid.</p>
-        </section>
-        <p>USAHUDhomes.com is an independent real estate resource and is not a government agency or affiliated with HUD.</p>
-      </main>`
-
-    let html = stripGenericMetadata(loadIndex())
-    html = html.replace('<head>', `<head>\n${metadata}`)
-    html = html.replace('<div id="root"></div>', `<div id="root">${staticContent}</div>`)
-
-    res.setHeader('Content-Type', 'text/html; charset=utf-8')
-    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=900, stale-while-revalidate=86400')
-    return res.status(200).send(html)
+    const supabase = createSupabase()
+    return state
+      ? await renderGeoPage(res, supabase, state, citySlug)
+      : await renderDirectory(res, supabase)
   } catch (error) {
     console.error('[geo-meta] Failed:', error)
     return res.status(500).send('Unable to load HUD homes')

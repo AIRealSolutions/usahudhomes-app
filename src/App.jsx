@@ -28,6 +28,7 @@ import FullAdminDashboard from './components/AdminShell'
 import BrokerShell from './components/BrokerShell'
 import HudHomesLanding from './pages/HudHomesLanding'
 import HudHomesStates from './pages/HudHomesStates'
+import DefaultSEO from './components/DefaultSEO'
 import HowItWorksGuide from './pages/HowItWorks'
 import BuyerAlerts from './pages/BuyerAlerts'
 import SearchHeroSection from './components/SearchHeroSection'
@@ -492,17 +493,17 @@ function HomePage() {
   return (
     <div>
       <Helmet>
-        <title>USAHUDhomes.com - Find HUD Homes & Government Foreclosures</title>
+        <title>HUD Homes for Sale in All 50 States | USAHUDhomes.com</title>
         <meta name="description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.usahudhomes.com/" />
-        <meta property="og:title" content="USAHUDhomes.com - Find HUD Homes & Government Foreclosures" />
+        <meta property="og:title" content="HUD Homes for Sale in All 50 States | USAHUDhomes.com" />
         <meta property="og:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
         <meta property="og:image" content="https://www.usahudhomes.com/main-marketing-optimized.png" />
-        <meta property="twitter:card" content="summary_large_image" />
-        <meta property="twitter:title" content="USAHUDhomes.com - Find HUD Homes & Government Foreclosures" />
-        <meta property="twitter:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
-        <meta property="twitter:image" content="https://www.usahudhomes.com/main-marketing-optimized.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="HUD Homes for Sale in All 50 States | USAHUDhomes.com" />
+        <meta name="twitter:description" content="Helping people bid on HUD homes for 25 years. Find $100 down FHA loans, closing cost assistance, and repair escrows on HUD properties." />
+        <meta name="twitter:image" content="https://www.usahudhomes.com/main-marketing-optimized.png" />
       </Helmet>
 
       {/* NEW: Phase 2 Homepage Design */}
@@ -972,11 +973,11 @@ function PropertyDetailPage() {
         <meta property="fb:app_id" content="1993076721256699" />
 
         {/* Twitter */}
-        <meta property="twitter:card" content="summary_large_image" />
-        <meta property="twitter:url" content={propertyUrl} />
-        <meta property="twitter:title" content={propertyTitle} />
-        <meta property="twitter:description" content={propertyDescription} />
-        <meta property="twitter:image" content={propertyImage} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:url" content={propertyUrl} />
+        <meta name="twitter:title" content={propertyTitle} />
+        <meta name="twitter:description" content={propertyDescription} />
+        <meta name="twitter:image" content={propertyImage} />
       </Helmet>
       {/* Breadcrumb */}
       <div className="mb-6 text-sm text-gray-600">
@@ -1249,6 +1250,7 @@ export default function App() {
       <AuthProvider>
       <SavedHomesProvider>
         <Router>
+        <DefaultSEO />
         <div className="min-h-screen flex flex-col">
           <Header />
           <main className="flex-1">

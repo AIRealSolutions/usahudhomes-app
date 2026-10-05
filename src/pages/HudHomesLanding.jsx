@@ -3,17 +3,8 @@ import { Helmet } from 'react-helmet-async'
 import { Link, useParams } from 'react-router-dom'
 import { Home, MapPin, Phone } from 'lucide-react'
 import { supabase } from '../config/supabase'
-import { US_STATES } from '../utils/states'
-
-const SITE_URL = 'https://www.usahudhomes.com'
-
-function slugify(value = '') {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-}
+import { US_STATES, stateSlug as toSlug } from '../utils/states'
+import { buildGeoSeo, fetchStateListings, findStateBySlug, jsonLdString } from '../utils/geoSeo'
 
 function PropertyCard({ property }) {
   return (
@@ -22,7 +13,7 @@ function PropertyCard({ property }) {
         {property.main_image ? (
           <img
             src={property.main_image}
-            alt={`HUD home at ${property.address} in ${property.city}, ${property.state}`}
+            alt={`HUD home for sale in ${property.city}, ${property.state}`}
             className="h-full w-full object-cover"
             loading="lazy"
           />
@@ -33,7 +24,7 @@ function PropertyCard({ property }) {
         )}
       </div>
       <div className="p-5">
-        <h2 className="text-lg font-bold text-gray-900">{property.address}</h2>
+        <h3 className="text-lg font-bold text-gray-900">{property.address}</h3>
         <p className="mt-1 flex items-center text-sm text-gray-600">
           <MapPin className="mr-1 h-4 w-4" aria-hidden="true" />
           {property.city}, {property.state} {property.zip_code}
@@ -58,116 +49,81 @@ function PropertyCard({ property }) {
 
 export default function HudHomesLanding() {
   const { stateSlug, citySlug } = useParams()
-  const stateInfo = useMemo(
-    () => US_STATES.find(state => slugify(state.name) === stateSlug),
-    [stateSlug]
-  )
-  const [properties, setProperties] = useState([])
-  const [cities, setCities] = useState([])
-  const [cityName, setCityName] = useState('')
+  const stateInfo = useMemo(() => findStateBySlug(stateSlug), [stateSlug])
+  const [stateListings, setStateListings] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
-
-    async function loadLandingPage() {
-      if (!stateInfo) {
-        setLoading(false)
-        return
-      }
-
-      setLoading(true)
-      try {
-        const { data: cityRows, error: cityError } = await supabase
-          .from('properties')
-          .select('city')
-          .eq('state', stateInfo.code)
-          .eq('is_active', true)
-          .neq('status', 'UNDER CONTRACT')
-          .not('city', 'is', null)
-          .limit(1000)
-
-        if (cityError) throw cityError
-        const uniqueCities = [...new Set((cityRows || []).map(row => row.city).filter(Boolean))]
-          .sort((a, b) => a.localeCompare(b))
-        const resolvedCity = citySlug
-          ? uniqueCities.find(city => slugify(city) === citySlug) || ''
-          : ''
-
-        let query = supabase
-          .from('properties')
-          .select('id, case_number, address, city, state, zip_code, price, beds, baths, sq_ft, main_image, status, updated_at')
-          .eq('state', stateInfo.code)
-          .eq('is_active', true)
-          .neq('status', 'UNDER CONTRACT')
-          .order('updated_at', { ascending: false })
-          .limit(60)
-
-        if (citySlug) {
-          if (!resolvedCity) {
-            if (!cancelled) {
-              setCities(uniqueCities)
-              setCityName('')
-              setProperties([])
-            }
-            return
-          }
-          query = query.eq('city', resolvedCity)
-        }
-
-        const { data, error } = await query
-        if (error) throw error
-
-        if (!cancelled) {
-          setCities(uniqueCities)
-          setCityName(resolvedCity)
-          setProperties(data || [])
-        }
-      } catch (error) {
-        console.error('Unable to load geographic HUD listings:', error)
-        if (!cancelled) setProperties([])
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
+    if (!stateInfo) {
+      setLoading(false)
+      return
     }
 
-    loadLandingPage()
+    setLoading(true)
+    fetchStateListings(supabase, stateInfo.code)
+      .then(rows => { if (!cancelled) setStateListings(rows) })
+      .catch(error => {
+        console.error('Unable to load geographic HUD listings:', error)
+        if (!cancelled) setStateListings([])
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+
     return () => {
       cancelled = true
     }
-  }, [stateInfo, citySlug])
+  }, [stateInfo])
+
+  const seo = useMemo(
+    () => stateInfo && buildGeoSeo({ state: stateInfo, stateListings, citySlug }),
+    [stateInfo, stateListings, citySlug]
+  )
 
   if (!stateInfo) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16">
+        <Helmet>
+          <title>State not found | USAHUDhomes.com</title>
+          <meta name="robots" content="noindex, follow" />
+        </Helmet>
         <h1 className="text-3xl font-bold">State not found</h1>
-        <p className="mt-4 text-gray-600">Choose a state from the HUD home search.</p>
-        <Link to="/search" className="mt-6 inline-block text-blue-700 hover:underline">
-          Search all HUD homes
+        <p className="mt-4 text-gray-600">Choose a state to browse HUD homes.</p>
+        <Link to="/hud-homes" className="mt-6 inline-block text-blue-700 hover:underline">
+          Browse HUD homes by state
         </Link>
       </div>
     )
   }
 
-  const locationName = cityName || stateInfo.name
-  const canonicalPath = citySlug
-    ? `/hud-homes/${stateSlug}/${citySlug}`
-    : `/hud-homes/${stateSlug}`
-  const canonicalUrl = `${SITE_URL}${canonicalPath}`
-  const title = `HUD Homes for Sale in ${locationName} | USAHUDhomes.com`
-  const description = `Search active HUD homes for sale in ${locationName}. Review prices, property details, owner-occupant opportunities, and request help from a HUD-registered real estate broker.`
+  const { listings: properties, cities, city, faqs } = seo
+  const cityName = city?.name || ''
+  const cityMissing = !loading && !seo.found
+  const locationName = cityName ? `${cityName}, ${stateInfo.name}` : stateInfo.name
 
   return (
     <div className="bg-gray-50">
       <Helmet>
-        <title>{title}</title>
-        <meta name="description" content={description} />
-        <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
-        <link rel="canonical" href={canonicalUrl} />
+        <title>{seo.title}</title>
+        <meta name="description" content={seo.description} />
+        <meta
+          name="robots"
+          content={cityMissing ? 'noindex, follow' : 'index, follow, max-image-preview:large, max-snippet:-1'}
+        />
+        <link rel="canonical" href={seo.canonicalUrl} />
+        <meta name="geo.region" content={`US-${stateInfo.code}`} />
+        <meta name="geo.placename" content={cityName || stateInfo.name} />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content={canonicalUrl} />
-        <meta property="og:title" content={title} />
-        <meta property="og:description" content={description} />
+        <meta property="og:site_name" content="USAHUDhomes.com" />
+        <meta property="og:locale" content="en_US" />
+        <meta property="og:url" content={seo.canonicalUrl} />
+        <meta property="og:title" content={seo.title} />
+        <meta property="og:description" content={seo.description} />
+        <meta property="og:image" content={seo.image} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={seo.title} />
+        <meta name="twitter:description" content={seo.description} />
+        <meta name="twitter:image" content={seo.image} />
+        {!loading && <script type="application/ld+json">{jsonLdString(seo.jsonLd)}</script>}
       </Helmet>
 
       <section className="bg-gradient-to-br from-blue-800 to-blue-600 text-white">
@@ -190,11 +146,12 @@ export default function HudHomesLanding() {
             )}
           </nav>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            HUD Homes for Sale in {locationName}
+            {seo.h1}
           </h1>
           <p className="mt-5 max-w-3xl text-lg text-blue-100">
-            Browse current HUD-owned properties and get help understanding eligibility,
-            financing, inspections, bidding deadlines, and the closing process.
+            {loading
+              ? 'Browse current HUD-owned properties and get help with financing, inspections, bidding deadlines, and closing.'
+              : seo.intro}
           </p>
         </div>
       </section>
@@ -203,7 +160,9 @@ export default function HudHomesLanding() {
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
-              {loading ? 'Loading current listings…' : `${properties.length} active HUD ${properties.length === 1 ? 'home' : 'homes'}`}
+              {loading
+                ? 'Loading current listings…'
+                : `${seo.count} active HUD ${seo.count === 1 ? 'home' : 'homes'} in ${locationName}`}
             </h2>
             <p className="mt-2 text-gray-600">Inventory and bidding periods can change quickly.</p>
           </div>
@@ -220,11 +179,17 @@ export default function HudHomesLanding() {
           <section className="rounded-xl border border-gray-200 bg-white p-8 text-center">
             <h2 className="text-xl font-bold">No active listings found today</h2>
             <p className="mt-2 text-gray-600">
-              HUD inventory changes regularly. Search nearby areas or contact us about new listings.
+              HUD inventory changes regularly. Get an email when new HUD homes are listed here,
+              or search nearby areas.
             </p>
-            <Link to="/search" className="mt-5 inline-block font-semibold text-blue-700 hover:underline">
-              Search all properties
-            </Link>
+            <div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row sm:gap-6">
+              <Link to="/alerts" className="font-semibold text-blue-700 hover:underline">
+                Get free HUD home alerts
+              </Link>
+              <Link to="/search" className="font-semibold text-blue-700 hover:underline">
+                Search all properties
+              </Link>
+            </div>
           </section>
         ) : (
           <section className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" aria-label="HUD listings">
@@ -240,13 +205,13 @@ export default function HudHomesLanding() {
               Explore HUD homes by city in {stateInfo.name}
             </h2>
             <div className="mt-5 flex flex-wrap gap-3">
-              {cities.map(city => (
+              {cities.map(c => (
                 <Link
-                  key={city}
-                  to={`/hud-homes/${stateSlug}/${slugify(city)}`}
+                  key={c.slug}
+                  to={`/hud-homes/${stateSlug}/${c.slug}`}
                   className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 font-medium text-blue-800 hover:bg-blue-100"
                 >
-                  {city}
+                  {c.name} ({c.count})
                 </Link>
               ))}
             </div>
@@ -260,7 +225,7 @@ export default function HudHomesLanding() {
               {US_STATES.filter(state => state.code !== stateInfo.code).map(state => (
                 <Link
                   key={state.code}
-                  to={`/hud-homes/${slugify(state.name)}`}
+                  to={`/hud-homes/${toSlug(state.name)}`}
                   className="rounded-full border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-800"
                 >
                   {state.name}
@@ -286,6 +251,20 @@ export default function HudHomesLanding() {
               designation, understand earnest-money requirements, and plan for inspections and
               utility activation after an accepted bid.
             </p>
+          </div>
+        </section>
+
+        <section className="mt-14">
+          <h2 className="text-2xl font-bold text-gray-900">
+            Questions about HUD homes in {locationName}
+          </h2>
+          <div className="mt-5 space-y-3">
+            {faqs.map(faq => (
+              <details key={faq.question} className="rounded-lg border border-gray-200 bg-white p-5">
+                <summary className="cursor-pointer font-semibold text-gray-900">{faq.question}</summary>
+                <p className="mt-3 leading-7 text-gray-700">{faq.answer}</p>
+              </details>
+            ))}
           </div>
         </section>
 

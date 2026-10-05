@@ -4,38 +4,14 @@ import { Link } from 'react-router-dom'
 import { MapPin, Phone } from 'lucide-react'
 import { supabase } from '../config/supabase'
 import { US_STATES, stateSlug } from '../utils/states'
-
-const SITE_URL = 'https://www.usahudhomes.com'
-const HOME_STATE = 'NC'
-
-async function fetchStateCounts() {
-  const pageSize = 1000
-  const counts = {}
-
-  for (let start = 0; ; start += pageSize) {
-    const { data, error } = await supabase
-      .from('properties')
-      .select('state')
-      .eq('is_active', true)
-      .neq('status', 'UNDER CONTRACT')
-      .range(start, start + pageSize - 1)
-
-    if (error) throw error
-    for (const row of data || []) {
-      if (row.state) counts[row.state] = (counts[row.state] || 0) + 1
-    }
-    if (!data || data.length < pageSize) break
-  }
-
-  return counts
-}
+import { buildDirectorySeo, fetchStateCounts, HOME_STATE, jsonLdString } from '../utils/geoSeo'
 
 export default function HudHomesStates() {
   const [counts, setCounts] = useState(null)
 
   useEffect(() => {
     let cancelled = false
-    fetchStateCounts()
+    fetchStateCounts(supabase)
       .then(result => { if (!cancelled) setCounts(result) })
       .catch(error => {
         console.error('Unable to load HUD home counts by state:', error)
@@ -47,21 +23,27 @@ export default function HudHomesStates() {
   }, [])
 
   const homeState = US_STATES.find(state => state.code === HOME_STATE)
-  const canonicalUrl = `${SITE_URL}/hud-homes`
-  const title = 'HUD Homes for Sale by State | USAHUDhomes.com'
-  const description = 'Browse HUD homes for sale in all 50 states and Washington, DC. Pick a state to see current HUD-owned listings, prices, and cities, and get help from a HUD-registered broker.'
+  const seo = buildDirectorySeo({ counts: counts || {} })
 
   return (
     <div className="bg-gray-50">
       <Helmet>
-        <title>{title}</title>
-        <meta name="description" content={description} />
+        <title>{seo.title}</title>
+        <meta name="description" content={seo.description} />
         <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
-        <link rel="canonical" href={canonicalUrl} />
+        <link rel="canonical" href={seo.canonicalUrl} />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content={canonicalUrl} />
-        <meta property="og:title" content={title} />
-        <meta property="og:description" content={description} />
+        <meta property="og:site_name" content="USAHUDhomes.com" />
+        <meta property="og:locale" content="en_US" />
+        <meta property="og:url" content={seo.canonicalUrl} />
+        <meta property="og:title" content={seo.title} />
+        <meta property="og:description" content={seo.description} />
+        <meta property="og:image" content={seo.image} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={seo.title} />
+        <meta name="twitter:description" content={seo.description} />
+        <meta name="twitter:image" content={seo.image} />
+        <script type="application/ld+json">{jsonLdString(seo.jsonLd)}</script>
       </Helmet>
 
       <section className="bg-gradient-to-br from-blue-800 to-blue-600 text-white">

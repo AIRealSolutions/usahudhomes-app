@@ -68,6 +68,9 @@ function stripGenericMetaTags(html) {
   html = html.replace(/<meta\s+(?:property|name)="twitter:[^"]*"[^>]*>/gi, '');
   // Remove generic description meta tag (we'll inject the property-specific one)
   html = html.replace(/<meta\s+name="description"[^>]*>/gi, '');
+  // Remove the homepage canonical and robots tags (property-specific ones are injected)
+  html = html.replace(/<link\s+rel="canonical"[^>]*>/gi, '');
+  html = html.replace(/<meta\s+name="robots"[^>]*>/gi, '');
   // Remove fb:app_id (we'll re-add it in the injected block)
   html = html.replace(/<meta\s+property="fb:app_id"[^>]*>/gi, '');
   return html;
