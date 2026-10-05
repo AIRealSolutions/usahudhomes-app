@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 const SITE_URL = 'https://www.usahudhomes.com'
 const STATE_NAMES = {
   AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
-  CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', FL: 'Florida', GA: 'Georgia',
+  CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', DC: 'District of Columbia', FL: 'Florida', GA: 'Georgia',
   HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa',
   KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland',
   MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi',
@@ -18,6 +18,7 @@ const STATE_NAMES = {
 const STATIC_ROUTES = [
   { path: '/', priority: '1.0', changefreq: 'daily' },
   { path: '/search', priority: '0.9', changefreq: 'daily' },
+  { path: '/hud-homes', priority: '0.9', changefreq: 'daily' },
   { path: '/how-it-works', priority: '0.8', changefreq: 'monthly' },
   { path: '/alerts', priority: '0.8', changefreq: 'monthly' },
   { path: '/deals', priority: '0.7', changefreq: 'weekly' },
@@ -109,14 +110,17 @@ export default async function handler(req, res) {
     <priority>0.8</priority>
   </url>`).join('')
 
-    const geoPages = new Map()
+    // Every state page is listed, even when it has no active listings today
+    const geoPages = new Map(
+      Object.values(STATE_NAMES).map(stateName => [`/hud-homes/${slugify(stateName)}`, today])
+    )
     for (const property of properties) {
       const stateName = STATE_NAMES[property.state]
       if (!stateName) continue
 
       const statePath = `/hud-homes/${slugify(stateName)}`
       const updated = formatDate(property.updated_at)
-      if (!geoPages.has(statePath) || updated > geoPages.get(statePath)) {
+      if (updated > geoPages.get(statePath)) {
         geoPages.set(statePath, updated)
       }
 

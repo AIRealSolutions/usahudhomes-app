@@ -382,6 +382,12 @@ export default function HowItWorks() {
                 North Carolina HUD Homes
               </Link>
               <Link
+                to="/hud-homes"
+                className="rounded-lg border border-blue-700 bg-white px-6 py-3 font-bold text-blue-700 hover:bg-blue-50"
+              >
+                HUD Homes by State
+              </Link>
+              <Link
                 to="/contact"
                 className="rounded-lg bg-orange-500 px-6 py-3 font-bold text-white hover:bg-orange-600"
               >

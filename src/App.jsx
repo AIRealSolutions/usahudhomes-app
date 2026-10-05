@@ -27,6 +27,7 @@ import SuccessfulDeals from './components/SuccessfulDeals'
 import FullAdminDashboard from './components/AdminShell'
 import BrokerShell from './components/BrokerShell'
 import HudHomesLanding from './pages/HudHomesLanding'
+import HudHomesStates from './pages/HudHomesStates'
 import HowItWorksGuide from './pages/HowItWorks'
 import BuyerAlerts from './pages/BuyerAlerts'
 import SearchHeroSection from './components/SearchHeroSection'
@@ -106,11 +107,12 @@ function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex space-x-8 items-center">
+          <nav className="hidden md:flex space-x-6 items-center">
             {!user && (
               <>
                 <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Home</Link>
                 <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Properties</Link>
+                <Link to="/hud-homes" className="text-gray-700 hover:text-blue-600 font-medium">By State</Link>
                 <Link to="/how-it-works" className="text-gray-700 hover:text-blue-600 font-medium">How It Works</Link>
                 <Link to="/alerts" className="text-gray-700 hover:text-blue-600 font-medium">Home Alerts</Link>
                 <Link to="/deals" className="text-gray-700 hover:text-blue-600 font-medium">Successful Deals</Link>
@@ -174,6 +176,13 @@ function Header() {
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Search Properties
+                  </Link>
+                  <Link
+                    to="/hud-homes"
+                    className="text-gray-700 hover:text-blue-600 font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    HUD Homes by State
                   </Link>
                   <Link
                     to="/how-it-works"
@@ -294,6 +303,12 @@ function Footer() {
               className="mt-3 inline-block text-blue-300 hover:text-white"
             >
               North Carolina HUD Homes
+            </Link>
+            <Link
+              to="/hud-homes"
+              className="mt-2 block text-blue-300 hover:text-white"
+            >
+              HUD Homes by State
             </Link>
           </div>
         </div>
@@ -1252,6 +1267,7 @@ export default function App() {
               <Route path="/profile" element={<ProtectedRoute><DashboardLayout><Profile /></DashboardLayout></ProtectedRoute>} />
               <Route path="/lead/:id" element={<LeadDetail />} />
               <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />
+              <Route path="/hud-homes" element={<HudHomesStates />} />
               <Route path="/hud-homes/:stateSlug" element={<HudHomesLanding />} />
               <Route path="/hud-homes/:stateSlug/:citySlug" element={<HudHomesLanding />} />
               <Route path="/contact" element={<ContactForm />} />

@@ -10,7 +10,8 @@ const SITE_URL = 'https://www.usahudhomes.com'
 const STATES = {
   al: ['AL', 'Alabama'], ak: ['AK', 'Alaska'], az: ['AZ', 'Arizona'],
   ar: ['AR', 'Arkansas'], ca: ['CA', 'California'], co: ['CO', 'Colorado'],
-  ct: ['CT', 'Connecticut'], de: ['DE', 'Delaware'], fl: ['FL', 'Florida'],
+  ct: ['CT', 'Connecticut'], de: ['DE', 'Delaware'], dc: ['DC', 'District of Columbia'],
+  fl: ['FL', 'Florida'],
   ga: ['GA', 'Georgia'], hi: ['HI', 'Hawaii'], id: ['ID', 'Idaho'],
   il: ['IL', 'Illinois'], in: ['IN', 'Indiana'], ia: ['IA', 'Iowa'],
   ks: ['KS', 'Kansas'], ky: ['KY', 'Kentucky'], la: ['LA', 'Louisiana'],
@@ -93,15 +94,61 @@ async function resolveCity(supabase, stateCode, citySlug) {
   }
 }
 
+function stateLinks(excludeSlug) {
+  return Object.entries(STATE_SLUGS)
+    .filter(([slug]) => slug !== excludeSlug)
+    .sort(([, [, a]], [, [, b]]) => a.localeCompare(b))
+    .map(([slug, [, name]]) => `
+      <li><a href="/hud-homes/${slug}">HUD homes in ${escapeHtml(name)}</a></li>`)
+    .join('')
+}
+
+function renderStateDirectory(res) {
+  const canonicalUrl = `${SITE_URL}/hud-homes`
+  const title = 'HUD Homes for Sale by State | USAHUDhomes.com'
+  const description = 'Browse HUD homes for sale in all 50 states and Washington, DC. Pick a state to see current HUD-owned listings, prices, and cities, and get help from a HUD-registered broker.'
+
+  const metadata = `
+    <title>${escapeHtml(title)}</title>
+    <meta name="description" content="${escapeHtml(description)}">
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+    <link rel="canonical" href="${canonicalUrl}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="${canonicalUrl}">
+    <meta property="og:title" content="${escapeHtml(title)}">
+    <meta property="og:description" content="${escapeHtml(description)}">
+    <meta property="og:site_name" content="USAHUDhomes.com">`
+
+  const staticContent = `
+      <main>
+        <nav><a href="/">Home</a> / HUD Homes by State</nav>
+        <h1>HUD Homes for Sale by State</h1>
+        <p>Choose a state to browse current HUD-owned properties, explore listings by city, and get help preparing and submitting a bid.</p>
+        <ul>${stateLinks()}</ul>
+        <p>USAHUDhomes.com is an independent real estate resource and is not a government agency or affiliated with HUD.</p>
+      </main>`
+
+  let html = stripGenericMetadata(loadIndex())
+  html = html.replace('<head>', `<head>\n${metadata}`)
+  html = html.replace('<div id="root"></div>', `<div id="root">${staticContent}</div>`)
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=86400, stale-while-revalidate=86400')
+  return res.status(200).send(html)
+}
+
 export default async function handler(req, res) {
   const { stateSlug, citySlug } = req.query
-  const stateInfo = STATE_SLUGS[stateSlug]
-  if (!stateInfo) return res.status(404).send('State not found')
 
   if (!isCrawler(req.headers['user-agent'] || '')) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
     return res.status(200).send(loadIndex())
   }
+
+  if (!stateSlug) return renderStateDirectory(res)
+
+  const stateInfo = STATE_SLUGS[stateSlug]
+  if (!stateInfo) return res.status(404).send('State not found')
 
   try {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
@@ -190,12 +237,13 @@ export default async function handler(req, res) {
 
     const staticContent = `
       <main>
-        <nav><a href="/">Home</a> / ${citySlug ? `<a href="/hud-homes/${stateSlug}">${escapeHtml(stateName)}</a> / ${escapeHtml(location)}` : escapeHtml(stateName)}</nav>
+        <nav><a href="/">Home</a> / <a href="/hud-homes">States</a> / ${citySlug ? `<a href="/hud-homes/${stateSlug}">${escapeHtml(stateName)}</a> / ${escapeHtml(location)}` : escapeHtml(stateName)}</nav>
         <h1>HUD Homes for Sale in ${escapeHtml(location)}</h1>
         <p>Browse current HUD-owned properties and get help understanding financing, inspections, bidding deadlines, and closing.</p>
         <p>${properties?.length || 0} active HUD ${properties?.length === 1 ? 'home' : 'homes'} found.</p>
         <section>${propertyCards || '<p>No active listings found today. Inventory changes regularly.</p>'}</section>
         ${cityLinks ? `<section><h2>Explore HUD homes by city in ${escapeHtml(stateName)}</h2><ul>${cityLinks}</ul></section>` : ''}
+        ${!citySlug ? `<section><h2>HUD homes in other states</h2><ul>${stateLinks(stateSlug)}</ul></section>` : ''}
         <section>
           <h2>How buying a HUD home works</h2>
           <p>HUD homes are generally sold as-is through an electronic bidding process. A HUD-registered real estate broker submits the bid for the buyer. Owner-occupants may receive priority during designated listing periods.</p>
