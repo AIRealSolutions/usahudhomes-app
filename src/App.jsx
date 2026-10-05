@@ -509,6 +509,22 @@ function HomePage() {
       {/* NEW: Phase 2 Homepage Design */}
       <SearchHeroSection />
 
+      {/* Welcome Video Section */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-16">
+        <h2 className="text-3xl font-bold mb-2 text-center">Welcome to USAhudHomes.com</h2>
+        <p className="text-gray-600 text-center mb-8">See how we help you find and bid on HUD homes.</p>
+        <video
+          className="w-full rounded-xl shadow-lg bg-black aspect-video"
+          src="/videos/usahudhomes-welcome.mp4"
+          poster="/videos/usahudhomes-welcome-poster.jpg"
+          controls
+          playsInline
+          preload="metadata"
+        >
+          Your browser does not support the video tag.
+        </video>
+      </div>
+
       {/* Recently Added Properties Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <h2 className="text-3xl font-bold mb-8">Recently Added HUD Homes</h2>
