@@ -175,6 +175,8 @@ export default function HudHomesLanding() {
           <nav className="mb-5 text-sm text-blue-100" aria-label="Breadcrumb">
             <Link to="/" className="hover:text-white">Home</Link>
             <span className="mx-2">/</span>
+            <Link to="/hud-homes" className="hover:text-white">States</Link>
+            <span className="mx-2">/</span>
             {citySlug ? (
               <>
                 <Link to={`/hud-homes/${stateSlug}`} className="hover:text-white">
@@ -245,6 +247,23 @@ export default function HudHomesLanding() {
                   className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 font-medium text-blue-800 hover:bg-blue-100"
                 >
                   {city}
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!citySlug && (
+          <section className="mt-14 rounded-xl border border-gray-200 bg-white p-7">
+            <h2 className="text-2xl font-bold text-gray-900">HUD homes in other states</h2>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {US_STATES.filter(state => state.code !== stateInfo.code).map(state => (
+                <Link
+                  key={state.code}
+                  to={`/hud-homes/${slugify(state.name)}`}
+                  className="rounded-full border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-800"
+                >
+                  {state.name}
                 </Link>
               ))}
             </div>

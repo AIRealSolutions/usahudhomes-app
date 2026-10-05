@@ -4,6 +4,43 @@
   "devCommand": "npm run dev",
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
+      "source": "/hud-homes",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|TelegramBot|Discordbot|SkypeUriPreview|Pinterest|redditbot|Embedly|iMessage|Applebot|Googlebot|bingbot|DuckDuckBot|YandexBot|Baiduspider).*"
+        }
+      ],
+      "destination": "/api/geo-meta"
+    },
+    {
+      "source": "/hud-homes/:stateSlug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|TelegramBot|Discordbot|SkypeUriPreview|Pinterest|redditbot|Embedly|iMessage|Applebot|Googlebot|bingbot|DuckDuckBot|YandexBot|Baiduspider).*"
+        }
+      ],
+      "destination": "/api/geo-meta?stateSlug=:stateSlug"
+    },
+    {
+      "source": "/hud-homes/:stateSlug/:citySlug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|TelegramBot|Discordbot|SkypeUriPreview|Pinterest|redditbot|Embedly|iMessage|Applebot|Googlebot|bingbot|DuckDuckBot|YandexBot|Baiduspider).*"
+        }
+      ],
+      "destination": "/api/geo-meta?stateSlug=:stateSlug&citySlug=:citySlug"
+    },
+    {
       "source": "/property/:caseNumber",
       "has": [
         {
@@ -35,6 +72,9 @@
     },
     "api/og-image.js": {
       "includeFiles": "api/fonts/**"
+    },
+    "api/geo-meta.js": {
+      "includeFiles": "dist/index.html"
     }
   }
 }

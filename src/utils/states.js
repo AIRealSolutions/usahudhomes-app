@@ -51,3 +51,7 @@ export const US_STATES = [
   { code: 'WI', name: 'Wisconsin' },
   { code: 'WY', name: 'Wyoming' }
 ];
+
+// URL slug for a state's landing page, e.g. "North Carolina" -> "north-carolina"
+export const stateSlug = (name = '') =>
+  name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
