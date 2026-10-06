@@ -40,6 +40,7 @@ import AgentRequestForm from './components/AgentRequestForm'
 import SearchFilters from './components/SearchFilters'
 import { BidHistorySummary, PropertyHistoryPanel } from './components/BidHistory'
 import SaveHomeButton from './components/SaveHomeButton'
+import PaymentBreakdown from './components/PaymentBreakdown'
 import ShareProperty, { propertyShareText } from './components/ShareProperty'
 import { SavedHomesProvider } from './contexts/SavedHomesContext'
 import { fetchOffersByCase, isUnderContract, priceChange } from './services/acceptedOffers'
@@ -1125,6 +1126,9 @@ function PropertyDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Monthly payment and cash to close: HUD $100 down vs standard FHA vs conventional */}
+          <PaymentBreakdown property={property} />
 
           {/* Price changes, status changes and accepted offers (terms for signed-in buyers) */}
           <PropertyHistoryPanel property={property} signedIn={!!user} />
