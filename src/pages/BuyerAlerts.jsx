@@ -15,7 +15,7 @@ import {
 import { supabase } from '../config/supabase'
 import { notifyLeadSubmitted } from '../services/leadMessaging'
 import { useAuth } from '../contexts/AuthContext'
-import { stateName, rememberProfileDetails, TIMELINE_FROM_PROFILE, TIMELINE_TO_PROFILE } from '../services/buyerProfile'
+import { stateName, stateCode, rememberProfileDetails, TIMELINE_FROM_PROFILE, TIMELINE_TO_PROFILE } from '../services/buyerProfile'
 
 const states = [
   'North Carolina', 'South Carolina', 'Virginia', 'Georgia', 'Florida', 'Alabama',
@@ -126,6 +126,9 @@ export default function BuyerAlerts() {
         'Consent: Buyer requested property alerts and agreed to be contacted about matching homes.'
       ].join('\n')
 
+      // leads.state and properties.state hold two-letter codes; the alert email matches on them
+      const code = stateCode(form.state)
+
       // Signed-out visitors can insert leads but not read them back, so the id is generated here.
       const lead = { id: crypto.randomUUID() }
       const { error: leadError } = await supabase
@@ -136,7 +139,7 @@ export default function BuyerAlerts() {
           last_name: form.lastName.trim(),
           email: form.email.trim().toLowerCase(),
           phone: form.phone.trim() || null,
-          state: form.state,
+          state: code,
           budget_min: form.budgetMin ? Number(form.budgetMin) : null,
           budget_max: form.budgetMax ? Number(form.budgetMax) : null,
           timeline: form.timeline || null,
@@ -170,7 +173,7 @@ export default function BuyerAlerts() {
         lead_id: lead.id,
         email: form.email.trim().toLowerCase(),
         first_name: form.firstName.trim(),
-        state: form.state,
+        state: code,
         areas: form.areas.split(/[,;\n]+/).map(a => a.trim()).filter(Boolean),
         budget_min: form.budgetMin ? Number(form.budgetMin) : null,
         budget_max: form.budgetMax ? Number(form.budgetMax) : null,
