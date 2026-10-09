@@ -41,6 +41,7 @@ import SearchFilters from './components/SearchFilters'
 import { BidHistorySummary, PropertyHistoryPanel } from './components/BidHistory'
 import SaveHomeButton from './components/SaveHomeButton'
 import PaymentBreakdown from './components/PaymentBreakdown'
+import LenderSpotlight, { GetQualifiedButton } from './components/GetQualified'
 import ShareProperty, { propertyShareText } from './components/ShareProperty'
 import { SavedHomesProvider } from './contexts/SavedHomesContext'
 import { fetchOffersByCase, isUnderContract, priceChange } from './services/acceptedOffers'
@@ -119,6 +120,7 @@ function Header() {
                 <Link to="/alerts" className="text-gray-700 hover:text-blue-600 font-medium">Home Alerts</Link>
                 <Link to="/deals" className="text-gray-700 hover:text-blue-600 font-medium">Successful Deals</Link>
                 <Link to="/broker/register" className="text-gray-700 hover:text-blue-600 font-medium">Become a Partner</Link>
+                <GetQualifiedButton />
                 <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>
                 <Link to="/login" className="text-gray-700 hover:text-blue-600 font-medium">Login</Link>
               </>
@@ -214,6 +216,7 @@ function Header() {
                   >
                     Become a Partner
                   </Link>
+                  <GetQualifiedButton className="py-3" onClick={() => setMobileMenuOpen(false)} />
                   <Link
                     to="/contact"
                     className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold text-center transition-colors"
@@ -555,6 +558,9 @@ function HomePage() {
           </Link>
         </div>
       </div>
+
+      {/* Preferred lender: get qualified before bidding */}
+      <LenderSpotlight />
 
       {/* Why HUD Homes Section */}
       <BenefitsSection />
@@ -1129,6 +1135,8 @@ function PropertyDetailPage() {
 
           {/* Monthly payment and cash to close: HUD $100 down vs standard FHA vs conventional */}
           <PaymentBreakdown property={property} />
+
+          <LenderSpotlight compact />
 
           {/* Price changes, status changes and accepted offers (terms for signed-in buyers) */}
           <PropertyHistoryPanel property={property} signedIn={!!user} />
