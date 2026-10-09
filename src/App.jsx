@@ -104,24 +104,23 @@ function Header() {
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex justify-between items-center">
-          <Link to="/" className="flex items-center min-w-0">
+          <Link to="/" className="flex items-center min-w-0 xl:flex-shrink-0">
             <HomeIcon className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 mr-2 flex-shrink-0" />
-            <span className="text-lg sm:text-2xl font-bold text-gray-900 truncate">USAHUDhomes.com</span>
+            <span className="text-lg sm:text-2xl xl:text-lg font-bold text-gray-900 truncate">USAHUDhomes.com</span>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex space-x-6 items-center">
+          <nav className="hidden xl:flex space-x-3 items-center text-sm [&>a]:whitespace-nowrap [&>button]:whitespace-nowrap">
             {!user && (
               <>
-                <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Home</Link>
-                <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Properties</Link>
+                                <Link to="/search" className="text-gray-700 hover:text-blue-600 font-medium">Search Properties</Link>
                 <Link to="/hud-homes" className="text-gray-700 hover:text-blue-600 font-medium">By State</Link>
                 <Link to="/how-it-works" className="text-gray-700 hover:text-blue-600 font-medium">How It Works</Link>
                 <Link to="/alerts" className="text-gray-700 hover:text-blue-600 font-medium">Home Alerts</Link>
                 <Link to="/deals" className="text-gray-700 hover:text-blue-600 font-medium">Successful Deals</Link>
                 <Link to="/broker/register" className="text-gray-700 hover:text-blue-600 font-medium">Become a Partner</Link>
-                <GetQualifiedButton />
-                <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>
+                <GetQualifiedButton className="px-3" />
+                <Link to="/contact" className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg font-semibold transition-colors">Get Connected</Link>
                 <Link to="/login" className="text-gray-700 hover:text-blue-600 font-medium">Login</Link>
               </>
             )}
@@ -146,13 +145,13 @@ function Header() {
           <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
             <a href="tel:9103636147" className="flex items-center text-blue-600 hover:text-blue-700 font-semibold">
               <Phone className="h-5 w-5 mr-2" />
-              <span className="hidden sm:inline">910-363-6147</span>
+              <span className="hidden sm:inline xl:hidden whitespace-nowrap">910-363-6147</span>
             </a>
             
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-gray-700 hover:text-blue-600"
+              className="xl:hidden p-2 text-gray-700 hover:text-blue-600"
               aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={mobileMenuOpen}
             >
@@ -163,7 +162,7 @@ function Header() {
         
         {/* Mobile Navigation Menu */}
         {mobileMenuOpen && (
-          <nav className="md:hidden mt-4 pb-4 border-t border-gray-200 pt-4">
+          <nav className="xl:hidden mt-4 pb-4 border-t border-gray-200 pt-4">
             <div className="flex flex-col space-y-4">
               {!user && (
                 <>
