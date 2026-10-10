@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { notifyLeadSubmitted } from '../services/leadMessaging';
 import { useAuth } from '../contexts/AuthContext';
-import { stateName, rememberProfileDetails, TIMELINE_FROM_PROFILE, TIMELINE_TO_PROFILE } from '../services/buyerProfile';
+import { stateName, stateCode, rememberProfileDetails, TIMELINE_FROM_PROFILE, TIMELINE_TO_PROFILE } from '../services/buyerProfile';
 
 // Signed-in buyers: these fields come from their profile
 function contactFieldsFromProfile(profile, user) {
@@ -130,7 +130,7 @@ export default function ContactForm() {
           last_name: formData.last_name,
           email: formData.email,
           phone: formData.phone,
-          state: formData.state,
+          state: stateCode(formData.state) || null,
           budget_min: formData.budget_min ? parseInt(formData.budget_min) : null,
           budget_max: formData.budget_max ? parseInt(formData.budget_max) : null,
           timeline: formData.timeline || null,
