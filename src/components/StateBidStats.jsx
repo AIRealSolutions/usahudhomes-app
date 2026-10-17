@@ -53,36 +53,98 @@ function Bars({ title, rows, max }) {
   )
 }
 
+// Share of the sale price HUD typically pays out before its net: buyer's broker commission,
+// plus up to 3% closing-cost help for owner-occupants. Bid price = net / (1 - rate).
+const SALE_COSTS = { 'Owner-Occupant': 0.09, Investor: 0.06 }
+const MIN_BUYER_BIDS = 5
+
+/** Sale price that leaves HUD a given net after paying the buyer type's costs */
+const bidFromNet = (net, buyer) => net / (1 - SALE_COSTS[buyer])
+
 function BidCalculator({ stats }) {
   const [listPrice, setListPrice] = useState('150000')
+  const [buyer, setBuyer] = useState('Owner-Occupant')
   const price = Number(String(listPrice).replace(/[^0-9.]/g, ''))
-  const at = (ratio) => (price && ratio != null ? formatMoney(price * Number(ratio)) : '—')
-  const buyers = (stats.by_buyer || []).filter(b => b.pct_p50 != null && b.buyer !== 'Other')
+
+  // Use this buyer type's own accepted bids when there are enough; otherwise all bids
+  const own = (stats.by_buyer || []).find(b => b.buyer === buyer)
+  const useOwn = own && own.n >= MIN_BUYER_BIDS && own.pct_p50 != null
+  const ratios = useOwn
+    ? { low: own.pct_p25, typical: own.pct_p50, high: own.pct_p75 }
+    : { low: stats.pct.p25, typical: stats.pct.p50, high: stats.pct.p75 }
+  const rows = [
+    ['Lower quarter', ratios.low],
+    ['Typical', ratios.typical],
+    ['Upper quarter', ratios.high],
+  ].map(([label, ratio]) => {
+    const net = price && ratio != null ? price * Number(ratio) : null
+    const bid = net != null ? bidFromNet(net, buyer) : null
+    return { label, net, bid, bidPct: bid != null ? bid / price : null }
+  })
 
   return (
     <div className="rounded-lg border border-blue-100 bg-blue-50 p-5">
       <h3 className="flex items-center gap-2 font-semibold text-gray-900">
-        <Calculator className="h-5 w-5 text-blue-700" aria-hidden="true" /> Apply it to a list price
+        <Calculator className="h-5 w-5 shrink-0 text-blue-700" aria-hidden="true" /> Estimate a bid price
       </h3>
-      <label className="mt-3 block text-sm text-gray-700" htmlFor="bid-stats-list-price">HUD list price</label>
-      <input
-        id="bid-stats-list-price"
-        inputMode="numeric"
-        value={listPrice}
-        onChange={e => setListPrice(e.target.value)}
-        className="mt-1 w-full max-w-xs rounded-md border border-gray-300 px-3 py-2"
-      />
-      <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-        <div><dt className="text-gray-600">Lower quarter ({pct(stats.pct.p25)})</dt><dd className="font-semibold">{at(stats.pct.p25)}</dd></div>
-        <div><dt className="text-gray-600">Typical ({pct(stats.pct.p50)})</dt><dd className="font-semibold">{at(stats.pct.p50)}</dd></div>
-        <div><dt className="text-gray-600">Upper quarter ({pct(stats.pct.p75)})</dt><dd className="font-semibold">{at(stats.pct.p75)}</dd></div>
-        {buyers.map(b => (
-          <div key={b.buyer}><dt className="text-gray-600">{BUYER_LABELS[b.buyer]} typical ({pct(b.pct_p50)})</dt><dd className="font-semibold">{at(b.pct_p50)}</dd></div>
-        ))}
-      </dl>
+      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end">
+        <div>
+          <label className="block text-sm text-gray-700" htmlFor="bid-stats-list-price">HUD list price</label>
+          <input
+            id="bid-stats-list-price"
+            inputMode="numeric"
+            value={listPrice}
+            onChange={e => setListPrice(e.target.value)}
+            className="mt-1 w-full max-w-xs rounded-md border border-gray-300 bg-white px-3 py-2"
+          />
+        </div>
+        <div role="radiogroup" aria-label="Buyer type" className="inline-flex rounded-md border border-gray-300 bg-white p-1 text-sm">
+          {Object.keys(SALE_COSTS).map(type => (
+            <button
+              key={type}
+              type="button"
+              role="radio"
+              aria-checked={buyer === type}
+              onClick={() => setBuyer(type)}
+              className={`rounded px-3 py-1.5 font-medium ${buyer === type ? 'bg-blue-700 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+            >
+              {type === 'Investor' ? 'Investor' : 'Owner-occupant'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <table className="w-full text-left text-sm">
+          <thead className="text-gray-600">
+            <tr>
+              <th className="py-1.5 pr-3 font-normal">Accepted bids</th>
+              <th className="py-1.5 pr-3 font-normal">Net to HUD</th>
+              <th className="py-1.5 pr-3 font-normal">Estimated bid price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r.label} className="border-t border-blue-100">
+                <td className="py-2 pr-3 text-gray-700">{r.label}</td>
+                <td className="py-2 pr-3">{formatMoney(r.net)}</td>
+                <td className="py-2 pr-3 font-semibold text-gray-900">
+                  {formatMoney(r.bid)}{r.bidPct != null && <span className="block font-normal text-gray-600 sm:inline"><span className="hidden sm:inline"> · </span>{pct(r.bidPct)} of list</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <p className="mt-3 text-xs text-gray-600">
-        These are net-to-HUD amounts. Your bid price is usually higher, because HUD may pay part of
-        the closing costs and the broker commission out of the price.
+        {useOwn
+          ? `Based on ${own.n} accepted ${buyer === 'Investor' ? 'investor' : 'owner-occupant'} bids. `
+          : `Too few ${buyer === 'Investor' ? 'investor' : 'owner-occupant'} bids to use on their own, so this uses all accepted bids. `}
+        HUD reports what it netted, not the sale price. The estimated bid adds back the costs HUD pays from the
+        price: {buyer === 'Investor'
+          ? 'about 6% for investors (buyer’s broker commission).'
+          : 'about 9% for owner-occupants (buyer’s broker commission plus up to 3% toward closing costs).'}
       </p>
     </div>
   )
@@ -194,6 +256,12 @@ export default function StateBidStats({ stateInfo, stateSlug, signedIn }) {
               <p className="mt-1 text-sm text-gray-700">
                 Typically netted HUD <strong>{pct(b.pct_p50)}</strong> of list after <strong>{days(b.days_p50)}</strong> on the market
               </p>
+              {b.pct_p50 != null && (
+                <p className="mt-1 text-sm text-gray-600">
+                  About {pct(bidFromNet(Number(b.pct_p50), b.buyer))} of list as a bid price, after the{' '}
+                  {Math.round(SALE_COSTS[b.buyer] * 100)}% HUD pays from the price
+                </p>
+              )}
             </div>
           ))}
         </div>

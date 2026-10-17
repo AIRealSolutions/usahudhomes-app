@@ -64,9 +64,12 @@ AS $$
       FROM (SELECT pct_band b, count(*) n FROM o2 WHERE pct_band IS NOT NULL GROUP BY 1) x),
     'by_buyer', (
       SELECT coalesce(jsonb_agg(jsonb_build_object(
-               'buyer', buyer, 'n', n, 'pct_p50', pct_p50, 'days_p50', days_p50) ORDER BY n DESC), '[]')
+               'buyer', buyer, 'n', n, 'pct_p25', pct_p25, 'pct_p50', pct_p50, 'pct_p75', pct_p75,
+               'days_p50', days_p50) ORDER BY n DESC), '[]')
       FROM (SELECT buyer, count(*) n,
+                   percentile_cont(0.25) WITHIN GROUP (ORDER BY pct) pct_p25,
                    percentile_cont(0.5) WITHIN GROUP (ORDER BY pct) pct_p50,
+                   percentile_cont(0.75) WITHIN GROUP (ORDER BY pct) pct_p75,
                    percentile_cont(0.5) WITHIN GROUP (ORDER BY days) days_p50
             FROM o2 GROUP BY 1) x),
     'by_age', (
