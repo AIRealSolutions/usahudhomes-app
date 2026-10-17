@@ -5,6 +5,8 @@ import { Home, MapPin, Phone } from 'lucide-react'
 import { supabase } from '../config/supabase'
 import { US_STATES, stateSlug as toSlug } from '../utils/states'
 import { buildGeoSeo, fetchStateListings, findStateBySlug, jsonLdString } from '../utils/geoSeo'
+import { useAuth } from '../contexts/AuthContext'
+import StateBidStats from '../components/StateBidStats'
 
 function PropertyCard({ property }) {
   return (
@@ -49,6 +51,7 @@ function PropertyCard({ property }) {
 
 export default function HudHomesLanding() {
   const { stateSlug, citySlug } = useParams()
+  const { user } = useAuth()
   const stateInfo = useMemo(() => findStateBySlug(stateSlug), [stateSlug])
   const [stateListings, setStateListings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -198,6 +201,8 @@ export default function HudHomesLanding() {
             ))}
           </section>
         )}
+
+        <StateBidStats stateInfo={stateInfo} stateSlug={stateSlug} signedIn={!!user} />
 
         {!citySlug && cities.length > 0 && (
           <section className="mt-14 rounded-xl border border-gray-200 bg-white p-7">

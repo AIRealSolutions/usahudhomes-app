@@ -76,3 +76,10 @@ export function percentOfList(offer, fallbackListPrice) {
 }
 
 export const OUTCOME_LABELS = { pending: 'Under contract', fell_through: 'Fell through', closed: 'Closed' }
+
+/** Bid statistics for a state (2-letter code) or nationwide (null). Signed-in users only. */
+export async function fetchOfferStats(stateCode) {
+  const { data, error } = await supabase.rpc('state_offer_stats', { p_state: stateCode })
+  if (error) throw error
+  return data
+}
