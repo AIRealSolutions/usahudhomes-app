@@ -540,6 +540,7 @@ async function handleConsultationRequest(req, res) {
   } catch (e) {
     console.error('[lead-request] admin notification failed:', e.message)
   }
+  await routeLeadToBroker(lead)
 
   return res.status(200).json({ success: true, data: { id: lead.id } })
 }
@@ -655,6 +656,85 @@ async function handleAgentInvite(req, res) {
   })
 }
 
+// ─── Lead routing ─────────────────────────────────────────────────────────────
+// Every lead stays in the admin Leads list. When routing is switched on in
+// lead_routing_settings and the lead's state is one of the chosen states, the lead
+// is also assigned to the chosen broker, the same way an admin assigns one by hand.
+const escapeLike = (v) => v.replace(/[\\%_]/g, m => '\\' + m)
+
+async function routeLeadToBroker(lead) {
+  try {
+    const settings = (await supabaseFetch('lead_routing_settings?id=eq.1&select=enabled,states,agent_id&limit=1'))?.[0]
+    const state = String(lead?.state || '').trim().toUpperCase()
+    if (!settings?.enabled || !settings.agent_id || !state || !(settings.states || []).includes(state)) return null
+    const already = await supabaseFetch(`lead_events?lead_id=eq.${lead.id}&event_type=eq.assigned_to_agent&select=id&limit=1`)
+    if (already?.length) return null
+
+    // Find or create the customer (customers.email is unique)
+    let customerId = lead.customer_id
+    if (!customerId && lead.email) {
+      const existing = (await supabaseFetch(
+        `customers?select=id,is_deleted&email=ilike.${encodeURIComponent(escapeLike(lead.email.trim()))}&limit=1`
+      ))?.[0]
+      if (existing) {
+        customerId = existing.id
+        if (existing.is_deleted) await supabaseWrite('rpc/restore_customer', 'POST', { customer_id: customerId })
+      }
+    }
+    if (!customerId) {
+      customerId = (await supabaseFetch('customers', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({
+          first_name: lead.first_name || '', last_name: lead.last_name || '', email: lead.email, phone: lead.phone || null,
+          state, lead_source: lead.source || 'website', status: 'active', is_active: true,
+        }),
+      }))?.[0]?.id
+    }
+    if (!customerId) throw new Error('could not find or create the customer')
+
+    const name = `${lead.first_name || ''} ${lead.last_name || ''}`.trim()
+    const now = new Date().toISOString()
+    const consultation = (await supabaseFetch('consultations', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        customer_id: customerId,
+        agent_id: settings.agent_id,
+        assigned_broker_id: settings.agent_id,
+        assigned_at: now,
+        property_id: lead.property_id || null,
+        case_number: lead.property_case_number || null,
+        consultation_type: lead.lead_type || lead.source || 'property_inquiry',
+        first_name: lead.first_name, last_name: lead.last_name, email: lead.email, phone: lead.phone,
+        customer_name: name || null, customer_email: lead.email, customer_phone: lead.phone,
+        state, message: lead.message,
+        source: lead.source, source_details: { lead_id: lead.id, auto_routed: true },
+        budget_min: lead.budget_min ?? null, budget_max: lead.budget_max ?? null,
+        timeline: lead.timeline || null, financing_type: lead.financing_type || null,
+        down_payment: lead.down_payment || null, credit_score_range: lead.credit_score_range || null,
+        pre_approved: lead.pre_approved ?? false, buyer_type: lead.buyer_type || null,
+        experience_level: lead.experience_level || null,
+        price_range_min: lead.price_range_min ?? null, price_range_max: lead.price_range_max ?? null,
+        property_preferences: lead.property_preferences || null, hear_about_us: lead.hear_about_us || null,
+        status: 'new', is_deleted: false,
+      }),
+    }))?.[0]
+    if (!consultation) throw new Error('could not create the consultation')
+
+    await supabaseWrite(`leads?id=eq.${lead.id}`, 'PATCH', { customer_id: customerId, status: 'under_review', updated_at: now })
+    await supabaseWrite('lead_events', 'POST', {
+      lead_id: lead.id,
+      event_type: 'assigned_to_agent',
+      event_data: { agent_id: settings.agent_id, consultation_id: consultation.id, auto_routed: true, rule: `state ${state}` },
+    })
+    return consultation
+  } catch (e) {
+    console.error('[lead-routing] failed:', e.message)
+    return null
+  }
+}
+
 // ─── Action: lead submitted (public forms) ────────────────────────────────────
 // Public forms call this after saving a lead. Only the lead id is accepted; the
 // lead is read from the database, must be recent, and is announced once.
@@ -699,6 +779,7 @@ async function handleLeadSubmitted(req, res) {
   } catch (e) {
     console.error('[lead-submitted] notify failed:', e.message)
   }
+  await routeLeadToBroker(lead)
   return res.status(200).json({ success: true })
 }
 

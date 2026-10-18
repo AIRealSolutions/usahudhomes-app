@@ -18,6 +18,7 @@ import { supabase } from '../../config/supabase'
 import { assignLeadToAgent } from '../../services/database/leadService'
 import AddLeadModal from './AddLeadModal'
 import AlertSignupsTab from './AlertSignupsTab'
+import LeadRoutingSettings from './LeadRoutingSettings'
 import {
   Search, Filter, Eye, Calendar, MapPin, DollarSign, Home,
   AlertCircle, Phone, Mail, User, Clock, CheckCircle,
@@ -614,6 +615,9 @@ export default function LeadsHub({ onNavigate }) {
 
   return (
     <div className="space-y-5">
+      {/* State-based auto-routing to a broker's Active Leads */}
+      <LeadRoutingSettings />
+
       {/* Tab bar */}
       <div className="flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl w-fit">
         {TABS.map(t => {
