@@ -7,6 +7,7 @@
 import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import BrokerOfferInbox from './broker/BrokerOfferInbox'
 import { useActiveClient } from '../contexts/ActiveClientContext'
 import { supabase } from '../config/supabase'
 import { consultationService } from '../services/database/consultationService'
@@ -1429,6 +1430,7 @@ export default function BrokerShell({ user, showAdminAccess }) {
         return <ActiveLeadsPanel agentId={agentId} />
       case 'referrals':
         return (
+          {activePanel === 'overview' && agentId && <BrokerOfferInbox agentId={agentId} />}
           <Suspense fallback={<PanelFallback />}>
             <BrokerReferralInbox />
           </Suspense>
