@@ -459,6 +459,7 @@ function PropertyCard({ property, offers, signedIn }) {
         <div className="text-sm text-gray-600 mb-4">
           {property.beds || 'N/A'} bed • {property.baths || 'N/A'} bath • {property.sq_ft ? property.sq_ft.toLocaleString() + ' sqft' : 'N/A'}
         </div>
+        <Link to={user ? `/dashboard?case=${encodeURIComponent(property.case_number)}` : `/login?next=${encodeURIComponent('/dashboard?case=' + property.case_number)}`} className="block w-full bg-green-700 text-white text-center py-2 rounded-lg hover:bg-green-800 font-semibold mb-3">Prepare an Offer</Link>
         {signedIn !== undefined && <BidHistorySummary property={property} offers={offers} signedIn={signedIn} />}
         <Link
           to={`/property/${property.case_number}`}
