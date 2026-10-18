@@ -63,7 +63,7 @@
     },
     {
       "path": "/api/hud?action=accepted-offers-sync",
-      "schedule": "0 15 * * *"
+      "schedule": "0 10 * * *"
     }
   ],
   "functions": {

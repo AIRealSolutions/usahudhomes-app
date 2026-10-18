@@ -14,7 +14,9 @@
  *   PATCH ?action=schedules        — update a schedule
  *   DELETE ?action=schedules       — delete a schedule
  *   GET/POST ?action=accepted-offers-sync — daily cron (CRON_SECRET) or an admin: record HUD accepted
- *                                    offers (bidresults) for every state into accepted_offers
+ *                                    offers (bidresults) for every state into accepted_offers. The daily
+ *                                    cron then also imports available listings (with photos) for every
+ *                                    state, stalest first, within the time limit
  *   GET  ?action=gallery&caseNumber=  — public: every photo of one home, fetched from HUD the first
  *                                    time it's asked for and saved on the property (refresh=1 re-fetches)
  *   GET  ?action=gallery-image&url=   — public: one HUD photo passed through (for zip downloads when the
@@ -529,13 +531,82 @@ async function syncAcceptedOffers(supabase, states) {
 }
 
 async function handleAcceptedOffersSync(req, res, trigger) {
+  const startedAt = Date.now()
   const supabase = getSupabase()
   const requested = [].concat(req.body?.states || req.query?.state || []).map(s => String(s).trim().toUpperCase())
   const states = requested.length ? requested.filter(s => HUD_STATES.includes(s)) : HUD_STATES
-  const stats = await syncAcceptedOffers(supabase, states)
-  const { error: logErr } = await supabase.from('accepted_offer_runs').insert([{ trigger, ...stats }])
-  if (logErr) console.warn('[hud/accepted-offers] run log failed:', logErr.message)
-  return res.status(200).json({ success: true, ...stats })
+  const withListings = trigger === 'cron' || req.query?.listings === '1'
+
+  // Accepted offers and listings run independently: one failing doesn't stop the other
+  let stats = null, offersError = null
+  try {
+    stats = await syncAcceptedOffers(supabase, states)
+    const { error: logErr } = await supabase.from('accepted_offer_runs').insert([{ trigger, ...stats }])
+    if (logErr) console.warn('[hud/accepted-offers] run log failed:', logErr.message)
+  } catch (e) {
+    offersError = e.message
+    console.error('[hud/accepted-offers] sync failed:', e)
+    if (!withListings) throw e
+  }
+
+  // The daily cron also refreshes available listings (one cron slot does both)
+  const listings = withListings ? await syncListings(supabase, startedAt + LISTING_TIME_BUDGET_MS) : undefined
+  return res.status(offersError ? 207 : 200).json({
+    success: !offersError,
+    ...(stats || {}),
+    ...(offersError ? { accepted_offers_error: offersError } : {}),
+    ...(listings ? { listings } : {}),
+  })
+}
+
+// ─── Daily listing import (runs inside the accepted-offers cron) ──────────────
+// Stays inside the function's time limit: states run a few at a time, stalest first,
+// and any left over go first the next day.
+export const config = { maxDuration: 60 }
+const LISTING_TIME_BUDGET_MS = 50000
+const LISTING_CONCURRENCY = 6
+
+async function syncListings(supabase, deadline) {
+  const jobId = `cron-${new Date().toISOString().slice(0, 10)}`
+  // Stalest states first, so a run that runs out of time picks up there tomorrow
+  const { data: runs } = await supabase.from('hud_sync_runs').select('state, created_at').eq('dry_run', false).order('created_at', { ascending: false }).limit(1000)
+  const lastRun = new Map()
+  for (const r of runs || []) if (!lastRun.has(r.state)) lastRun.set(r.state, new Date(r.created_at).getTime())
+  const queue = [...HUD_STATES].sort((a, b) => (lastRun.get(a) || 0) - (lastRun.get(b) || 0))
+
+  const done = [], skipped = [], failed = []
+  let next = 0
+  const worker = async () => {
+    while (next < queue.length) {
+      if (Date.now() > deadline) return
+      const state = queue[next++]
+      try {
+        const listings = parseHudPage(await fetchHudHtml(state), state)
+        // A missing or partial HUD page must not mark a state's homes as gone
+        const { count: active } = await supabase.from('properties').select('id', { count: 'exact', head: true }).eq('state', state).eq('is_active', true)
+        if (listings.length === 0 || (active >= 10 && listings.length < active * 0.5)) {
+          skipped.push({ state, listed: listings.length, active: active || 0 })
+          continue
+        }
+        const stats = await importProperties(supabase, listings, state, false, jobId)
+        done.push({ state, total: listings.length, new: stats.new_properties, marked: stats.marked_under_contract })
+      } catch (e) {
+        failed.push({ state, error: e.message })
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: LISTING_CONCURRENCY }, worker))
+
+  const leftOver = queue.slice(next)
+  // Keep the admin "All States Daily Sync" schedule's last-run time current
+  if (done.length) {
+    const { error } = await supabase.from('hud_sync_schedules').update({ last_run_at: new Date().toISOString() }).eq('enabled', true)
+    if (error) console.warn('[hud/listings] schedule update failed:', error.message)
+  }
+  if (skipped.length || failed.length || leftOver.length) {
+    console.warn('[hud/listings]', JSON.stringify({ skipped, failed, leftOver }))
+  }
+  return { imported: done.length, skipped, failed, left_for_tomorrow: leftOver }
 }
 
 // ─── Action handlers ──────────────────────────────────────────────────────────
