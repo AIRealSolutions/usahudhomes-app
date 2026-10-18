@@ -17,6 +17,7 @@ export default function Login() {
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
   const [needsConfirm, setNeedsConfirm] = useState(false)
+  const [confirmationEmail, setConfirmationEmail] = useState('')
   const [resetMode, setResetMode] = useState(searchParams.get('reset') === '1')
   const [resetSent, setResetSent] = useState(false)
   const navigate = useNavigate()
@@ -62,6 +63,8 @@ export default function Login() {
 
         setIsSignUp(false)
         setPassword('')
+        setConfirmationEmail(email.trim())
+        setNeedsConfirm(true)
         setNotice(`Account created! We sent a confirmation link to ${email.trim()}. Open it (check your spam folder too), then sign in here.`)
       } else {
         // Sign in existing user using AuthContext
@@ -94,7 +97,8 @@ export default function Login() {
 
   const handleResendConfirmation = async () => {
     setLoading(true)
-    const result = await authService.resendConfirmation(email.trim())
+    const address = (confirmationEmail || email).trim()
+    const result = await authService.resendConfirmation(address)
     setLoading(false)
     if (!result.success) {
       setError(result.error)
@@ -102,7 +106,7 @@ export default function Login() {
     }
     setError(null)
     setNeedsConfirm(false)
-    setNotice(`A new confirmation link is on its way to ${email.trim()}. Open it (check your spam folder too), then sign in here.`)
+    setNotice(`A new confirmation link is on its way to ${address}. Open it (check your spam folder too), then sign in here.`)
   }
 
   // Emails a link to /reset-password where a new password is chosen
@@ -291,6 +295,13 @@ export default function Login() {
               </div>
             )}
 
+            {needsConfirm && notice && !error && (
+              <button type="button" onClick={handleResendConfirmation} disabled={loading}
+                className="mt-3 text-sm font-semibold text-blue-700 hover:underline disabled:opacity-50">
+                {loading ? 'Sending…' : 'Resend confirmation email'}
+              </button>
+            )}
+
             {error && (
               <div className="rounded-md bg-red-50 p-4">
                 <div className="text-sm text-red-700">{error}</div>
@@ -330,6 +341,7 @@ export default function Login() {
                       setError(null)
                       setNotice(null)
                       setNeedsConfirm(false)
+                      setConfirmationEmail('')
                     }}
                     className="ml-2 font-medium text-blue-600 hover:text-blue-500"
                   >
