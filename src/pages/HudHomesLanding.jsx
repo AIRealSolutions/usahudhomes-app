@@ -7,8 +7,9 @@ import { US_STATES, stateSlug as toSlug } from '../utils/states'
 import { buildGeoSeo, fetchStateListings, findStateBySlug, jsonLdString } from '../utils/geoSeo'
 import { useAuth } from '../contexts/AuthContext'
 import StateBidStats from '../components/StateBidStats'
+import { displayAddress, signInToSeeAddressUrl } from '../utils/addressPrivacy'
 
-function PropertyCard({ property }) {
+function PropertyCard({ property, signedIn }) {
   return (
     <article className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="h-48 bg-gray-100">
@@ -26,7 +27,12 @@ function PropertyCard({ property }) {
         )}
       </div>
       <div className="p-5">
-        <h3 className="text-lg font-bold text-gray-900">{property.address}</h3>
+        <h3 className="text-lg font-bold text-gray-900">{displayAddress(property, signedIn)}</h3>
+        {!signedIn && (
+          <Link to={signInToSeeAddressUrl(`/property/${property.case_number}`)} className="text-sm text-blue-600 hover:underline">
+            Sign in to see the address
+          </Link>
+        )}
         <p className="mt-1 flex items-center text-sm text-gray-600">
           <MapPin className="mr-1 h-4 w-4" aria-hidden="true" />
           {property.city}, {property.state} {property.zip_code}
@@ -197,7 +203,7 @@ export default function HudHomesLanding() {
         ) : (
           <section className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" aria-label="HUD listings">
             {properties.map(property => (
-              <PropertyCard key={property.id} property={property} />
+              <PropertyCard key={property.id} property={property} signedIn={!!user} />
             ))}
           </section>
         )}

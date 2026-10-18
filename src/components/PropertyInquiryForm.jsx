@@ -1,33 +1,15 @@
 /**
  * Property Inquiry Form
  * Short "Ask about this home" form for signed-out visitors on a property page.
- * Saves a lead (no account needed), alerts the admins, and unlocks the address.
+ * Saves a lead (no account needed) and alerts the admins. The street address
+ * stays behind the login.
  */
 
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../config/supabase'
 import { notifyLeadSubmitted } from '../services/leadMessaging'
 import { CheckCircle, AlertCircle, Loader } from 'lucide-react'
-
-const STORAGE_KEY = 'inquiredProperties'
-
-/** Case numbers this browser has already asked about (their addresses stay unlocked). */
-export function hasInquired(caseNumber) {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]').includes(caseNumber)
-  } catch {
-    return false
-  }
-}
-
-function rememberInquiry(caseNumber) {
-  try {
-    const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-    if (!list.includes(caseNumber)) localStorage.setItem(STORAGE_KEY, JSON.stringify([...list, caseNumber].slice(-50)))
-  } catch {
-    // Storage can be blocked; the address is still shown for this visit.
-  }
-}
 
 const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'
 
@@ -91,7 +73,6 @@ export default function PropertyInquiryForm({ property, onSubmitted }) {
       if (eventError) console.error('Error creating lead event:', eventError)
 
       notifyLeadSubmitted(leadId)
-      rememberInquiry(property.case_number)
       setSubmitted(true)
       onSubmitted?.()
     } catch (err) {
@@ -108,7 +89,13 @@ export default function PropertyInquiryForm({ property, onSubmitted }) {
         <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
         <h4 className="text-lg font-semibold mb-1">Thanks, {formData.name.trim().split(/\s+/)[0]}!</h4>
         <p className="text-sm text-gray-600">
-          The full address is now shown above. Marc Spencer with Lightkeeper Realty will reach out shortly.
+          Marc Spencer with Lightkeeper Realty will reach out shortly.
+        </p>
+        <p className="text-sm text-gray-600 mt-3">
+          Want the full address now?{' '}
+          <Link to={`/login?signup=1&next=${encodeURIComponent(`/property/${property.case_number}`)}`} className="text-blue-600 hover:underline font-medium">
+            Create a free account
+          </Link>
         </p>
       </div>
     )
@@ -154,7 +141,7 @@ export default function PropertyInquiryForm({ property, onSubmitted }) {
         disabled={submitting}
         className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center"
       >
-        {submitting ? <><Loader className="h-4 w-4 mr-2 animate-spin" />Sending...</> : 'Send & Show Address'}
+        {submitting ? <><Loader className="h-4 w-4 mr-2 animate-spin" />Sending...</> : 'Send Question'}
       </button>
       <p className="text-xs text-gray-500 text-center">No account needed. We only use this to answer you.</p>
     </form>

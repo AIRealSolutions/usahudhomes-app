@@ -34,7 +34,8 @@ import SearchHeroSection from './components/SearchHeroSection'
 import BuyerProgramsSection from './components/BuyerProgramsSection'
 import HowItWorksPreview from './components/HowItWorksPreview'
 import AddressRevealGate from './components/AddressRevealGate'
-import PropertyInquiryForm, { hasInquired } from './components/PropertyInquiryForm'
+import PropertyInquiryForm from './components/PropertyInquiryForm'
+import { displayAddress as addressFor, signInToSeeAddressUrl } from './utils/addressPrivacy'
 import PropertyRequestForm from './components/PropertyRequestForm'
 import AgentRequestForm from './components/AgentRequestForm'
 import SearchFilters from './components/SearchFilters'
@@ -400,6 +401,7 @@ function BenefitsSection() {
 
 // Property Card Component (offers/signedIn add the bid-history line in search results)
 function PropertyCard({ property, offers, signedIn }) {
+  const { user } = useAuth()
   const underContract = isUnderContract(property)
   const change = priceChange(property)
   return (
@@ -414,7 +416,7 @@ function PropertyCard({ property, offers, signedIn }) {
         {property.main_image ? (
           <img 
             src={property.main_image} 
-            alt={property.address}
+            alt={`HUD home for sale in ${property.city}, ${property.state}`}
             className="w-full h-full object-cover"
             onError={(e) => {
               e.target.style.display = 'none'
@@ -430,7 +432,12 @@ function PropertyCard({ property, offers, signedIn }) {
         </div>
       </div>
       <div className="p-6">
-        <h3 className="text-xl font-semibold mb-2">{property.address}</h3>
+        <h3 className="text-xl font-semibold mb-2">{addressFor(property, !!user)}</h3>
+        {!user && (
+          <Link to={signInToSeeAddressUrl(`/property/${property.case_number}`)} className="text-sm text-blue-600 hover:underline">
+            Sign in to see the address
+          </Link>
+        )}
         <p className="text-gray-600 mb-4 flex items-center">
           <MapPin className="h-4 w-4 mr-1" />
           {property.city}, {property.state} {property.zip}
@@ -782,7 +789,6 @@ function PropertyDetailPage() {
   const [property, setProperty] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showAddressGate, setShowAddressGate] = useState(false)
-  const [inquirySent, setInquirySent] = useState(() => hasInquired(caseNumber))
   const [sidebarTab, setSidebarTab] = useState('agent') // 'agent' or 'property'
 
   useEffect(() => {
@@ -803,17 +809,10 @@ function PropertyDetailPage() {
       }
     }
     loadProperty()
-    setInquirySent(hasInquired(caseNumber))
   }, [caseNumber])
 
-  // Mask the address until the visitor signs in or sends an inquiry about this home
-  const canSeeAddress = !!user || inquirySent
-  const displayAddress = canSeeAddress ? property?.address : `HUD Home in ${property?.city}, ${property?.state}`
-  const scrollToInquiry = () => {
-    const form = document.getElementById('ask-about-home')
-    form?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    setTimeout(() => form?.querySelector('input')?.focus({ preventScroll: true }), 400)
-  }
+  // The street address is only shown to signed-in visitors
+  const displayAddress = addressFor(property, !!user)
   const propertyUrl = property ? `https://www.usahudhomes.com/property/${property.case_number}` : ''
   // Titles and share tags never include the street address (it stays behind the login)
   const propertyTitle = property ? `${property.price ? `$${Number(property.price).toLocaleString()} — ` : ''}HUD Home in ${property.city}, ${property.state}` : 'Property Details'
@@ -869,9 +868,9 @@ function PropertyDetailPage() {
         <span className="mx-2">/</span>
         <span className="text-gray-900 flex items-center">
           {displayAddress}
-          {!canSeeAddress && (
+          {!user && (
             <button
-              onClick={scrollToInquiry}
+              onClick={() => setShowAddressGate(true)}
               className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200 transition-colors"
             >
               Unlock
@@ -888,7 +887,7 @@ function PropertyDetailPage() {
             {property.main_image ? (
               <img 
                 src={property.main_image} 
-                alt={property.address}
+                alt={`HUD home for sale in ${property.city}, ${property.state}`}
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   e.target.style.display = 'none'
@@ -910,9 +909,9 @@ function PropertyDetailPage() {
           {/* Property Title */}
           <div className="mb-2 flex items-start justify-between">
             <h1 className="text-3xl font-bold">{displayAddress}</h1>
-            {!canSeeAddress && (
+            {!user && (
               <button
-                onClick={scrollToInquiry}
+                onClick={() => setShowAddressGate(true)}
                 className="ml-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors whitespace-nowrap"
               >
                 Unlock Address
@@ -1046,13 +1045,13 @@ function PropertyDetailPage() {
             </>
           ) : (
             /* Inquiry card (for unauthenticated users) — no account needed */
-            <div id="ask-about-home" className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 scroll-mt-24">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
               <h3 className="text-xl font-bold mb-2">Ask about this home</h3>
               <p className="text-gray-700 text-sm mb-4">
-                Get the full address, schedule a showing, or ask how to bid. A HUD-registered agent will get back to you.
+                Schedule a showing, ask what you'd pay, or learn how to bid. A HUD-registered agent will get back to you.
               </p>
 
-              <PropertyInquiryForm property={property} onSubmitted={() => setInquirySent(true)} />
+              <PropertyInquiryForm property={property} />
 
               <div className="mt-4 space-y-3">
                 <a
@@ -1074,7 +1073,7 @@ function PropertyDetailPage() {
                 <button onClick={() => setShowAddressGate(true)} className="text-blue-600 hover:underline font-medium">
                   Sign in or create a free account
                 </button>
-                {' '}to save homes and see every address.
+                {' '}to see the full address and save homes.
               </p>
 
               <div className="mt-6 pt-6 border-t border-blue-200">

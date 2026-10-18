@@ -129,9 +129,10 @@ async function renderGeoPage(res, supabase, state, citySlug) {
     <meta name="geo.region" content="US-${state.code}">
     <meta name="geo.placename" content="${escapeHtml(cityName || state.name)}">`
 
+  // No street addresses: they are only shown to signed-in visitors
   const propertyCards = seo.listings.map(property => `
         <article>
-          <h3><a href="/property/${encodeURIComponent(property.case_number)}">${escapeHtml(property.address)}</a></h3>
+          <h3><a href="/property/${encodeURIComponent(property.case_number)}">HUD home in ${escapeHtml(property.city)}, ${escapeHtml(property.state)}</a></h3>
           <p>${escapeHtml(property.city)}, ${escapeHtml(property.state)} ${escapeHtml(property.zip_code || '')}</p>
           <p>${property.price ? '$' + Number(property.price).toLocaleString('en-US') : 'Price available'} · ${escapeHtml(property.beds ?? 'N/A')} beds · ${escapeHtml(property.baths ?? 'N/A')} baths${property.sq_ft ? ' · ' + Number(property.sq_ft).toLocaleString('en-US') + ' sq. ft.' : ''}</p>
         </article>`).join('')

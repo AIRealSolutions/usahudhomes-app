@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../services/database'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
+import { displayAddress } from '../utils/addressPrivacy'
 
 export default function SuccessfulDeals() {
+  const { user } = useAuth()
   const [deals, setDeals] = useState([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
@@ -172,7 +175,7 @@ export default function SuccessfulDeals() {
                     <div className="p-6">
                       {/* Address */}
                       <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                        {deal.address}
+                        {displayAddress(deal, !!user)}
                       </h3>
                       <p className="text-sm text-gray-600 mb-4">
                         {deal.city}, {deal.state} {deal.zip_code}
