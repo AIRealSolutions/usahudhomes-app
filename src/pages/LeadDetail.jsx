@@ -8,6 +8,7 @@ import { listPicks, addPicks, markPicks, removePick } from '../services/property
 import { suggestedReplies, labelFor } from '../services/leadReplies';
 import { US_STATES } from '../utils/states';
 import ClientActivity from '../components/broker/ClientActivity';
+import BrokerOfferInbox from '../components/broker/BrokerOfferInbox';
 import {
   ArrowLeft, Edit2, Save, X, Mail, Phone, MessageSquare, Calendar, MapPin, Clock,
   User, FileText, Home, CheckCircle, Star, ThumbsUp, ThumbsDown, Trash2,
@@ -527,6 +528,8 @@ export default function LeadDetail() {
                     <p className={`whitespace-pre-wrap ${lead.notes ? 'text-gray-900' : 'text-gray-400'}`}>{lead.notes || 'No notes yet. Use "Add note" on the right to keep a running log.'}</p>
                   )}
                 </Card>
+
+                <BrokerOfferInbox consultationId={lead.id} />
 
                 {/* Site activity */}
                 <ClientActivity consultationId={lead.id} defaultOpen />
