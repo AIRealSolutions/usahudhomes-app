@@ -19,6 +19,10 @@
  *                                    time it's asked for and saved on the property (refresh=1 re-fetches)
  *   GET  ?action=gallery-image&url=   — public: one HUD photo passed through (for zip downloads when the
  *                                    browser can't fetch the image host directly)
+ *   POST ?action=gallery-backfill     — admin: save every listed home's photo set for one state
+ *                                    (photo links only; nothing else about the homes changes)
+ *
+ * Imports also save each home's photo links in properties.images, so listings show every photo.
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -120,6 +124,7 @@ function parseHudPage(html, stateCode) {
       latitude:         p.latitude           ? parseFloat(p.latitude)         : null,
       longitude:        p.longitude          ? parseFloat(p.longitude)        : null,
       main_image:       mainImage,
+      gallery_images:   cleanGallery(mainImage, photosFromGalleryField(p.galleryImages, photoBase(mainImage))),
       // NOTE: gallery_images intentionally excluded from response to avoid 4.5MB Vercel limit
       // It is stored during import via the raw HUD data
       is_new_listing:   isNew,
@@ -210,7 +215,10 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
       if (upsertErr) {
         errorCount += rows.length
         errors.push({ chunk: i, error: upsertErr.message })
+        continue
       }
+      // Photo sets are saved separately so homes without one keep what they have
+      await savePhotoSets(supabase, valid)
     }
 
     // Mark properties no longer on HUD as UNDER CONTRACT
@@ -328,19 +336,52 @@ async function hudListingFor(caseNumber, state) {
   return null
 }
 
-async function hudGalleryFor(property) {
-  const base = photoBase(property.main_image)
-  const raw = await hudListingFor(property.case_number, property.state)
-  const found = raw ? [...photosFromGalleryField(raw.galleryImages, base), ...(raw.propertyThumb ? [raw.propertyThumb] : [])] : []
-
-  // Main photo first, one entry per file, no placeholders
+// Main photo first, one entry per file, no placeholders
+function cleanGallery(mainImage, urls) {
   const seen = new Set()
-  return [property.main_image, ...found].filter(Boolean).filter(url => {
+  return [mainImage, ...urls].filter(Boolean).filter(url => {
     const name = fileName(url).toLowerCase()
     if (!name || !isPhotoUrl(url) || isPlaceholder(name) || seen.has(name)) return false
     seen.add(name)
     return true
   }).slice(0, 80)
+}
+
+// Saves photo links for homes that have more than the main photo
+async function savePhotoSets(supabase, properties) {
+  let saved = 0
+  const withPhotos = properties.filter(p => p.case_number && p.gallery_images?.length > 1)
+  for (let i = 0; i < withPhotos.length; i += 10) {
+    const results = await Promise.all(withPhotos.slice(i, i + 10).map(p =>
+      supabase.from('properties').update({ images: p.gallery_images }).eq('case_number', p.case_number)
+    ))
+    results.forEach(r => (r.error ? console.warn('[hud] photo set not saved:', r.error.message) : saved++))
+  }
+  return saved
+}
+
+async function handleGalleryBackfill(req, res) {
+  const stateCode = String(req.body?.state || '').trim().toUpperCase()
+  if (!/^[A-Z]{2}$/.test(stateCode)) return res.status(400).json({ success: false, error: 'state required' })
+  const supabase = getSupabase()
+  const listings = parseHudPage(await fetchHudHtml(stateCode), stateCode)
+  // Only homes already in the database; nothing else about them changes
+  const caseNumbers = listings.map(p => p.case_number).filter(Boolean)
+  const { data: existing } = caseNumbers.length
+    ? await supabase.from('properties').select('case_number').in('case_number', caseNumbers)
+    : { data: [] }
+  const known = new Set((existing || []).map(p => p.case_number))
+  const saved = await savePhotoSets(supabase, listings.filter(p => known.has(p.case_number)))
+  const photos = listings.reduce((n, p) => n + (p.gallery_images?.length || 0), 0)
+  return res.status(200).json({ success: true, state: stateCode, listings: listings.length, saved, photos })
+}
+
+async function hudGalleryFor(property) {
+  const base = photoBase(property.main_image)
+  const raw = await hudListingFor(property.case_number, property.state)
+  const found = raw ? [...photosFromGalleryField(raw.galleryImages, base), ...(raw.propertyThumb ? [raw.propertyThumb] : [])] : []
+
+  return cleanGallery(property.main_image, found)
 }
 
 async function handleGallery(req, res) {
@@ -661,6 +702,7 @@ export default async function handler(req, res) {
       case 'history':           return await handleHistory(req, res)
       case 'queue-media':       return await handleQueueMedia(req, res)
       case 'schedules':         return await handleSchedules(req, res)
+      case 'gallery-backfill':  return await handleGalleryBackfill(req, res)
       default:
         return res.status(400).json({ success: false, error: `Unknown action: "${action}". Valid: scrape, scrape-and-import, import, history, queue-media, schedules, accepted-offers-sync` })
     }

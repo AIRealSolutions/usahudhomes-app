@@ -7,10 +7,10 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { fetchGallery, downloadPhoto, downloadPhotosZip, photoFileStem } from '../services/propertyGallery'
 import { X, Download, ChevronLeft, ChevronRight, CheckSquare, Square, Loader, RefreshCw, Images } from 'lucide-react'
 
-export default function PropertyGallery({ property, title, canDownload = false, onClose }) {
+export default function PropertyGallery({ property, title, canDownload = false, startIndex = null, onClose }) {
   const [photos, setPhotos] = useState(null)
   const [error, setError] = useState(null)
-  const [viewing, setViewing] = useState(null) // index in photos
+  const [viewing, setViewing] = useState(startIndex) // index in photos, or null for the grid
   const [selected, setSelected] = useState(() => new Set())
   const [progress, setProgress] = useState(null) // { done, total }
   const [note, setNote] = useState(null)

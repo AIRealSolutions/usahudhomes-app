@@ -4,7 +4,7 @@ import {
   Download, Upload, RefreshCw, CheckCircle, AlertCircle, Loader2,
   Home, MapPin, Clock, Trash2,
   ChevronDown, ChevronUp, Film, History, Plus, X,
-  ToggleLeft, ToggleRight, Info
+  ToggleLeft, ToggleRight, Info, Images
 } from 'lucide-react'
 
 // ─── All API calls go to Vercel serverless functions (same origin) ────────────
@@ -29,6 +29,7 @@ const api = {
   scrapeAndImport: (state, opts)  => hudFetch('action=scrape-and-import', { method: 'POST', body: { state, ...opts } }),
   history:         (limit = 50)   => hudFetch(`action=history&limit=${limit}`),
   queueMedia:      (body)         => hudFetch('action=queue-media',       { method: 'POST', body }),
+  galleryBackfill: (state)        => hudFetch('action=gallery-backfill',  { method: 'POST', body: { state } }),
   schedules: {
     list:   ()       => hudFetch('action=schedules'),
     create: (body)   => hudFetch('action=schedules',          { method: 'POST',   body }),
@@ -106,6 +107,7 @@ export default function HUDScrapeManager() {
           { id: 'scrape',   label: 'Scrape & Import', icon: Download },
           { id: 'schedule', label: 'Schedules',       icon: Clock },
           { id: 'history',  label: 'Run History',     icon: History },
+          { id: 'photos',   label: 'Photos',          icon: Images },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -123,6 +125,79 @@ export default function HUDScrapeManager() {
       {activeTab === 'scrape'   && <ScrapeTab />}
       {activeTab === 'schedule' && <ScheduleTab />}
       {activeTab === 'history'  && <HistoryTab />}
+      {activeTab === 'photos'   && <PhotosTab />}
+    </div>
+  )
+}
+
+// ─── Photos Tab ───────────────────────────────────────────────────────────────
+// Saves every listed home's full photo set (links to HUD's photos) so listings show all
+// photos publicly. Imports do this too; this fills in homes imported before that.
+function PhotosTab() {
+  const [running, setRunning] = useState(false)
+  const [results, setResults] = useState([])
+  const [current, setCurrent] = useState(null)
+  const stopRef = useRef(false)
+
+  const run = async (states) => {
+    stopRef.current = false
+    setRunning(true)
+    setResults([])
+    for (const state of states) {
+      if (stopRef.current) break
+      setCurrent(state)
+      const data = await (await api.galleryBackfill(state)).json()
+      setResults(prev => [...prev, { state, ...data }])
+    }
+    setCurrent(null)
+    setRunning(false)
+  }
+
+  const saved = results.reduce((n, r) => n + (r.saved || 0), 0)
+  const failed = results.filter(r => !r.success)
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+      <div>
+        <h3 className="font-semibold text-gray-800 flex items-center gap-2"><Images className="w-4 h-4 text-blue-600" /> Property photo galleries</h3>
+        <p className="text-sm text-gray-600 mt-1">
+          Saves each listed home's full set of HUD photos to its listing, so every photo shows on the public property page.
+          Only photo links are saved (the photos stay on HUD's servers); prices, statuses and other details are not changed.
+          New imports save photos automatically.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => run(US_STATES)}
+          disabled={running}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        >
+          {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Images className="w-4 h-4" />}
+          {running ? `Saving photos… ${current || ''} (${results.length}/${US_STATES.length})` : 'Save photos for all homes'}
+        </button>
+        <button onClick={() => run(['NC'])} disabled={running} className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50">
+          North Carolina only
+        </button>
+        {running && (
+          <button onClick={() => { stopRef.current = true }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Stop</button>
+        )}
+      </div>
+      {results.length > 0 && (
+        <div className="text-sm">
+          <p className="font-medium text-gray-800 mb-2">
+            {saved} {saved === 1 ? 'home' : 'homes'} now have their full photo set
+            {failed.length > 0 && <span className="text-red-600"> · {failed.length} {failed.length === 1 ? 'state' : 'states'} failed ({failed.map(f => f.state).join(', ')}); run again to retry</span>}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {results.map(r => (
+              <span key={r.state} title={r.success ? `${r.listings} listings, ${r.photos} photos` : r.error}
+                className={`px-2 py-0.5 rounded text-xs font-semibold ${r.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'}`}>
+                {r.state} {r.success ? r.saved : '!'}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

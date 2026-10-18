@@ -788,7 +788,7 @@ function HowItWorksPage() {
 function PropertyDetailPage() {
   const { caseNumber } = useParams()
   const { user, canAccessBroker } = useAuth()
-  const [showGallery, setShowGallery] = useState(false)
+  const [showGallery, setShowGallery] = useState(false) // false, or { start: photo index | null }
   const [property, setProperty] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showAddressGate, setShowAddressGate] = useState(false)
@@ -816,6 +816,8 @@ function PropertyDetailPage() {
 
   // The street address is only shown to signed-in visitors
   const displayAddress = addressFor(property, !!user)
+  // Full photo set saved on the listing (main photo first)
+  const photoSet = Array.isArray(property?.images) ? property.images.filter(u => typeof u === 'string' && u.startsWith('http')) : []
   const propertyUrl = property ? `https://www.usahudhomes.com/property/${property.case_number}` : ''
   // Titles and share tags never include the street address (it stays behind the login)
   const propertyTitle = property ? `${property.price ? `$${Number(property.price).toLocaleString()} — ` : ''}HUD Home in ${property.city}, ${property.state}` : 'Property Details'
@@ -885,13 +887,14 @@ function PropertyDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="lg:col-span-2">
-          {/* Property Image */}
-          <div className="bg-gray-200 rounded-lg h-96 relative overflow-hidden mb-6">
+          {/* Property Image (opens the photo gallery) */}
+          <div className={`bg-gray-200 rounded-lg h-96 relative overflow-hidden ${photoSet.length > 1 ? 'mb-2' : 'mb-6'}`}>
             {property.main_image ? (
               <img 
                 src={property.main_image} 
                 alt={`HUD home for sale in ${property.city}, ${property.state}`}
-                className="w-full h-full object-cover"
+                onClick={() => setShowGallery({ start: 0 })}
+                className="w-full h-full object-cover cursor-zoom-in"
                 onError={(e) => {
                   e.target.style.display = 'none'
                   e.target.nextSibling.style.display = 'flex'
@@ -909,12 +912,36 @@ function PropertyDetailPage() {
             </div>
             <button
               type="button"
-              onClick={() => setShowGallery(true)}
+              onClick={() => setShowGallery({ start: null })}
               className="absolute bottom-3 right-3 flex items-center gap-2 bg-white/95 hover:bg-white text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg shadow"
             >
-              <Search className="h-4 w-4" /> See all photos
+              <Search className="h-4 w-4" /> {photoSet.length > 1 ? `See all ${photoSet.length} photos` : 'See all photos'}
             </button>
           </div>
+
+          {/* Saved photo set, visible to everyone */}
+          {photoSet.length > 1 && (
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-6">
+              {photoSet.slice(1, 7).map((url, i) => {
+                const index = i + 1
+                const more = index === 6 && photoSet.length > 7 ? photoSet.length - 7 : 0
+                return (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => setShowGallery({ start: more ? null : index })}
+                    className={`relative aspect-[4/3] rounded-md overflow-hidden bg-gray-100 ${i >= 4 ? 'hidden sm:block' : ''}`}
+                    aria-label={more ? `See all ${photoSet.length} photos` : `View photo ${index + 1}`}
+                  >
+                    <img src={url} alt="" loading="lazy" className="w-full h-full object-cover hover:opacity-90" />
+                    {more > 0 && (
+                      <span className="absolute inset-0 bg-black/55 text-white text-sm font-semibold flex items-center justify-center">+{more} more</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
           {showGallery && (
             <Suspense fallback={null}>
@@ -922,6 +949,7 @@ function PropertyDetailPage() {
                 property={property}
                 title={`${displayAddress} · Case #${property.case_number}`}
                 canDownload={!!canAccessBroker}
+                startIndex={showGallery.start}
                 onClose={() => setShowGallery(false)}
               />
             </Suspense>
