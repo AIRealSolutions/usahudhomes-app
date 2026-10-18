@@ -10,6 +10,7 @@ import {
 import EmailComposer from './EmailComposer'
 import SMSComposer from './SMSComposer'
 import SocialShareModal from './SocialShareModal'
+import ClientActivity from './ClientActivity'
 
 const ConsultationCard = ({ consultation, onUpdate }) => {
   const { profile } = useAuth()
@@ -215,6 +216,9 @@ const ConsultationCard = ({ consultation, onUpdate }) => {
               </div>
             </div>
           )}
+
+          {/* Saved homes, property requests and inquiries from the buyer's account */}
+          <ClientActivity consultationId={consultation.id} />
 
           {/* Customer Message */}
           {consultation.message && (

@@ -11,6 +11,7 @@
  *   POST ?action=decline         — broker declines a referral
  *   POST ?action=outcome         — update consultation outcome
  *   GET  ?action=referrals            — get all referrals for an agent
+ *   GET  ?action=client-activity      — a lead's saved homes, property requests and inquiries
  *   POST ?action=process-expired      — expire overdue referrals
  *   POST ?action=purge-under-contract — hard-delete stale UNDER CONTRACT properties
  */
@@ -197,6 +198,94 @@ async function handleGetReferrals(req, res) {
   return res.status(200).json({ success: true, data: data || [] })
 }
 
+// ─── Action: client-activity (GET) ────────────────────────────────────────────
+// Everything a buyer has done on the site, for the broker working the lead: their
+// account, saved homes, "this property" requests, and other inquiries. Buyers'
+// rows are private under RLS, so this runs with the service key after checking
+// the caller is an admin or the broker the lead is assigned to.
+const PROPERTY_FIELDS = 'id, case_number, address, city, state, zip_code, price, beds, baths, status, main_image'
+// Case-insensitive exact match: escape LIKE wildcards (an "_" in an email would match any character)
+const likeExact = (v) => v.replace(/[\\%_]/g, m => '\\' + m)
+
+async function handleClientActivity(req, res) {
+  const supabase = getSupabase()
+  const caller = await requireRole(req, res, supabase, ['admin', 'broker'])
+  if (!caller) return
+  const consultationId = req.query?.consultationId
+  if (!consultationId) return res.status(400).json({ success: false, error: 'consultationId query param required' })
+
+  const { data: lead, error: leadErr } = await supabase
+    .from('consultations')
+    .select('id, agent_id, assigned_broker_id, customer_email, email, customers(email)')
+    .eq('id', consultationId)
+    .maybeSingle()
+  if (leadErr) throw leadErr
+  if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' })
+  const ownerId = lead.agent_id || lead.assigned_broker_id
+  if (caller.role !== 'admin' && !(ownerId && await canActForAgent(supabase, caller, ownerId))) {
+    return res.status(403).json({ success: false, error: 'You can only view your own leads.' })
+  }
+
+  const rawEmail = (lead.customers?.email || lead.customer_email || lead.email || '').trim().toLowerCase()
+  if (!rawEmail) return res.status(200).json({ success: true, data: { account: null, saved: [], requests: [], inquiries: [] } })
+  const email = likeExact(rawEmail)
+
+  const { data: account } = await supabase
+    .from('users')
+    .select('id, created_at, last_signed_in, phone, state, city, timeline, financing_type, pre_approved, price_range_min, price_range_max, bedrooms, location_preferences')
+    .ilike('email', email)
+    .maybeSingle()
+
+  const otherConsultations = (column) => supabase.from('consultations')
+    .select('id, consultation_type, case_number, message, source, created_at')
+    .ilike(column, email).eq('is_deleted', false).neq('id', consultationId)
+    .order('created_at', { ascending: false }).limit(50)
+
+  const [savedRes, requestsRes, leadsRes, byCustomerEmail, byEmail] = await Promise.all([
+    account
+      ? supabase.from('saved_properties').select('id, property_id, case_number, price_at_save, notes, created_at').eq('user_id', account.id).order('created_at', { ascending: false })
+      : { data: [] },
+    account
+      ? supabase.from('property_requests').select('id, case_number, address, city, state, list_price, status, requested_at').eq('user_id', account.id).order('requested_at', { ascending: false })
+      : { data: [] },
+    supabase.from('leads').select('id, source, property_case_number, property_address, property_price, message, created_at').ilike('email', email).order('created_at', { ascending: false }).limit(50),
+    otherConsultations('customer_email'),
+    otherConsultations('email'),
+  ])
+  const consultations = [...(byCustomerEmail.data || []), ...(byEmail.data || [])]
+    .filter((c, i, all) => all.findIndex(x => x.id === c.id) === i)
+
+  // Current listing details for the saved homes
+  const saved = savedRes.data || []
+  const ids = saved.map(s => s.property_id).filter(Boolean)
+  const cases = saved.filter(s => !s.property_id && s.case_number).map(s => s.case_number)
+  const [byId, byCase] = await Promise.all([
+    ids.length ? supabase.from('properties').select(PROPERTY_FIELDS).in('id', ids) : { data: [] },
+    cases.length ? supabase.from('properties').select(PROPERTY_FIELDS).in('case_number', cases) : { data: [] },
+  ])
+  const props = [...(byId.data || []), ...(byCase.data || [])]
+  const savedHomes = saved.map(s => ({
+    ...s,
+    property: props.find(p => p.id === s.property_id) || props.find(p => p.case_number === s.case_number) || null,
+  }))
+
+  const inquiries = [
+    ...(leadsRes.data || []).map(l => ({
+      id: `lead-${l.id}`, kind: l.source || 'website', case_number: l.property_case_number,
+      address: l.property_address, price: l.property_price, message: l.message, at: l.created_at,
+    })),
+    ...consultations.map(c => ({
+      id: `consultation-${c.id}`, kind: c.consultation_type || c.source || 'consultation', case_number: c.case_number,
+      address: null, price: null, message: c.message, at: c.created_at,
+    })),
+  ].sort((a, b) => new Date(b.at) - new Date(a.at))
+
+  return res.status(200).json({
+    success: true,
+    data: { account: account || null, saved: savedHomes, requests: requestsRes.data || [], inquiries },
+  })
+}
+
 // ─── Action: purge-under-contract ───────────────────────────────────────────
 /**
  * Removes (hard-deletes) properties that have been UNDER CONTRACT for more
@@ -358,13 +447,14 @@ export default async function handler(req, res) {
     if (action === 'decline')          return await handleDecline(req, res)
     if (action === 'outcome')          return await handleOutcome(req, res)
     if (action === 'referrals')        return await handleGetReferrals(req, res)
+    if (action === 'client-activity')  return await handleClientActivity(req, res)
     if (action === 'process-expired')       return await handleProcessExpired(req, res)
     if (action === 'purge-under-contract')  return await handlePurgeUnderContract(req, res)
 
     return res.status(400).json({
       success: false,
       error: 'Missing or unknown ?action= parameter',
-      valid_actions: ['delete', 'assign', 'accept', 'decline', 'outcome', 'referrals', 'process-expired', 'purge-under-contract'],
+      valid_actions: ['delete', 'assign', 'accept', 'decline', 'outcome', 'referrals', 'client-activity', 'process-expired', 'purge-under-contract'],
     })
   } catch (err) {
     console.error(`[leads/${action}] Error:`, err)
