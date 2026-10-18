@@ -25,6 +25,8 @@ const AgentApplicationsAdmin = () => {
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [processing, setProcessing] = useState(false)
+  const [resendingVerification, setResendingVerification] = useState(false)
+  const [verificationMessage, setVerificationMessage] = useState(null)
 
   useEffect(() => {
     loadApplications()
@@ -41,7 +43,24 @@ const AgentApplicationsAdmin = () => {
 
   const handleViewDetails = (application) => {
     setSelectedApplication(application)
+    setVerificationMessage(null)
     setShowDetailModal(true)
+  }
+
+  const handleResendVerification = async () => {
+    if (!selectedApplication || resendingVerification) return
+    setResendingVerification(true)
+    setVerificationMessage(null)
+    try {
+      const result = await agentApplicationService.resendVerificationEmail(selectedApplication.email)
+      setVerificationMessage(result.success
+        ? { success: true, text: 'Verification email sent. Ask the applicant to check inbox and spam.' }
+        : { success: false, text: result.error || 'Email delivery failed. Check server logs.' })
+    } catch (error) {
+      setVerificationMessage({ success: false, text: error.message || 'Email delivery failed.' })
+    } finally {
+      setResendingVerification(false)
+    }
   }
 
   const handleApprove = async (application) => {
@@ -388,6 +407,20 @@ const AgentApplicationsAdmin = () => {
                       </Badge>
                     )}
                   </div>
+                  {!selectedApplication.email_verified && selectedApplication.status === 'pending' && (
+                    <div className="pt-3 space-y-2">
+                      <Button type="button" variant="outline" size="sm"
+                        onClick={handleResendVerification} disabled={resendingVerification}>
+                        <Mail className="w-4 h-4 mr-2" />
+                        {resendingVerification ? 'Sending...' : 'Resend Verification Email'}
+                      </Button>
+                      {verificationMessage && (
+                        <p role="status" className={verificationMessage.success ? 'text-green-700' : 'text-red-700'}>
+                          {verificationMessage.text}
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {selectedApplication.email_verified_at && (
                     <div className="text-gray-600 text-xs">
                       Verified on: {new Date(selectedApplication.email_verified_at).toLocaleString()}
