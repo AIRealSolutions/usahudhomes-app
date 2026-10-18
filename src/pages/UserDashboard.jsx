@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Mail, Phone, MapPin, DollarSign, Calendar, Home as HomeIcon } from 'lucide-react'
 import SavedHomesSection from '../components/SavedHomesSection'
+import BuyerBidBuilder from '../components/BuyerBidBuilder'
 import { useAuth } from '../contexts/AuthContext'
 import { PROFILE_KEYS, OPTIONS, stateName } from '../services/buyerProfile'
 
@@ -142,6 +143,8 @@ export default function UserDashboard({ user }) {
 
       {/* Profile: forms across the site fill in from it */}
       <ProfileCard />
+
+      <BuyerBidBuilder user={user} />
 
       {/* Homes the buyer saved, with price and contract activity */}
       <SavedHomesSection />
