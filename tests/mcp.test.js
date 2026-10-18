@@ -1,9 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import handler from '../api/mcp.js';
-
-process.env.SUPABASE_URL ||= 'https://example.supabase.co';
-process.env.SUPABASE_SERVICE_KEY ||= 'test-key';
+process.env.SUPABASE_URL = 'https://example.supabase.co';
+process.env.SUPABASE_SERVICE_KEY = 'test-key';
+const {default:handler} = await import('../api/mcp.js');
 
 function request(method, params) {
   const req = {method:'POST',body:{jsonrpc:'2.0',id:1,method,params}};
