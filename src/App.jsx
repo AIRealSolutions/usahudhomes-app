@@ -991,6 +991,14 @@ function PropertyDetailPage() {
             </div>
           </div>
 
+          {/* Prepare a proposal using this property's HUD case number and current asking price. */}
+          <div className="mb-8 rounded-xl border border-blue-200 bg-blue-50 p-5">
+            <h2 className="text-xl font-bold text-gray-900">Interested in making an offer?</h2>
+            <p className="mt-1 text-sm text-gray-700">Prepare an offer for a registered HUD broker to review. Property details will be filled in automatically.</p>
+            <Link to={user ? `/dashboard?case=${encodeURIComponent(property.case_number)}` : `/login?redirect=${encodeURIComponent('/dashboard?case=' + property.case_number)}`} className="mt-3 inline-block rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800">Prepare an Offer</Link>
+            <p className="mt-2 text-xs text-gray-600">Preparing a proposal does not submit a bid to HUD. Availability and bidding periods must be confirmed.</p>
+          </div>
+
           {/* Key Features */}
           <div className="grid grid-cols-3 gap-4 mb-8">
             <div className="bg-gray-50 p-4 rounded-lg text-center">
