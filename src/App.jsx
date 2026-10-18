@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
 import DashboardLayout from './components/DashboardLayout'
 import DashboardRouter from './components/DashboardRouter'
+import BuyerBidBuilder from './components/BuyerBidBuilder'
 import LeadDetail from './pages/LeadDetail'
 import LeadDetailsPage from './pages/LeadDetailsPage'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -459,7 +460,7 @@ function PropertyCard({ property, offers, signedIn }) {
         <div className="text-sm text-gray-600 mb-4">
           {property.beds || 'N/A'} bed • {property.baths || 'N/A'} bath • {property.sq_ft ? property.sq_ft.toLocaleString() + ' sqft' : 'N/A'}
         </div>
-        <Link to={user ? `/dashboard?case=${encodeURIComponent(property.case_number)}` : `/login?next=${encodeURIComponent('/dashboard?case=' + property.case_number)}`} className="block w-full bg-green-700 text-white text-center py-2 rounded-lg hover:bg-green-800 font-semibold mb-3">Prepare an Offer</Link>
+        <Link to={`/property/${encodeURIComponent(property.case_number)}#prepare-offer`} className="block w-full bg-green-700 text-white text-center py-2 rounded-lg hover:bg-green-800 font-semibold mb-3">Prepare an Offer</Link>
         {signedIn !== undefined && <BidHistorySummary property={property} offers={offers} signedIn={signedIn} />}
         <Link
           to={`/property/${property.case_number}`}
@@ -992,12 +993,14 @@ function PropertyDetailPage() {
             </div>
           </div>
 
-          {/* Prepare a proposal using this property's HUD case number and current asking price. */}
-          <div className="mb-8 rounded-xl border border-blue-200 bg-blue-50 p-5">
-            <h2 className="text-xl font-bold text-gray-900">Interested in making an offer?</h2>
-            <p className="mt-1 text-sm text-gray-700">Prepare an offer for a registered HUD broker to review. Property details will be filled in automatically.</p>
-            <Link to={user ? `/dashboard?case=${encodeURIComponent(property.case_number)}` : `/login?redirect=${encodeURIComponent('/dashboard?case=' + property.case_number)}`} className="mt-3 inline-block rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800">Prepare an Offer</Link>
-            <p className="mt-2 text-xs text-gray-600">Preparing a proposal does not submit a bid to HUD. Availability and bidding periods must be confirmed.</p>
+          <div id="prepare-offer" className="mb-8 scroll-mt-24">
+            {user ? <BuyerBidBuilder user={user} property={property} /> : (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
+                <h2 className="text-xl font-bold">Prepare an Offer for This Property</h2>
+                <p className="mt-2 text-sm">Sign in to prepare an offer. The form stays with this property's details, and saved offers appear in your dashboard.</p>
+                <Link className="mt-3 inline-block rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white" to={`/login?next=${encodeURIComponent('/property/' + property.case_number + '#prepare-offer')}`}>Sign in to Prepare an Offer</Link>
+              </div>
+            )}
           </div>
 
           {/* Key Features */}
