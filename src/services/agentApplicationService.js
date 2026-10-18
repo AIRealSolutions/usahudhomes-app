@@ -196,7 +196,7 @@ export const agentApplicationService = {
 
       if (getError) throw getError
 
-      if (!application.email_verified || application.status !== 'under_review') {
+      if (!application.email_verified || !['pending', 'under_review'].includes(application.status)) {
         throw new Error('The applicant must verify their email before approval.')
       }
       if (!application.agreed_to_terms || !application.signature) {
