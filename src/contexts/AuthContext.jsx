@@ -144,8 +144,9 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true)
       const result = await authService.signUp(userData)
-      
-      if (result.success && result.data) {
+
+      // No session yet means the email must be confirmed first; the visitor is still signed out
+      if (result.success && result.data?.session) {
         setUser(result.data.user)
         setProfile(result.data.profile)
         setRole(result.data.profile?.role || 'end_user')

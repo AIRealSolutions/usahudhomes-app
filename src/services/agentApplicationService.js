@@ -53,6 +53,8 @@ export const agentApplicationService = {
       // Log the submission
       await this.logVerificationAction(data.id, null, 'application_submitted', 'Application submitted by agent')
 
+      await this.notifyAdminsOfNewApplication(data)
+
       // The server issues the token and sends the verification email.
       const emailResult = await this.resendVerificationEmail(data.email)
       if (!emailResult.success) console.error('Verification email not sent:', emailResult.error)
@@ -409,9 +411,17 @@ export const agentApplicationService = {
    * Notify admins of new application
    */
   async notifyAdminsOfNewApplication(application) {
-    // This would send notifications to admin users
-    // Implementation depends on your notification system
-    console.log('New application ready for review:', application.id)
+    // Server looks the application up by id and emails the admins once. Never throws.
+    try {
+      await fetch('/api/notifications?action=agent-application-submitted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicationId: application.id }),
+        keepalive: true
+      })
+    } catch (error) {
+      console.error('Admin notice for new application failed:', error)
+    }
   },
 
   /**

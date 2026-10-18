@@ -4,14 +4,15 @@
  */
 
 import { supabase } from '../config/supabase'
+import { notifyLeadSubmitted } from './leadMessaging'
 
 class AuthService {
   /**
    * Sign up new user
-   * @param {Object} userData - User registration data
-   * @returns {Promise<Object>} Result with user and profile
+   * @param {Object} userData - User registration data (property: the listing they signed up from, optional)
+   * @returns {Promise<Object>} Result with user, profile, and session (null until the email is confirmed)
    */
-  async signUp({ email, password, firstName, lastName, role = 'end_user', phone, state, address }) {
+  async signUp({ email, password, firstName, lastName, role = 'end_user', phone, state, address, property }) {
     try {
       // Safety check
       if (!supabase || !supabase.auth) {
@@ -43,6 +44,13 @@ class AuthService {
         return { success: false, error: 'User creation failed', data: null }
       }
 
+      // With email confirmation on, Supabase answers a repeat sign-up with a user that has no identities
+      if (authData.user.identities?.length === 0) {
+        return { success: false, existingAccount: true, error: 'An account with this email already exists. Please sign in instead.', data: null }
+      }
+
+      if (role === 'end_user') await this.recordSignupLead({ email, firstName, lastName, phone, state, property })
+
       // Create user record in database
       const { data: profileData, error: profileError } = await supabase
         .from('users')
@@ -70,12 +78,42 @@ class AuthService {
         success: true,
         data: {
           user: authData.user,
-          profile: profileData
+          profile: profileData,
+          session: authData.session
         }
       }
     } catch (error) {
       console.error('Error in signUp:', error)
       return { success: false, error: error.message, data: null }
+    }
+  }
+
+  /**
+   * Files a new buyer account as a lead so the admins hear about it. Never throws;
+   * a failed notice shouldn't block the sign-up.
+   */
+  async recordSignupLead({ email, firstName, lastName, phone, state, property }) {
+    try {
+      // Signed-out visitors can insert leads but not read them back, so the id is generated here.
+      const leadId = crypto.randomUUID()
+      const { error } = await supabase.from('leads').insert({
+        id: leadId,
+        first_name: firstName || '',
+        last_name: lastName || '',
+        email,
+        phone: phone || null,
+        state: (property?.state || state) ? String(property?.state || state).trim().toUpperCase().slice(0, 2) : null,
+        property_id: property?.id || null,
+        property_case_number: property?.case_number || null,
+        property_address: property ? [property.address, property.city, property.state].filter(Boolean).join(', ') : null,
+        property_price: property?.price ?? null,
+        source: 'account_signup',
+        status: 'new_lead'
+      })
+      if (error) throw error
+      notifyLeadSubmitted(leadId)
+    } catch (error) {
+      console.error('Sign-up lead not recorded:', error)
     }
   }
 

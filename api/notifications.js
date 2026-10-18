@@ -10,6 +10,7 @@
  *   POST ?action=agent-email — send agent onboarding email (verification/approval/rejection)
  *   POST ?action=agent-verify — confirm an agent applicant's email token
  *   POST ?action=agent-resend-verification — issue and email a new verification link
+ *   POST ?action=agent-application-submitted — public form: announce a new broker application to admins (once)
  *   POST ?action=lead-email — broker/admin emails a lead via Gmail (Bearer token required)
  *   POST ?action=lead-sms   — broker/admin texts a lead via Twilio (Bearer token required)
  *   POST ?action=consultation-request — signed-in buyer asks for an agent callback (saved as a lead)
@@ -207,6 +208,47 @@ async function handleAgentVerify(req, res) {
   }
 
   return res.status(200).json({ success: true, data: { id: app.id, email: app.email, firstName: app.first_name } })
+}
+
+// Applicants are signed out, so only the application id is accepted; the application
+// is read from the database, must be recent, and is announced once.
+async function handleAgentApplicationSubmitted(req, res) {
+  const id = String(req.body?.applicationId || '')
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return res.status(400).json({ success: false, error: 'applicationId required' })
+
+  const app = (await supabaseFetch(
+    `agent_applications?id=eq.${id}&select=id,email,first_name,last_name,phone,company,license_number,license_state,states_covered,created_at&limit=1`
+  ))?.[0]
+  if (!app) return res.status(404).json({ success: false, error: 'Application not found' })
+  const createdAt = new Date(app.created_at + (/[zZ+]/.test(String(app.created_at).slice(-6)) ? '' : 'Z')).getTime()
+  if (Date.now() - createdAt > 15 * 60 * 1000) return res.status(200).json({ success: true, skipped: 'not recent' })
+  const already = await supabaseFetch(`agent_verification_logs?application_id=eq.${id}&action_type=eq.admin_notified&select=id&limit=1`)
+  if (already?.length) return res.status(200).json({ success: true, skipped: 'already notified' })
+  await logAgentAction(id, 'admin_notified', 'Admins emailed about the new application')
+
+  const rows = {
+    Name: `${app.first_name || ''} ${app.last_name || ''}`.trim(),
+    Email: app.email,
+    Phone: app.phone,
+    Company: app.company,
+    License: [app.license_number, app.license_state].filter(Boolean).join(' — '),
+    'States covered': (app.states_covered || []).join(', '),
+  }
+  const table = Object.entries(rows)
+    .filter(([, v]) => v)
+    .map(([k, v]) => `<tr><td style="padding:6px 12px;font-weight:bold">${escapeHtml(k)}</td><td style="padding:6px 12px">${escapeHtml(String(v))}</td></tr>`)
+    .join('')
+  try {
+    await sendEmail({
+      to: GMAIL_USER,
+      subject: `New broker application: ${rows.Name}`,
+      html: `<p>A new broker partner application was just submitted.</p><table>${table}</table>` +
+            `<p>They've been sent an email verification link. <a href="${SITE_URL}/admin">Review it in the Admin Panel</a> under Agent Applications.</p>`,
+    })
+  } catch (err) {
+    console.error('[agent-application-submitted] admin notice failed:', err.message)
+  }
+  return res.status(200).json({ success: true })
 }
 
 async function handleAgentResendVerification(req, res) {
@@ -619,6 +661,7 @@ async function handleAgentInvite(req, res) {
 const SOURCE_LABELS = {
   hud_home_alerts: 'HUD home alert sign-up',
   property_inquiry: 'property inquiry',
+  account_signup: 'buyer account',
   website: 'contact form',
 }
 
@@ -826,6 +869,7 @@ export default async function handler(req, res) {
     if (action === 'agent-email') return await handleAgentEmail(req, res)
     if (action === 'agent-verify') return await handleAgentVerify(req, res)
     if (action === 'agent-resend-verification') return await handleAgentResendVerification(req, res)
+    if (action === 'agent-application-submitted') return await handleAgentApplicationSubmitted(req, res)
     if (action === 'lead-email')  return await handleLeadEmail(req, res)
     if (action === 'lead-sms')    return await handleLeadSms(req, res)
     if (action === 'consultation-request') return await handleConsultationRequest(req, res)
@@ -836,7 +880,7 @@ export default async function handler(req, res) {
     return res.status(400).json({
       success: false,
       error: 'Missing or unknown ?action= parameter',
-      valid_actions: ['lead', 'sms', 'agent-email', 'agent-verify', 'agent-resend-verification', 'lead-email', 'lead-sms', 'consultation-request', 'agent-invite', 'lead-submitted', 'send-alerts', 'unsubscribe'],
+      valid_actions: ['lead', 'sms', 'agent-email', 'agent-verify', 'agent-resend-verification', 'agent-application-submitted', 'lead-email', 'lead-sms', 'consultation-request', 'agent-invite', 'lead-submitted', 'send-alerts', 'unsubscribe'],
     })
   } catch (err) {
     console.error(`[notifications/${action}] Error:`, err.message)

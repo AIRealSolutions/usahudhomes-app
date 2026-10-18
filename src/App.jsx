@@ -3,7 +3,6 @@ import { Helmet } from 'react-helmet-async'
 import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import { supabase } from './config/supabase'
-import { notifyLeadSubmitted } from './services/leadMessaging'
 import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User, Menu } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
@@ -35,6 +34,7 @@ import SearchHeroSection from './components/SearchHeroSection'
 import BuyerProgramsSection from './components/BuyerProgramsSection'
 import HowItWorksPreview from './components/HowItWorksPreview'
 import AddressRevealGate from './components/AddressRevealGate'
+import PropertyInquiryForm, { hasInquired } from './components/PropertyInquiryForm'
 import PropertyRequestForm from './components/PropertyRequestForm'
 import AgentRequestForm from './components/AgentRequestForm'
 import SearchFilters from './components/SearchFilters'
@@ -775,161 +775,14 @@ function HowItWorksPage() {
   )
 }
 
-// Inquiry Form Modal
-function InquiryFormModal({ property, onClose }) {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    message: `I'm interested in the property at ${property.address}, ${property.city}, ${property.state}`
-  })
-  const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSubmitting(true)
-
-    try {
-      // Split name into first and last name
-      const nameParts = formData.name.trim().split(' ')
-      const firstName = nameParts[0] || ''
-      const lastName = nameParts.slice(1).join(' ') || ''
-
-      // Save inquiry to leads table with property information
-      // Signed-out visitors can insert leads but not read them back, so the id is generated here.
-      const leadData = { id: crypto.randomUUID() }
-      const { error: leadError } = await supabase
-        .from('leads')
-        .insert([{
-          id: leadData.id,
-          first_name: firstName,
-          last_name: lastName,
-          email: formData.email,
-          phone: formData.phone,
-          state: property.state,
-          message: formData.message,
-          property_case_number: property.case_number,
-          property_address: `${property.address}, ${property.city}, ${property.state}`,
-          property_price: property.price ?? property.list_price,
-          source: 'property_inquiry',
-          status: 'new_lead'
-        }]);
-
-      if (leadError) throw leadError;
-
-      // Create initial lead event
-      const { error: eventError } = await supabase
-        .from('lead_events')
-        .insert({
-          lead_id: leadData.id,
-          event_type: 'lead_received',
-          event_data: {
-            source: 'property_inquiry',
-            form_type: 'property_inquiry',
-            property_case_number: property.case_number,
-            property_address: `${property.address}, ${property.city}, ${property.state}`,
-            property_price: property.price ?? property.list_price
-          }
-        });
-
-      if (eventError) console.error('Error creating lead event:', eventError);
-
-      notifyLeadSubmitted(leadData.id)
-
-      setSubmitted(true)
-      setTimeout(() => onClose(), 2000)
-    } catch (err) {
-      console.error('Error submitting inquiry:', err)
-      alert('Failed to submit inquiry. Please call us at 910-363-6147')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-2xl font-bold">Request Information</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X className="h-6 w-6" />
-          </button>
-        </div>
-
-        {submitted ? (
-          <div className="text-center py-8">
-            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-            <h4 className="text-xl font-semibold mb-2">Thank You!</h4>
-            <p className="text-gray-600">We'll contact you shortly about this property.</p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-              <input
-                type="email"
-                required
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Phone *</label>
-              <input
-                type="tel"
-                required
-                value={formData.phone}
-                onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
-              <textarea
-                rows="4"
-                value={formData.message}
-                onChange={(e) => setFormData({...formData, message: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
-            >
-              {submitting ? 'Submitting...' : 'Send Inquiry'}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // Property Detail Page
 function PropertyDetailPage() {
   const { caseNumber } = useParams()
   const { user } = useAuth()
   const [property, setProperty] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showInquiryForm, setShowInquiryForm] = useState(false)
   const [showAddressGate, setShowAddressGate] = useState(false)
+  const [inquirySent, setInquirySent] = useState(() => hasInquired(caseNumber))
   const [sidebarTab, setSidebarTab] = useState('agent') // 'agent' or 'property'
 
   useEffect(() => {
@@ -950,10 +803,17 @@ function PropertyDetailPage() {
       }
     }
     loadProperty()
+    setInquirySent(hasInquired(caseNumber))
   }, [caseNumber])
 
-  // Mask address for unauthenticated users
-  const displayAddress = user ? property?.address : `HUD Home in ${property?.city}, ${property?.state}`
+  // Mask the address until the visitor signs in or sends an inquiry about this home
+  const canSeeAddress = !!user || inquirySent
+  const displayAddress = canSeeAddress ? property?.address : `HUD Home in ${property?.city}, ${property?.state}`
+  const scrollToInquiry = () => {
+    const form = document.getElementById('ask-about-home')
+    form?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setTimeout(() => form?.querySelector('input')?.focus({ preventScroll: true }), 400)
+  }
   const propertyUrl = property ? `https://www.usahudhomes.com/property/${property.case_number}` : ''
   // Titles and share tags never include the street address (it stays behind the login)
   const propertyTitle = property ? `${property.price ? `$${Number(property.price).toLocaleString()} — ` : ''}HUD Home in ${property.city}, ${property.state}` : 'Property Details'
@@ -1009,9 +869,9 @@ function PropertyDetailPage() {
         <span className="mx-2">/</span>
         <span className="text-gray-900 flex items-center">
           {displayAddress}
-          {!user && (
+          {!canSeeAddress && (
             <button
-              onClick={() => setShowAddressGate(true)}
+              onClick={scrollToInquiry}
               className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200 transition-colors"
             >
               Unlock
@@ -1050,9 +910,9 @@ function PropertyDetailPage() {
           {/* Property Title */}
           <div className="mb-2 flex items-start justify-between">
             <h1 className="text-3xl font-bold">{displayAddress}</h1>
-            {!user && (
+            {!canSeeAddress && (
               <button
-                onClick={() => setShowAddressGate(true)}
+                onClick={scrollToInquiry}
                 className="ml-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors whitespace-nowrap"
               >
                 Unlock Address
@@ -1185,34 +1045,37 @@ function PropertyDetailPage() {
               {sidebarTab === 'property' && <PropertyRequestForm property={property} />}
             </>
           ) : (
-            /* Contact Card (for unauthenticated users) */
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 sticky top-24">
-              <h3 className="text-xl font-bold mb-4">Interested in this property?</h3>
-              <p className="text-gray-700 mb-6">
-                Contact us today to schedule a viewing or get more information about this HUD home.
+            /* Inquiry card (for unauthenticated users) — no account needed */
+            <div id="ask-about-home" className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 scroll-mt-24">
+              <h3 className="text-xl font-bold mb-2">Ask about this home</h3>
+              <p className="text-gray-700 text-sm mb-4">
+                Get the full address, schedule a showing, or ask how to bid. A HUD-registered agent will get back to you.
               </p>
 
-              <button
-                onClick={() => setShowAddressGate(true)}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 mb-3"
-              >
-                Unlock Full Details
-              </button>
+              <PropertyInquiryForm property={property} onSubmitted={() => setInquirySent(true)} />
 
-              <Link
-                to="/alerts"
-                className="mb-3 block w-full rounded-lg bg-orange-500 py-3 text-center font-semibold text-white hover:bg-orange-600"
-              >
-                Get HUD Home Alerts
-              </Link>
+              <div className="mt-4 space-y-3">
+                <a
+                  href="tel:9103636147"
+                  className="w-full bg-white border-2 border-blue-600 text-blue-600 py-3 rounded-lg font-semibold hover:bg-blue-50 flex items-center justify-center"
+                >
+                  <Phone className="h-5 w-5 mr-2" />
+                  Call 910-363-6147
+                </a>
+                <Link
+                  to="/alerts"
+                  className="block w-full rounded-lg bg-orange-500 py-3 text-center font-semibold text-white hover:bg-orange-600"
+                >
+                  Get HUD Home Alerts
+                </Link>
+              </div>
 
-              <a
-                href="tel:9103636147"
-                className="w-full bg-white border-2 border-blue-600 text-blue-600 py-3 rounded-lg font-semibold hover:bg-blue-50 flex items-center justify-center"
-              >
-                <Phone className="h-5 w-5 mr-2" />
-                Call 910-363-6147
-              </a>
+              <p className="mt-4 text-sm text-center text-gray-600">
+                <button onClick={() => setShowAddressGate(true)} className="text-blue-600 hover:underline font-medium">
+                  Sign in or create a free account
+                </button>
+                {' '}to save homes and see every address.
+              </p>
 
               <div className="mt-6 pt-6 border-t border-blue-200">
                 <p className="text-sm text-gray-600 mb-2">Lightkeeper Realty</p>
@@ -1246,14 +1109,6 @@ function PropertyDetailPage() {
           </div>
         </div>
       </div>
-
-      {/* Inquiry Form Modal */}
-      {showInquiryForm && (
-        <InquiryFormModal
-          property={property}
-          onClose={() => setShowInquiryForm(false)}
-        />
-      )}
 
       {/* Address Reveal Gate Modal */}
       <AddressRevealGate
