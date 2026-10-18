@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 const initial = { case_number:'', asking_price:'', offer_price:'', occupancy:'owner', financing:'fha', closing_cost_percent:0, earnest_money:1000, notes:'' }
 const money = n => Number(n || 0).toLocaleString('en-US',{style:'currency',currency:'USD'})
 export default function BuyerBidBuilder({ user, property }) {
+ const [searchParams]=useSearchParams()
  const [form,setForm]=useState(initial), [bids,setBids]=useState([]), [busy,setBusy]=useState(false), [message,setMessage]=useState('')
  const change=(key,value)=>setForm(old=>({...old,[key]:value}))
  const load=async()=>{ if(!user?.id)return; const {data,error}=await supabase.from('buyer_bid_drafts').select('*').eq('buyer_id',user.id).order('created_at',{ascending:false}); if(error)setMessage(error.message);else setBids(data||[]) }
  useEffect(()=>{load()},[user?.id])
  useEffect(()=>{ if(!property?.case_number)return; setForm(old=>({...initial,case_number:property.case_number,asking_price:property.price??'',offer_price:property.price??''}));setMessage('Property details loaded. Verify bidding eligibility with your broker.') },[property?.case_number,property?.price])
+ useEffect(()=>{const selected=bids.find(b=>b.id===searchParams.get('offer')&&b.case_number===property?.case_number);if(selected&&['draft','changes_requested'].includes(selected.status))setForm({...selected,asking_price:property.price??''})},[bids,searchParams,property?.case_number,property?.price])
  const save=async(status)=>{
   if(!user?.id)return setMessage('Please sign in to save an offer.')
   if(!/^\d{3}-\d{6}$/.test(form.case_number.trim()))return setMessage('Enter a valid HUD case number (000-000000).')
