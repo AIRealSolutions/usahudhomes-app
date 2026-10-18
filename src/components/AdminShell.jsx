@@ -47,6 +47,7 @@ const PropertySearchTab   = lazy(() => import('./admin/PropertySearchTab'))
 const LeadAdmin           = lazy(() => import('./admin/LeadsHub'))
 const CustomerAdmin       = lazy(() => import('./admin/CustomerAdmin'))
 const ReferralManagement  = lazy(() => import('./admin/ReferralManagement'))
+const OfferReferralMarketplace = lazy(() => import('./broker/OfferReferralMarketplace'))
 const ConsultationAdmin   = lazy(() => import('./admin/ConsultationAdmin'))
 const EmailTemplateEditor = lazy(() => import('./admin/EmailTemplateEditor'))
 const AgentAdmin          = lazy(() => import('./admin/AgentAdmin'))
@@ -87,6 +88,7 @@ const NAV = [
       { id: 'leads',            label: 'Leads',             icon: MessageSquare, color: 'text-orange-500', alertKey: 'newLeads' },
       { id: 'customers',        label: 'Customers',         icon: Users,         color: 'text-blue-500' },
       { id: 'referrals',        label: 'Referrals',         icon: GitMerge,      color: 'text-purple-500' },
+      { id: 'offer-referrals', label: 'Unassigned Offers', icon: Gavel, color: 'text-amber-600' },
       { id: 'consultations',    label: 'Assigned Leads', icon: PhoneCall,     color: 'text-green-500' },
       { id: 'email-templates',  label: 'Email Templates', icon: Mail,         color: 'text-sky-500' },
     ]
@@ -126,6 +128,7 @@ const COMPONENT_MAP = {
   'leads':             LeadAdmin, // LeadManagement — queries leads table
   'customers':         CustomerAdmin,
   'referrals':         ReferralManagement,
+  'offer-referrals':   () => <OfferReferralMarketplace admin />,
   'consultations':     ConsultationAdmin,
   'email-templates':   EmailTemplateEditor,
   'agents':            AgentAdmin,
