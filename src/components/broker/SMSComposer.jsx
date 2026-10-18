@@ -6,7 +6,7 @@ import { markPicks } from '../../services/propertyPicks'
 import InsertPicksButton from './InsertPicksButton'
 import { X, MessageSquare, Send, Sparkles } from 'lucide-react'
 
-const SMSComposer = ({ consultation, customer, property, onSend, onCancel }) => {
+const SMSComposer = ({ consultation, customer, property, onSend, onCancel, initialMessage = '' }) => {
   const { profile, user } = useAuth()
   // users.name is a single field; first/last only exist on some older profiles.
   const nameParts = String(profile?.name || '').trim().split(/\s+/).filter(Boolean)
@@ -23,7 +23,7 @@ const SMSComposer = ({ consultation, customer, property, onSend, onCancel }) => 
     address: property?.address || consultation?.property_address || ''
   }
   customer = { ...(customer || {}), first_name: customer?.first_name || String(customer?.name || consultation?.customer_name || '').split(' ')[0] || 'there' }
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(initialMessage)
   const [insertedPickIds, setInsertedPickIds] = useState([])
   const [sending, setSending] = useState(false)
 

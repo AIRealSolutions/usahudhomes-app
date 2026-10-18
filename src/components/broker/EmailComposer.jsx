@@ -7,7 +7,7 @@ import { markPicks } from '../../services/propertyPicks'
 import InsertPicksButton from './InsertPicksButton'
 import { X, Mail, Send, FileText, Sparkles } from 'lucide-react'
 
-const EmailComposer = ({ consultation, customer, property, onSend, onCancel }) => {
+const EmailComposer = ({ consultation, customer, property, onSend, onCancel, initialSubject = '', initialBody = '' }) => {
   const { profile, user } = useAuth()
   // users.name is a single field; first/last only exist on some older profiles.
   const nameParts = String(profile?.name || '').trim().split(/\s+/).filter(Boolean)
@@ -24,8 +24,8 @@ const EmailComposer = ({ consultation, customer, property, onSend, onCancel }) =
     address: property?.address || consultation?.property_address || ''
   }
   customer = { ...(customer || {}), first_name: customer?.first_name || String(customer?.name || consultation?.customer_name || '').split(' ')[0] || 'there' }
-  const [subject, setSubject] = useState('')
-  const [body, setBody] = useState('')
+  const [subject, setSubject] = useState(initialSubject)
+  const [body, setBody] = useState(initialBody)
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [sending, setSending] = useState(false)
   const [savedTemplates, setSavedTemplates] = useState([])

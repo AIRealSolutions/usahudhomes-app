@@ -4,7 +4,7 @@
  * them homes. Loaded on demand from /api/leads?action=client-activity.
  */
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../config/supabase'
 import { removePick } from '../../services/propertyPicks'
@@ -68,7 +68,7 @@ function PropertyLine({ caseNumber, address, city, state, price, status, note, a
   )
 }
 
-export default function ClientActivity({ consultationId }) {
+export default function ClientActivity({ consultationId, defaultOpen = false }) {
   const [open, setOpen] = useState(false)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -89,6 +89,11 @@ export default function ClientActivity({ consultationId }) {
       }
     }
   }
+
+  // Pages that are all about one lead show the activity without an extra tap
+  useEffect(() => {
+    if (defaultOpen && consultationId) toggle()
+  }, [defaultOpen, consultationId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const account = data?.account
   const budget = account && (account.price_range_min || account.price_range_max)
