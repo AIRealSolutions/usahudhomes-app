@@ -20,3 +20,5 @@ create policy "buyers read own bids" on public.buyer_bid_drafts for select to au
 create policy "buyers create own bids" on public.buyer_bid_drafts for insert to authenticated with check (buyer_id=auth.uid() and status in ('draft','submitted'));
 create policy "buyers edit drafts" on public.buyer_bid_drafts for update to authenticated using (buyer_id=auth.uid() and status in ('draft','changes_requested')) with check (buyer_id=auth.uid() and status in ('draft','submitted'));
 -- Broker access must be implemented through verified assignment relationships, not broad RLS.
+
+grant select, insert, update on public.buyer_bid_drafts to authenticated;
