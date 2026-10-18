@@ -343,27 +343,9 @@ async function hudGalleryFor(property) {
   }).slice(0, 80)
 }
 
-// TEMPORARY: shows which HUD searches find a home and how its photos are listed
-async function galleryDiagnostics(caseNumber, state) {
-  const out = {}
-  for (const citystate of [caseNumber, state]) {
-    try {
-      const listings = parseRawListings(await fetchHudHtml(citystate))
-      const raw = listings.find(p => p.propertyCaseNumber === caseNumber)
-      out[citystate] = { listings: listings.length, found: !!raw, photos: raw ? photosFromGalleryField(raw.galleryImages, '').length : 0 }
-    } catch (e) { out[citystate] = { error: e.message } }
-  }
-  return out
-}
-
 async function handleGallery(req, res) {
   const caseNumber = String(req.query?.caseNumber || '').trim()
   if (!/^[0-9A-Za-z-]{5,20}$/.test(caseNumber)) return res.status(400).json({ success: false, error: 'caseNumber required' })
-  if (req.query?.debug === '1') {
-    const { data: p } = await getSupabase().from('properties').select('state').eq('case_number', caseNumber).maybeSingle()
-    res.setHeader('Cache-Control', 'no-store')
-    return res.status(200).json({ success: true, debug: await galleryDiagnostics(caseNumber, p?.state || 'NC') })
-  }
   const supabase = getSupabase()
   const { data: property, error } = await supabase
     .from('properties')
