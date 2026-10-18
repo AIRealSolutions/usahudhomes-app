@@ -3,7 +3,7 @@
  * Stateless JSON-RPC over HTTP. No customer data or service-role key exposed.
  */
 const VERSION = '2025-03-26';
-const URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_KEY;
 const ORIGIN = 'https://www.usahudhomes.com';
 const tools = [
@@ -14,8 +14,8 @@ function response(id,result){return {jsonrpc:'2.0',id,result}}
 function error(id,code,message){return {jsonrpc:'2.0',id,error:{code,message}}}
 function clean(p){return {case_number:p.case_number,city:p.city,state:p.state,county:p.county,price:p.price,beds:p.beds,baths:p.baths,sq_ft:p.sq_ft,status:p.status,listing_period:p.listing_period,fha_financing:p.fha_financing,bid_deadline:p.bid_deadline,updated_at:p.updated_at,property_url:`${ORIGIN}/property/${encodeURIComponent(p.case_number)}`,hud_url:p.hud_url}}
 async function query(args,detail){
- if(!URL||!KEY)throw Error('Property search is temporarily unavailable');
- const u=new URL(`${URL}/rest/v1/properties`);
+ if(!SUPABASE_URL||!KEY)throw Error('Property search is temporarily unavailable');
+ const u=new URL(`${SUPABASE_URL}/rest/v1/properties`);
  u.searchParams.set('select','case_number,city,state,county,price,beds,baths,sq_ft,status,listing_period,fha_financing,bid_deadline,updated_at,hud_url');
  u.searchParams.set('limit',detail?'1':String(Math.min(20,Math.max(1,Number(args.limit)||10))));
  if(detail){
