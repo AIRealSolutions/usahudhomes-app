@@ -97,15 +97,17 @@ function easternDate(options, now) {
  * @param {{code: string, name: string}} args.state
  * @param {Array} args.stateListings every active listing in the state
  * @param {string} [args.citySlug] when set, the page is for that city
+ * @param {boolean} [args.showPriceStats] include the price range and median (signed-in visitors only)
  * @param {Date} [args.now]
  */
-export function buildGeoSeo({ state, stateListings, citySlug = '', now = new Date() }) {
+export function buildGeoSeo({ state, stateListings, citySlug = '', showPriceStats = false, now = new Date() }) {
   const slug = stateSlug(state.name)
   const cities = cityCounts(stateListings)
   const city = citySlug ? cities.find(c => c.slug === citySlug) : null
   const listings = city ? stateListings.filter(p => p.city === city.name) : stateListings
   const count = listings.length
-  const stats = priceStats(listings)
+  // Price statistics are for signed-in members; visitors and search engines don't get them
+  const stats = showPriceStats ? priceStats(listings) : null
   const topCities = [...cities].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 3)
   const leadingCities = topCities.filter(c => c.count > 1)
   const isHomeState = state.code === HOME_STATE

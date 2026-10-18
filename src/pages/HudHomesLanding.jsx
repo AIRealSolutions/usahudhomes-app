@@ -84,8 +84,8 @@ export default function HudHomesLanding() {
   }, [stateInfo])
 
   const seo = useMemo(
-    () => stateInfo && buildGeoSeo({ state: stateInfo, stateListings, citySlug }),
-    [stateInfo, stateListings, citySlug]
+    () => stateInfo && buildGeoSeo({ state: stateInfo, stateListings, citySlug, showPriceStats: !!user }),
+    [stateInfo, stateListings, citySlug, user]
   )
 
   if (!stateInfo) {

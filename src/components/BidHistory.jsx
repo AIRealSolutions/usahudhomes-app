@@ -1,11 +1,12 @@
 /**
  * Bid history shown to signed-in buyers: what HUD accepted on a home before.
  * BidHistorySummary — one line on a search result card
- * PropertyHistoryPanel — price summary and activity timeline on the property page
+ * PropertyHistoryPanel — price summary and activity timeline on the property page (members only)
  */
 
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import SignUpGate from './SignUpGate'
 import { Gavel, Lock, Clock } from 'lucide-react'
 import {
   fetchPropertyHistory, buildTimeline, priceChange, formatMoney, formatDate, percentOfList, isUnderContract, OUTCOME_LABELS,
@@ -49,7 +50,7 @@ const EVENT_STYLE = {
   back_on_market:  { dot: 'bg-purple-500',  title: 'Back on the market' },
 }
 
-function TimelineDetail({ item, property, signedIn }) {
+function TimelineDetail({ item, property }) {
   switch (item.kind) {
     case 'listed':
       return <>Listed at {formatMoney(item.list_price)}</>
@@ -72,13 +73,6 @@ function TimelineDetail({ item, property, signedIn }) {
     case 'back_on_market':
       return <>Relisted at {formatMoney(item.list_price)}; the previous contract did not close</>
     case 'offer_accepted': {
-      if (!signedIn) {
-        return (
-          <Link to={signUpLink(property.case_number)} className="inline-flex items-center gap-1 text-blue-700 hover:underline">
-            <Lock className="h-3.5 w-3.5" /> Create a free account to see the accepted amount and buyer type
-          </Link>
-        )
-      }
       const o = item.offer
       const pct = percentOfList(o, property.price)
       return (
@@ -99,21 +93,33 @@ export function PropertyHistoryPanel({ property, signedIn }) {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (!property?.case_number) return
+    if (!signedIn || !property?.case_number) return
     let cancelled = false
     setHistory(null)
-    fetchPropertyHistory(property.case_number, { withOffers: signedIn })
+    fetchPropertyHistory(property.case_number, { withOffers: true })
       .then(h => { if (!cancelled) setHistory(h) })
       .catch(e => { if (!cancelled) setError(e.message) })
     return () => { cancelled = true }
   }, [signedIn, property?.case_number])
 
-  const timeline = history ? buildTimeline(history) : []
-  // Visitors see that an offer was accepted when the home went under contract, without the terms
-  if (history && !signedIn && isUnderContract(property) && !timeline.some(t => t.kind === 'offer_accepted')) {
-    const uc = timeline.find(t => t.kind === 'under_contract')
-    if (uc) timeline.splice(timeline.indexOf(uc) + 1, 0, { kind: 'offer_accepted', at: uc.at, id: 'offer-locked' })
+  if (!signedIn) {
+    return (
+      <SignUpGate
+        icon={Clock}
+        className="mb-8"
+        title="Price & Activity History"
+        description="See everything that has happened to this home since HUD listed it."
+        benefits={[
+          'Every price reduction, with dates and amounts',
+          'How many times it went under contract and fell through',
+          'What HUD accepted, net to HUD, and the buyer type',
+        ]}
+        cta="See the full history"
+      />
+    )
   }
+
+  const timeline = history ? buildTimeline(history) : []
   const change = priceChange(property)
   const contracts = timeline.filter(t => t.kind === 'under_contract').length
   const reductions = timeline.filter(t => t.kind === 'price_change' && Number(t.list_price) < Number(t.previous_price)).length
@@ -160,7 +166,7 @@ export function PropertyHistoryPanel({ property, signedIn }) {
                 <span className={`absolute -left-[7px] mt-1.5 h-3 w-3 rounded-full ring-4 ring-white ${style.dot}`} />
                 <p className="text-xs text-gray-500">{formatDate(item.at)}</p>
                 <p className="font-semibold text-gray-900">{title}</p>
-                <p className="text-sm text-gray-700"><TimelineDetail item={item} property={property} signedIn={signedIn} /></p>
+                <p className="text-sm text-gray-700"><TimelineDetail item={item} property={property} /></p>
               </li>
             )
           })}
@@ -173,7 +179,7 @@ export function PropertyHistoryPanel({ property, signedIn }) {
           {contracts > 1 && `This home has gone under contract ${contracts} times.`}
         </p>
       )}
-      {signedIn && history?.offers?.length > 0 && (
+      {history?.offers?.length > 0 && (
         <p className="text-xs text-gray-400 mt-4">
           Net to HUD is what HUD receives after any closing costs and commissions it agreed to pay, so the contract price is usually higher.
         </p>

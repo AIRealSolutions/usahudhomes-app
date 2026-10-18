@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async'
 import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import { supabase } from './config/supabase'
-import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User, Menu } from 'lucide-react'
+import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User, Menu, Calculator } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
@@ -42,6 +42,7 @@ import SearchFilters from './components/SearchFilters'
 import { BidHistorySummary, PropertyHistoryPanel } from './components/BidHistory'
 import SaveHomeButton from './components/SaveHomeButton'
 import PaymentBreakdown from './components/PaymentBreakdown'
+import SignUpGate from './components/SignUpGate'
 import LenderSpotlight, { GetQualifiedButton } from './components/GetQualified'
 import ShareProperty, { propertyShareText } from './components/ShareProperty'
 import { SavedHomesProvider } from './contexts/SavedHomesContext'
@@ -446,7 +447,7 @@ function PropertyCard({ property, offers, signedIn }) {
           <span className="text-2xl font-bold text-blue-600">
             ${property.price?.toLocaleString()}
           </span>
-          {change && change.amount < 0 && (
+          {user && change && change.amount < 0 && (
             <span className="text-sm font-semibold text-green-700" title={`First listed at $${Number(property.original_list_price).toLocaleString()}`}>
               ↓ ${Math.abs(change.amount).toLocaleString()} ({Math.abs(change.percent)}%)
             </span>
@@ -991,12 +992,27 @@ function PropertyDetailPage() {
             </div>
           </div>
 
-          {/* Monthly payment and cash to close: HUD $100 down vs standard FHA vs conventional */}
-          <PaymentBreakdown property={property} />
+          {/* Monthly payment and cash to close: HUD $100 down vs standard FHA vs conventional (members only) */}
+          {user ? (
+            <PaymentBreakdown property={property} />
+          ) : (
+            <SignUpGate
+              icon={Calculator}
+              className="mb-8"
+              title="What would your payment be?"
+              description={`See your monthly payment and cash to close for this ${property.city} HUD home, side by side for each loan type.`}
+              benefits={[
+                'HUD $100-down FHA vs. standard FHA vs. conventional',
+                'Taxes, insurance, mortgage insurance and HUD\'s closing-cost credit built in',
+                'Adjust the rate, down payment and term to fit your budget',
+              ]}
+              cta="Unlock the payment calculator"
+            />
+          )}
 
           <LenderSpotlight compact />
 
-          {/* Price changes, status changes and accepted offers (terms for signed-in buyers) */}
+          {/* Price changes, status changes and accepted offers (members only) */}
           <PropertyHistoryPanel property={property} signedIn={!!user} />
 
           {/* Description */}
