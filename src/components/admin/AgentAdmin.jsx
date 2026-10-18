@@ -20,6 +20,7 @@ import {
   Send
 } from 'lucide-react'
 import { agentService } from '../../services/database'
+import { US_STATES } from '../../utils/states'
 import { agentInvitationService } from '../../services/agentInvitationService'
 
 function AgentAdmin() {
@@ -47,7 +48,9 @@ function AgentAdmin() {
       specialties: [],
       yearsExperience: 0,
       bio: '',
-      isAdmin: false
+      isAdmin: false,
+      autoReferralEnabled: false,
+      autoReferralStates: []
     }
   }
 
@@ -99,7 +102,9 @@ function AgentAdmin() {
       specialties: agent.specialties || [],
       yearsExperience: agent.years_experience || 0,
       bio: agent.bio || '',
-      isAdmin: agent.is_admin || false
+      isAdmin: agent.is_admin || false,
+      autoReferralEnabled: agent.auto_referral_enabled || false,
+      autoReferralStates: agent.auto_referral_states || []
     })
     setShowForm(true)
   }
@@ -145,6 +150,15 @@ function AgentAdmin() {
       return
     }
 
+    if (formData.autoReferralEnabled && !formData.autoReferralStates.length) {
+      alert('Choose at least one state for automatic referrals, or turn off auto referrals.')
+      return
+    }
+    const overlaps = agents.filter(a => a.id !== editingAgent?.id && a.auto_referral_enabled && (a.auto_referral_states || []).some(s => formData.autoReferralStates.includes(s)))
+    if (formData.autoReferralEnabled && overlaps.length) {
+      alert('These states are already assigned for automatic referrals to: ' + overlaps.map(a => `${a.first_name} ${a.last_name}`).join(', ') + '. Remove the conflicting assignments first.')
+      return
+    }
     setLoading(true)
 
     try {
@@ -440,6 +454,35 @@ function AgentAdmin() {
                     </Button>
                   ))}
                 </div>
+              </div>
+
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-3">
+                <label className="flex items-center gap-3 font-semibold text-gray-900">
+                  <input type="checkbox" checked={formData.autoReferralEnabled}
+                    onChange={e => setFormData({ ...formData, autoReferralEnabled: e.target.checked })}
+                    className="h-4 w-4" />
+                  Automatically assign buyer referrals to this agent
+                </label>
+                <p className="text-sm text-gray-600">Admin controlled. Only selected states route automatically; normal coverage states above do not enable auto-referrals.</p>
+                {formData.autoReferralEnabled && (
+                  <>
+                    <p className="text-sm font-medium">Auto-referral states ({formData.autoReferralStates.length})</p>
+                    <div className="grid grid-cols-5 sm:grid-cols-9 gap-2">
+                      {US_STATES.map(s => (
+                        <label key={s.code} title={s.name} className="flex items-center gap-1 text-sm">
+                          <input type="checkbox" checked={formData.autoReferralStates.includes(s.code)}
+                            onChange={() => setFormData(d => ({
+                              ...d,
+                              autoReferralStates: d.autoReferralStates.includes(s.code)
+                                ? d.autoReferralStates.filter(x => x !== s.code)
+                                : [...d.autoReferralStates, s.code].sort()
+                            }))} />
+                          {s.code}
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
 
               <div>

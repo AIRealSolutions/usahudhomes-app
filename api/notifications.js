@@ -664,9 +664,23 @@ const escapeLike = (v) => v.replace(/[\\%_]/g, m => '\\' + m)
 
 async function routeLeadToBroker(lead) {
   try {
-    const settings = (await supabaseFetch('lead_routing_settings?id=eq.1&select=enabled,states,agent_id&limit=1'))?.[0]
     const state = String(lead?.state || '').trim().toUpperCase()
-    if (!settings?.enabled || !settings.agent_id || !state || !(settings.states || []).includes(state)) return null
+    if (!/^[A-Z]{2}$/.test(state)) return null
+    // Per-agent admin settings take priority over the older global routing rule.
+    // Never auto-route to an inactive or unapproved agent.
+    const eligible = await supabaseFetch(
+      'agents?select=id,auto_referral_states&is_active=eq.true&status=eq.approved&auto_referral_enabled=eq.true&order=id.asc'
+    )
+    const matched = (eligible || []).find(agent => (agent.auto_referral_states || []).includes(state))
+    const settings = (await supabaseFetch('lead_routing_settings?id=eq.1&select=enabled,states,agent_id&limit=1'))?.[0]
+    const legacyAgentId = settings?.enabled && (settings.states || []).includes(state) ? settings.agent_id : null
+    const agentId = matched?.id || legacyAgentId
+    if (!agentId) return null
+    // The legacy rule must also point to an approved, active broker.
+    if (!matched) {
+      const active = await supabaseFetch(`agents?id=eq.${agentId}&is_active=eq.true&status=eq.approved&select=id&limit=1`)
+      if (!active?.length) return null
+    }
     const already = await supabaseFetch(`lead_events?lead_id=eq.${lead.id}&event_type=eq.assigned_to_agent&select=id&limit=1`)
     if (already?.length) return null
 
@@ -700,8 +714,8 @@ async function routeLeadToBroker(lead) {
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
         customer_id: customerId,
-        agent_id: settings.agent_id,
-        assigned_broker_id: settings.agent_id,
+        agent_id: agentId,
+        assigned_broker_id: agentId,
         assigned_at: now,
         property_id: lead.property_id || null,
         case_number: lead.property_case_number || null,
@@ -726,7 +740,7 @@ async function routeLeadToBroker(lead) {
     await supabaseWrite('lead_events', 'POST', {
       lead_id: lead.id,
       event_type: 'assigned_to_agent',
-      event_data: { agent_id: settings.agent_id, consultation_id: consultation.id, auto_routed: true, rule: `state ${state}` },
+      event_data: { agent_id: agentId, consultation_id: consultation.id, auto_routed: true, rule: `state ${state}` },
     })
     return consultation
   } catch (e) {
