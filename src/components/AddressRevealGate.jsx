@@ -8,12 +8,13 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import authService from '../services/authService'
 import { Mail, X, Eye, EyeOff } from 'lucide-react'
 
 const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'
 
 function friendlyAuthError(message = '') {
-  if (/email not confirmed/i.test(message)) return 'Please confirm your email first. Check your inbox (and spam folder) for the link we sent.'
+  if (/email not confirmed/i.test(message)) return 'Your email address isn\'t confirmed yet. Open the link we emailed you, or send a new one below.'
   if (/invalid login credentials/i.test(message)) return 'That email and password don\'t match. Try again or reset your password.'
   return message || 'Something went wrong. Please try again.'
 }
@@ -23,6 +24,7 @@ export default function AddressRevealGate({ property, isOpen, onClose, onSuccess
   const [mode, setMode] = useState('signup') // 'signup' | 'signin' | 'check-email'
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [notice, setNotice] = useState(null)
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', phone: '', password: '' })
 
@@ -35,6 +37,18 @@ export default function AddressRevealGate({ property, isOpen, onClose, onSuccess
   const switchMode = (next) => {
     setMode(next)
     setError(null)
+    setNotice(null)
+  }
+
+  const needsConfirm = /isn't confirmed/.test(error || '')
+
+  const handleResend = async () => {
+    setLoading(true)
+    const result = await authService.resendConfirmation(formData.email.trim())
+    setLoading(false)
+    if (!result.success) return setError(result.error)
+    setError(null)
+    setNotice(`A new confirmation link is on its way to ${formData.email.trim()}. Check your spam folder too.`)
   }
 
   const handleSignUp = async () => {
@@ -53,7 +67,12 @@ export default function AddressRevealGate({ property, isOpen, onClose, onSuccess
       property
     })
     if (!result.success) {
-      if (result.existingAccount) setMode('signin')
+      if (result.existingAccount) {
+        setMode('signin')
+        setFormData(prev => ({ ...prev, password: '' }))
+        setNotice('You already have an account with this email. Sign in below, or use "Forgot password?" to set a new password.')
+        return
+      }
       throw new Error(result.error || 'Registration failed')
     }
     if (result.data?.session) {
@@ -75,6 +94,7 @@ export default function AddressRevealGate({ property, isOpen, onClose, onSuccess
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
+    setNotice(null)
     setLoading(true)
     try {
       await (mode === 'signin' ? handleSignIn() : handleSignUp())
@@ -128,6 +148,14 @@ export default function AddressRevealGate({ property, isOpen, onClose, onSuccess
               >
                 I've confirmed — sign in
               </button>
+              <button
+                onClick={handleResend}
+                disabled={loading}
+                className="mt-3 text-sm font-medium text-blue-700 hover:underline disabled:opacity-50"
+              >
+                Didn't get it? Send a new link
+              </button>
+              {notice && <p className="mt-3 text-sm text-green-700">{notice}</p>}
             </div>
           ) : (
             <>
@@ -150,9 +178,25 @@ export default function AddressRevealGate({ property, isOpen, onClose, onSuccess
                 </div>
               )}
 
+              {notice && (
+                <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg mb-4 text-sm">
+                  {notice}
+                </div>
+              )}
+
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
                   {error}
+                  {needsConfirm && (
+                    <button
+                      type="button"
+                      onClick={handleResend}
+                      disabled={loading}
+                      className="block mt-2 font-semibold text-blue-700 hover:underline disabled:opacity-50"
+                    >
+                      Send me a new confirmation link
+                    </button>
+                  )}
                 </div>
               )}
 

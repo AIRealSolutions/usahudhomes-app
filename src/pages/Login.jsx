@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../config/supabase'
+import authService from '../services/authService'
 import { US_STATES } from '../services/buyerProfile'
 
 export default function Login() {
@@ -14,6 +15,8 @@ export default function Login() {
   const [signupState, setSignupState] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [notice, setNotice] = useState(null)
+  const [needsConfirm, setNeedsConfirm] = useState(false)
   const [resetMode, setResetMode] = useState(searchParams.get('reset') === '1')
   const [resetSent, setResetSent] = useState(false)
   const navigate = useNavigate()
@@ -31,6 +34,8 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setNotice(null)
+    setNeedsConfirm(false)
 
     try {
       if (isSignUp) {
@@ -45,12 +50,19 @@ export default function Login() {
           role: 'end_user'
         })
 
+        if (result.existingAccount) {
+          setIsSignUp(false)
+          setPassword('')
+          setNotice('You already have an account with this email. Sign in below. If you don\'t remember your password, use "Forgot password?" to set a new one.')
+          return
+        }
         if (!result.success) {
           throw new Error(result.error || 'Sign up failed')
         }
 
-        alert('Account created! Please check your email to verify your account.')
         setIsSignUp(false)
+        setPassword('')
+        setNotice(`Account created! We sent a confirmation link to ${email.trim()}. Open it (check your spam folder too), then sign in here.`)
       } else {
         // Sign in existing user using AuthContext
         const result = await signIn(email, password)
@@ -66,19 +78,31 @@ export default function Login() {
       }
     } catch (error) {
       const raw = error.message || 'An unexpected error occurred'
+      const unconfirmed = /email not confirmed/i.test(raw)
       const errorMsg = /invalid login credentials/i.test(raw)
         ? 'That email and password do not match. Check for typos, or use "Forgot password?" to set a new one.'
-        : raw
+        : unconfirmed
+          ? 'Your email address isn\'t confirmed yet. Open the confirmation link we emailed you, or send a new one below.'
+          : raw
       console.error('Login error:', errorMsg)
+      setNeedsConfirm(unconfirmed)
       setError(errorMsg)
-
-      // Keep error visible for at least 5 seconds
-      setTimeout(() => {
-        setError(current => current === errorMsg ? null : current)
-      }, 5000)
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleResendConfirmation = async () => {
+    setLoading(true)
+    const result = await authService.resendConfirmation(email.trim())
+    setLoading(false)
+    if (!result.success) {
+      setError(result.error)
+      return
+    }
+    setError(null)
+    setNeedsConfirm(false)
+    setNotice(`A new confirmation link is on its way to ${email.trim()}. Open it (check your spam folder too), then sign in here.`)
   }
 
   // Emails a link to /reset-password where a new password is chosen
@@ -261,9 +285,25 @@ export default function Login() {
               )}
             </div>
 
+            {notice && (
+              <div className="rounded-md bg-blue-50 border border-blue-200 p-4">
+                <div className="text-sm text-blue-800">{notice}</div>
+              </div>
+            )}
+
             {error && (
               <div className="rounded-md bg-red-50 p-4">
                 <div className="text-sm text-red-700">{error}</div>
+                {needsConfirm && (
+                  <button
+                    type="button"
+                    onClick={handleResendConfirmation}
+                    disabled={loading}
+                    className="mt-3 text-sm font-semibold text-blue-700 hover:underline disabled:opacity-50"
+                  >
+                    Send me a new confirmation link
+                  </button>
+                )}
               </div>
             )}
 
@@ -288,6 +328,8 @@ export default function Login() {
                     onClick={() => {
                       setIsSignUp(!isSignUp)
                       setError(null)
+                      setNotice(null)
+                      setNeedsConfirm(false)
                     }}
                     className="ml-2 font-medium text-blue-600 hover:text-blue-500"
                   >

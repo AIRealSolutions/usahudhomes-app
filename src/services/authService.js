@@ -89,6 +89,18 @@ class AuthService {
   }
 
   /**
+   * Re-sends the "confirm your email" link for an account that hasn't been confirmed yet.
+   */
+  async resendConfirmation(email) {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/login` }
+    })
+    return error ? { success: false, error: error.message } : { success: true }
+  }
+
+  /**
    * Files a new buyer account as a lead so the admins hear about it. Never throws;
    * a failed notice shouldn't block the sign-up.
    */
