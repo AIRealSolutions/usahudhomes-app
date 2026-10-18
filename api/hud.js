@@ -363,9 +363,39 @@ async function hudGalleryFor(property) {
   }).slice(0, 80)
 }
 
+// TEMPORARY: shows what HUD returns so the gallery parser can be matched to it
+async function galleryDiagnostics(caseNumber, state) {
+  const out = {}
+  const headers = { 'User-Agent': HUD_UA, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5' }
+  try {
+    const r = await fetch(`${HUD_BASE_URL}/propertydetail?caseNumber=${encodeURIComponent(caseNumber)}`, { headers, signal: AbortSignal.timeout(15000) })
+    const html = await r.text()
+    const around = (re) => { const m = html.search(re); return m < 0 ? null : html.slice(Math.max(0, m - 200), m + 600) }
+    out.detail = {
+      status: r.status, url: r.url, length: html.length,
+      cloudinary: (html.match(/res\.cloudinary\.com[^"'\s)<>]{0,200}/gi) || []).slice(0, 15),
+      gallery: around(/gallery/i), photo: around(/photo/i), media: around(/Media_/i), image: around(/\.jpe?g|\.png/i),
+      scripts: (html.match(/<script[^>]+src=["'][^"']+/gi) || []).slice(0, 15),
+    }
+  } catch (e) { out.detail = { error: e.message } }
+  try {
+    const listings = parseRawListings(await fetchHudHtml(state))
+    const raw = listings.find(p => p.propertyCaseNumber === caseNumber)
+    out.state = { listings: listings.length, found: !!raw, keys: raw ? Object.keys(raw) : (listings[0] ? Object.keys(listings[0]) : []),
+      galleryImages: raw ? String(raw.galleryImages ?? '').slice(0, 800) : null, thumb: raw?.propertyThumb ?? null,
+      imageish: raw ? Object.fromEntries(Object.entries(raw).filter(([k]) => /img|image|photo|gallery|thumb|media|pic/i.test(k)).map(([k, v]) => [k, String(v).slice(0, 400)])) : null }
+  } catch (e) { out.state = { error: e.message } }
+  return out
+}
+
 async function handleGallery(req, res) {
   const caseNumber = String(req.query?.caseNumber || '').trim()
   if (!/^[0-9A-Za-z-]{5,20}$/.test(caseNumber)) return res.status(400).json({ success: false, error: 'caseNumber required' })
+  if (req.query?.debug === '1') {
+    const { data: p } = await getSupabase().from('properties').select('state').eq('case_number', caseNumber).maybeSingle()
+    res.setHeader('Cache-Control', 'no-store')
+    return res.status(200).json({ success: true, debug: await galleryDiagnostics(caseNumber, p?.state || 'NC') })
+  }
   const supabase = getSupabase()
   const { data: property, error } = await supabase
     .from('properties')
