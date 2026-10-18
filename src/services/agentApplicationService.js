@@ -196,6 +196,13 @@ export const agentApplicationService = {
 
       if (getError) throw getError
 
+      if (!application.email_verified || application.status !== 'under_review') {
+        throw new Error('The applicant must verify their email before approval.')
+      }
+      if (!application.agreed_to_terms || !application.signature) {
+        throw new Error('A signed referral agreement is required.')
+      }
+
       const now = new Date().toISOString()
       const agentData = {
         first_name: application.first_name,
@@ -215,10 +222,10 @@ export const agentApplicationService = {
         signature: application.signature,
         referral_agreement_signed: !!application.agreed_to_terms,
         referral_agreement_date: application.terms_agreed_at,
-        status: 'approved',
-        is_active: true,
-        onboarding_completed: true,
-        onboarding_completed_at: now
+        status: 'pending',
+        is_active: false,
+        onboarding_completed: false,
+        onboarding_completed_at: null
       }
 
       // agents.email is unique: re-activate an existing agent row instead of failing
@@ -230,34 +237,30 @@ export const agentApplicationService = {
 
       if (agentError) throw agentError
 
-      // Create referral agreement
-      const agreementResult = await this.createReferralAgreement(agent.id, application)
-      if (!agreementResult.success) console.error('Referral agreement not created:', agreementResult.error)
-
-      // Update application status
-      const { error: updateError } = await supabase
-        .from('agent_applications')
-        .update({
-          status: 'approved',
-          reviewed_by: reviewerId,
-          reviewed_at: now
-        })
-        .eq('id', applicationId)
-
-      if (updateError) throw updateError
-
-      // Create the login and email a "set your password" link (server-side, service key)
+      // Provision credentials and permissions before activating the agent.
+      // Failed invitations or role grants must never leave a referral-eligible agent.
       const inviteResult = await agentInvitationService.sendInvitation({
         email: application.email,
         firstName: application.first_name,
         lastName: application.last_name
       })
-      if (!inviteResult.success) console.error('Invitation not sent:', inviteResult.error)
+      if (!inviteResult.success) throw new Error('Could not invite agent: ' + inviteResult.error)
 
-      // Give the applicant broker access. Runs after the invite so the users row created
-      // for the new auth account is the one updated (users_protect_role allows admins).
       const roleResult = await this.grantBrokerRole(application)
-      if (!roleResult.success) console.error('Broker role not granted:', roleResult.error)
+      if (!roleResult.success) throw new Error('Could not grant broker access: ' + roleResult.error)
+
+      const agreementResult = await this.createReferralAgreement(agent.id, application)
+      if (!agreementResult.success) throw new Error('Could not save referral agreement: ' + agreementResult.error)
+
+      const { error: activateError } = await supabase.from('agents')
+        .update({ status: 'approved', is_active: true, onboarding_completed: true, onboarding_completed_at: now })
+        .eq('id', agent.id)
+      if (activateError) throw activateError
+
+      const { error: updateError } = await supabase.from('agent_applications')
+        .update({ status: 'approved', reviewed_by: reviewerId, reviewed_at: now })
+        .eq('id', applicationId)
+      if (updateError) throw updateError
 
       // Log approval
       await this.logVerificationAction(applicationId, agent.id, 'approved', 'Application approved by admin', reviewerId)
@@ -266,9 +269,6 @@ export const agentApplicationService = {
       const emailResult = await this.sendApprovalEmail(application)
 
       const warnings = [
-        !agreementResult.success && `referral agreement: ${agreementResult.error}`,
-        !roleResult.success && `broker role: ${roleResult.error}`,
-        !inviteResult.success && `login invitation: ${inviteResult.error}`,
         !emailResult?.success && `approval email: ${emailResult?.error || 'failed'}`
       ].filter(Boolean)
 
