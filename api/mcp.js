@@ -8,6 +8,9 @@ const KEY = process.env.SUPABASE_SERVICE_KEY;
 const ORIGIN = 'https://www.usahudhomes.com';
 const tools = [
  {name:'search_hud_homes',description:'Find HUD-owned homes for sale across the United States by state, city, county, budget, bedrooms and buyer occupancy. Useful for homebuyers seeking a primary residence, HUD owner-occupant exclusive listings, FHA-insurable properties and price reductions. Returns listing links and case numbers. Data may be stale; verify with HUD Home Store.',inputSchema:{type:'object',properties:{state:{type:'string',description:'Two-letter state abbreviation'},city:{type:'string'},county:{type:'string'},max_price:{type:'number',minimum:0},min_beds:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:20},owner_occupant_only:{type:'boolean',description:'Only properties in the Exclusive or Extended listing periods, which may be available to eligible owner-occupants; does not confirm bid eligibility'},listing_period:{type:'string',enum:['Exclusive','Extended']},fha_insurable_only:{type:'boolean',description:'Only IN or IE FHA classification; lender approval still required'}},additionalProperties:false}},
+ {name:'get_buyer_registration',description:'Get the official USAHUDhomes buyer registration and sign-in workflow. Buyers can create an account and verify their email on the website; never request passwords in ChatGPT.',inputSchema:{type:'object',properties:{},additionalProperties:false}},
+ {name:'get_agent_registration',description:'Get the official USAHUDhomes broker application link. Agents apply and verify email through the secure website; approval is performed by administrators.',inputSchema:{type:'object',properties:{},additionalProperties:false}},
+ {name:'get_agent_referral_portal',description:'Get the secure USAHUDhomes agent dashboard link for assigned referrals. Sign-in and permissions are enforced by the website; this tool never returns private referrals.',inputSchema:{type:'object',properties:{},additionalProperties:false}},
  {name:'get_property_details',description:'Get a HUD home by its case number with price, size, location, FHA classification, listing period, and direct USAHUDhomes and HUD Home Store links. Confirm availability and bidding deadlines with HUD Home Store.',inputSchema:{type:'object',properties:{case_number:{type:'string'}},required:['case_number'],additionalProperties:false}}
 ];
 function response(id,result){return {jsonrpc:'2.0',id,result}}
@@ -56,6 +59,12 @@ export default async function handler(req,res){
   const {name,arguments:args={}}=body.params||{};
   if(!tools.some(t=>t.name===name))return res.status(200).json(error(id,-32602,'Unknown tool'));
   try{
+   const links={
+    get_buyer_registration:{url:`${ORIGIN}/login`,description:'Create a buyer account or sign in on USAHUDhomes. Email confirmation may be required.'},
+    get_agent_registration:{url:`${ORIGIN}/broker/register`,description:'Apply as a registered broker. Email verification and administrator approval are required.'},
+    get_agent_referral_portal:{url:`${ORIGIN}/broker-dashboard`,description:'Sign in to view your authorized agent dashboard and assigned referrals.'}
+   };
+   if(Object.hasOwn(links,name))return res.status(200).json(response(id,{content:[{type:'text',text:JSON.stringify(links[name])}]}));
    const records=await query(args,name==='get_property_details');
    return res.status(200).json(response(id,{content:[{type:'text',text:JSON.stringify({properties:records,retrieved_at:new Date().toISOString(),notice:'Records are informational, not a guarantee of current HUD availability, FHA eligibility, or bidding deadlines. Verify with HUD Home Store.'})}]}));
   }catch(e){return res.status(200).json(response(id,{isError:true,content:[{type:'text',text:e.message}]}))}
