@@ -16,6 +16,7 @@ import LeadDetailsPage from './pages/LeadDetailsPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import Unauthorized from './components/Unauthorized'
 const CustomerDetailsPage = lazy(() => import('./components/admin/CustomerDetailsPage'))
+const PropertyGallery = lazy(() => import('./components/PropertyGallery'))
 import ContactForm from './pages/ContactForm'
 import ContactThankYou from './pages/ContactThankYou'
 import AgentRegistration from './components/agent/AgentRegistration'
@@ -786,7 +787,8 @@ function HowItWorksPage() {
 // Property Detail Page
 function PropertyDetailPage() {
   const { caseNumber } = useParams()
-  const { user } = useAuth()
+  const { user, canAccessBroker } = useAuth()
+  const [showGallery, setShowGallery] = useState(false)
   const [property, setProperty] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showAddressGate, setShowAddressGate] = useState(false)
@@ -905,7 +907,25 @@ function PropertyDetailPage() {
                 <p className="text-gray-500">Property Image</p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setShowGallery(true)}
+              className="absolute bottom-3 right-3 flex items-center gap-2 bg-white/95 hover:bg-white text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg shadow"
+            >
+              <Search className="h-4 w-4" /> See all photos
+            </button>
           </div>
+
+          {showGallery && (
+            <Suspense fallback={null}>
+              <PropertyGallery
+                property={property}
+                title={`${displayAddress} · Case #${property.case_number}`}
+                canDownload={!!canAccessBroker}
+                onClose={() => setShowGallery(false)}
+              />
+            </Suspense>
+          )}
 
           {/* Property Title */}
           <div className="mb-2 flex items-start justify-between">

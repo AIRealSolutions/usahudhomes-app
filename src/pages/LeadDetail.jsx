@@ -16,6 +16,7 @@ import {
 const EmailComposer = lazy(() => import('../components/broker/EmailComposer'));
 const SMSComposer = lazy(() => import('../components/broker/SMSComposer'));
 const BrokerPropertySearch = lazy(() => import('../components/broker/BrokerPropertySearch'));
+const PropertyGallery = lazy(() => import('../components/PropertyGallery'));
 
 const STATUSES = [
   { value: 'new', label: 'New' },
@@ -178,6 +179,7 @@ export default function LeadDetail() {
   const [modalText, setModalText] = useState('');
   const [showingAt, setShowingAt] = useState('');
   const [toast, setToast] = useState(null);
+  const [showGallery, setShowGallery] = useState(false);
 
   const flash = (msg) => {
     setToast(msg);
@@ -459,6 +461,9 @@ export default function LeadDetail() {
                           <p className="text-sm text-gray-600">
                             {[money(property.price), property.beds && `${property.beds} bd`, property.baths && `${property.baths} ba`, property.sq_ft && `${Number(property.sq_ft).toLocaleString()} sq ft`, property.status, `Case #${property.case_number}`].filter(Boolean).join(' · ')}
                           </p>
+                          <button onClick={() => setShowGallery(true)} className="mt-1 text-sm font-medium text-blue-700 hover:underline">
+                            See all photos / download
+                          </button>
                         </div>
                       ) : lead.case_number ? (
                         <p className="text-sm text-gray-700">Case #{lead.case_number} (no longer listed)</p>
@@ -749,6 +754,17 @@ export default function LeadDetail() {
               onCancel={() => setComposer(null)}
             />
           )}
+        </Suspense>
+      )}
+
+      {showGallery && property && (
+        <Suspense fallback={null}>
+          <PropertyGallery
+            property={property}
+            title={`${property.address}, ${property.city} · Case #${property.case_number}`}
+            canDownload
+            onClose={() => setShowGallery(false)}
+          />
         </Suspense>
       )}
 

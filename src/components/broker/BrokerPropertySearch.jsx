@@ -6,7 +6,8 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../../config/supabase'
 import { US_STATES } from '../../utils/states'
-import { Search, Home, Bed, Bath, Maximize, CheckCircle, Circle, Loader, UserPlus, ExternalLink } from 'lucide-react'
+import { Search, Home, Bed, Bath, Maximize, CheckCircle, Circle, Loader, UserPlus, ExternalLink, Images } from 'lucide-react'
+import PropertyGallery from '../PropertyGallery'
 
 const RESULT_LIMIT = 60
 const FIELDS = 'id, case_number, address, city, state, zip_code, price, beds, baths, sq_ft, status, main_image, county'
@@ -21,6 +22,7 @@ export default function BrokerPropertySearch({ initialFilters, onAddToClients })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [selected, setSelected] = useState(() => new Map()) // id -> property
+  const [galleryFor, setGalleryFor] = useState(null) // property whose photos are open
 
   // Re-run when a different client's preferences are applied
   const filtersKey = JSON.stringify(initialFilters || {})
@@ -169,10 +171,13 @@ export default function BrokerPropertySearch({ initialFilters, onAddToClients })
                         </p>
                       </div>
                     </button>
-                    <div className="px-3 pb-3">
+                    <div className="px-3 pb-3 flex items-center gap-4">
                       <a href={`/property/${p.case_number}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:underline">
                         View listing <ExternalLink className="w-3 h-3" />
                       </a>
+                      <button type="button" onClick={() => setGalleryFor(p)} className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:underline">
+                        <Images className="w-3.5 h-3.5" /> Photos
+                      </button>
                     </div>
                   </div>
                 )
@@ -180,6 +185,15 @@ export default function BrokerPropertySearch({ initialFilters, onAddToClients })
             </div>
           )}
         </>
+      )}
+
+      {galleryFor && (
+        <PropertyGallery
+          property={galleryFor}
+          title={`${galleryFor.address}, ${galleryFor.city} · Case #${galleryFor.case_number}`}
+          canDownload
+          onClose={() => setGalleryFor(null)}
+        />
       )}
     </div>
   )

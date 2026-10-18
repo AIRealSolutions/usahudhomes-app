@@ -15,6 +15,10 @@
  *   DELETE ?action=schedules       — delete a schedule
  *   GET/POST ?action=accepted-offers-sync — daily cron (CRON_SECRET) or an admin: record HUD accepted
  *                                    offers (bidresults) for every state into accepted_offers
+ *   GET  ?action=gallery&caseNumber=  — public: every photo of one home, fetched from HUD the first
+ *                                    time it's asked for and saved on the property (refresh=1 re-fetches)
+ *   GET  ?action=gallery-image&url=   — public: one HUD photo passed through (for zip downloads when the
+ *                                    browser can't fetch the image host directly)
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -58,7 +62,8 @@ function toIsoOrNull(value) {
 const HUD_BASE_URL    = 'https://www.hudhomestore.gov'
 const CLOUDINARY_BASE = 'https://res.cloudinary.com/dkzfopaco/image/upload/'
 
-function parseHudPage(html, stateCode) {
+// The raw listing objects embedded in HUD's state search page
+function parseRawListings(html, stateCode = '') {
   const match = html.match(/id=["']available_prop["'][^>]*value=["']([^"']*)/i)
   if (!match) return []
   let raw = match[1]
@@ -71,7 +76,12 @@ function parseHudPage(html, stateCode) {
   try { rawProps = JSON.parse(raw) } catch (e) {
     throw new Error(`Failed to parse property JSON for ${stateCode}: ${e.message}`)
   }
-  if (!Array.isArray(rawProps) || rawProps.length === 0) return []
+  return Array.isArray(rawProps) ? rawProps : []
+}
+
+function parseHudPage(html, stateCode) {
+  const rawProps = parseRawListings(html, stateCode)
+  if (rawProps.length === 0) return []
   return rawProps.map(p => {
     const status    = (p.propertyStatus || '').toLowerCase()
     const isNew     = status.includes('new') || status.includes('initial')
@@ -275,6 +285,123 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
       errors:               0,
     }
   }
+}
+
+// ─── Photo gallery (on demand) ────────────────────────────────────────────────
+// HUD only gives us one photo per home in the daily scrape; the rest are fetched when
+// someone opens the gallery, then kept in properties.images so later opens are instant.
+const PHOTO_HOST = 'https://res.cloudinary.com/'
+const DEFAULT_PHOTO_BASE = 'https://res.cloudinary.com/yardi/image/upload/q_auto,f_auto,c_limit/d_hhs:themes:common:images:NoImage.jpg/hhs/'
+// Whole links only: HUD's links carry a "NoImage.jpg" fallback setting mid-path, so the
+// file type is checked on the last path segment, not the first ".jpg" seen
+const PHOTO_URL_RE = /https?:\/\/res\.cloudinary\.com\/[^"'\s)<>\\]+/gi
+const isPhotoUrl = (url) => /\.(jpe?g|png|webp)$/i.test(fileName(url))
+const isPlaceholder = (name) => /noimage|logo|icon|sprite|placeholder/i.test(name)
+const fileName = (url) => decodeURIComponent(String(url).split('?')[0].split('/').pop() || '')
+
+// Photo links are built like the scrape's thumbnails: the same delivery base, then the file name
+function photoBase(mainImage) {
+  const m = String(mainImage || '')
+  return m.startsWith(PHOTO_HOST) && m.includes('/hhs/') ? m.slice(0, m.lastIndexOf('/hhs/') + 5) : DEFAULT_PHOTO_BASE
+}
+
+function photosFromGalleryField(gallery, base) {
+  if (!gallery) return []
+  let text = String(gallery).trim()
+  // The list can arrive as a quoted string holding an escaped JSON array
+  if (text.startsWith('"') && text.endsWith('"')) text = text.slice(1, -1)
+  text = text.replace(/\\"/g, '"')
+  const quoted = [...text.matchAll(/"([^"]+)"/g)].map(m => m[1])
+  const entries = quoted.length ? quoted : text.replace(/[[\]]/g, '').split(/[,;|]/)
+  return entries
+    .map(e => e.trim())
+    .filter(e => /\.(jpe?g|png|webp)$/i.test(e.split('?')[0]))
+    .map(e => (/^https?:\/\//i.test(e) ? e : `${base}${e.replace(/^\/?(hhs\/)?/i, '')}`))
+}
+
+async function hudGalleryFor(property) {
+  const caseNumber = property.case_number
+  const base = photoBase(property.main_image)
+  const found = []
+  const headers = {
+    'User-Agent': HUD_UA,
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+  }
+
+  // 1) The home's own HUD page lists its photos
+  try {
+    const r = await fetch(`${HUD_BASE_URL}/propertydetail?caseNumber=${encodeURIComponent(caseNumber)}`, { headers, signal: AbortSignal.timeout(15000) })
+    if (r.ok) {
+      const html = (await r.text()).replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\\\//g, '/')
+      found.push(...(html.match(PHOTO_URL_RE) || []).filter(isPhotoUrl))
+      const field = html.match(/galleryImages["']?\s*[:=]\s*("(?:[^"\\]|\\.)*"|\[[^\]]*\])/i)
+      if (field) found.push(...photosFromGalleryField(field[1], base))
+    }
+  } catch (e) {
+    console.warn('[hud/gallery] detail page failed:', e.message)
+  }
+
+  // 2) Otherwise, the state listing data the daily scrape reads
+  if (!found.some(u => !isPlaceholder(fileName(u))) && property.state) {
+    try {
+      const listings = parseRawListings(await fetchHudHtml(property.state))
+      const raw = listings.find(p => p.propertyCaseNumber === caseNumber)
+      if (raw) found.push(...photosFromGalleryField(raw.galleryImages, base), ...(raw.propertyThumb ? [raw.propertyThumb] : []))
+    } catch (e) {
+      console.warn('[hud/gallery] state listing failed:', e.message)
+    }
+  }
+
+  // Main photo first, one entry per file, no placeholders
+  const seen = new Set()
+  return [property.main_image, ...found].filter(Boolean).filter(url => {
+    const name = fileName(url).toLowerCase()
+    if (!name || !isPhotoUrl(url) || isPlaceholder(name) || seen.has(name)) return false
+    seen.add(name)
+    return true
+  }).slice(0, 80)
+}
+
+async function handleGallery(req, res) {
+  const caseNumber = String(req.query?.caseNumber || '').trim()
+  if (!/^[0-9A-Za-z-]{5,20}$/.test(caseNumber)) return res.status(400).json({ success: false, error: 'caseNumber required' })
+  const supabase = getSupabase()
+  const { data: property, error } = await supabase
+    .from('properties')
+    .select('id, case_number, state, main_image, images')
+    .eq('case_number', caseNumber)
+    .maybeSingle()
+  if (error) throw error
+  if (!property) return res.status(404).json({ success: false, error: 'Property not found' })
+
+  const cached = Array.isArray(property.images) ? property.images.filter(u => typeof u === 'string' && u.startsWith('http')) : []
+  if (cached.length > 1 && req.query?.refresh !== '1') {
+    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400')
+    return res.status(200).json({ success: true, caseNumber, images: cached, source: 'saved' })
+  }
+
+  const images = await hudGalleryFor(property)
+  if (images.length > 1) {
+    const { error: saveErr } = await supabase.from('properties').update({ images }).eq('id', property.id)
+    if (saveErr) console.warn('[hud/gallery] could not save photos:', saveErr.message)
+  }
+  res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400')
+  return res.status(200).json({ success: true, caseNumber, images, source: 'hud' })
+}
+
+async function handleGalleryImage(req, res) {
+  const url = String(req.query?.url || '')
+  if (!url.startsWith(PHOTO_HOST) || !/\.(jpe?g|png|webp)(\?|$)/i.test(url)) {
+    return res.status(400).json({ success: false, error: 'Only HUD listing photos can be fetched' })
+  }
+  const r = await fetch(url, { headers: { 'User-Agent': HUD_UA }, signal: AbortSignal.timeout(20000) })
+  if (!r.ok) return res.status(502).json({ success: false, error: `Photo host returned ${r.status}` })
+  const type = r.headers.get('content-type') || 'image/jpeg'
+  if (!type.startsWith('image/')) return res.status(502).json({ success: false, error: 'Not an image' })
+  res.setHeader('Content-Type', type)
+  res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400')
+  return res.status(200).send(Buffer.from(await r.arrayBuffer()))
 }
 
 // ─── Accepted offers (hudhomestore.gov/bidresults) ────────────────────────────
@@ -541,7 +668,9 @@ export default async function handler(req, res) {
     if (action === 'accepted-offers-sync' && process.env.CRON_SECRET && bearer === process.env.CRON_SECRET) {
       return await handleAcceptedOffersSync(req, res, 'cron')
     }
-    // Every action (DB writes, run history, HUD proxy) is admin-only
+    // Photo gallery is public (HUD listing photos); every other action is admin-only
+    if (action === 'gallery' && req.method === 'GET') return await handleGallery(req, res)
+    if (action === 'gallery-image' && req.method === 'GET') return await handleGalleryImage(req, res)
     if (!(await requireAdmin(req, res))) return
     switch (action) {
       case 'accepted-offers-sync': return await handleAcceptedOffersSync(req, res, 'admin')
