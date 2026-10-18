@@ -121,6 +121,8 @@ class AgentService {
           license_state: pick('licenseState', 'license_state'),
           specialties: pick('specialties', 'specialties') || [],
           states_covered: pick('statesCovered', 'states_covered') || [],
+          auto_referral_enabled: pick('autoReferralEnabled', 'auto_referral_enabled') || false,
+          auto_referral_states: pick('autoReferralStates', 'auto_referral_states') || [],
           years_experience: pick('yearsExperience', 'years_experience'),
           bio: pick('bio', 'bio'),
           profile_image: pick('profileImage', 'profile_image'),
@@ -182,6 +184,8 @@ class AgentService {
       if (updates.licenseState) updateData.license_state = updates.licenseState
       if (updates.specialties) updateData.specialties = updates.specialties
       if (updates.statesCovered) updateData.states_covered = updates.statesCovered
+      if (updates.autoReferralEnabled !== undefined) updateData.auto_referral_enabled = updates.autoReferralEnabled
+      if (updates.autoReferralStates) updateData.auto_referral_states = updates.autoReferralStates
       if (updates.yearsExperience !== undefined) updateData.years_experience = updates.yearsExperience
       if (updates.bio !== undefined) updateData.bio = updates.bio
       if (updates.profileImage) updateData.profile_image = updates.profileImage
