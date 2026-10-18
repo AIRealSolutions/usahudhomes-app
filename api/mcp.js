@@ -7,8 +7,8 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_KEY;
 const ORIGIN = 'https://www.usahudhomes.com';
 const tools = [
- {name:'search_hud_homes',description:'Search HUD property records. Listings may be stale; always verify current availability and HUD financing with HUD Home Store and an approved lender.',inputSchema:{type:'object',properties:{state:{type:'string',description:'Two-letter state abbreviation'},city:{type:'string'},county:{type:'string'},max_price:{type:'number',minimum:0},min_beds:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:20}},additionalProperties:false}},
- {name:'get_property_details',description:'Retrieve a HUD property by its case number. Confirm availability and bidding deadlines with HUD Home Store.',inputSchema:{type:'object',properties:{case_number:{type:'string'}},required:['case_number'],additionalProperties:false}}
+ {name:'search_hud_homes',description:'Find HUD-owned homes for sale across the United States by state, city, county, budget, bedrooms and buyer occupancy. Useful for homebuyers seeking a primary residence, HUD owner-occupant exclusive listings, FHA-insurable properties and price reductions. Returns listing links and case numbers. Data may be stale; verify with HUD Home Store.',inputSchema:{type:'object',properties:{state:{type:'string',description:'Two-letter state abbreviation'},city:{type:'string'},county:{type:'string'},max_price:{type:'number',minimum:0},min_beds:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:20},owner_occupant_only:{type:'boolean',description:'Only properties in the Exclusive or Extended listing periods, which may be available to eligible owner-occupants; does not confirm bid eligibility'},listing_period:{type:'string',enum:['Exclusive','Extended']},fha_insurable_only:{type:'boolean',description:'Only IN or IE FHA classification; lender approval still required'}},additionalProperties:false}},
+ {name:'get_property_details',description:'Get a HUD home by its case number with price, size, location, FHA classification, listing period, and direct USAHUDhomes and HUD Home Store links. Confirm availability and bidding deadlines with HUD Home Store.',inputSchema:{type:'object',properties:{case_number:{type:'string'}},required:['case_number'],additionalProperties:false}}
 ];
 function response(id,result){return {jsonrpc:'2.0',id,result}}
 function error(id,code,message){return {jsonrpc:'2.0',id,error:{code,message}}}
@@ -31,6 +31,11 @@ async function query(args,detail){
   }
   if(args.max_price!==undefined){if(!Number.isFinite(args.max_price)||args.max_price<0)throw Error('Invalid max_price');u.searchParams.set('price',`lte.${args.max_price}`)}
   if(args.min_beds!==undefined){if(!Number.isInteger(args.min_beds)||args.min_beds<0)throw Error('Invalid min_beds');u.searchParams.set('beds',`gte.${args.min_beds}`)}
+  if(args.owner_occupant_only!==undefined && typeof args.owner_occupant_only!=='boolean')throw Error('Invalid owner_occupant_only');
+  if(args.listing_period!==undefined){if(!['Exclusive','Extended'].includes(args.listing_period))throw Error('Invalid listing_period');u.searchParams.set('listing_period',`eq.${args.listing_period}`)}
+  else if(args.owner_occupant_only)u.searchParams.set('listing_period','in.(Exclusive,Extended)');
+  if(args.fha_insurable_only!==undefined && typeof args.fha_insurable_only!=='boolean')throw Error('Invalid fha_insurable_only');
+  if(args.fha_insurable_only)u.searchParams.set('or','(fha_financing.ilike.IN*,fha_financing.ilike.IE*)');
   u.searchParams.set('order','updated_at.desc');
  }
  const r=await fetch(u,{headers:{apikey:KEY,Authorization:`Bearer ${KEY}`},signal:AbortSignal.timeout(8000)});
@@ -52,7 +57,7 @@ export default async function handler(req,res){
   if(!tools.some(t=>t.name===name))return res.status(200).json(error(id,-32602,'Unknown tool'));
   try{
    const records=await query(args,name==='get_property_details');
-   return res.status(200).json(response(id,{content:[{type:'text',text:JSON.stringify({properties:records,notice:'Records are informational, not a guarantee of current HUD availability, FHA eligibility, or bidding deadlines. Verify with HUD Home Store.'})}]}));
+   return res.status(200).json(response(id,{content:[{type:'text',text:JSON.stringify({properties:records,retrieved_at:new Date().toISOString(),notice:'Records are informational, not a guarantee of current HUD availability, FHA eligibility, or bidding deadlines. Verify with HUD Home Store.'})}]}));
   }catch(e){return res.status(200).json(response(id,{isError:true,content:[{type:'text',text:e.message}]}))}
  }
  return res.status(200).json(error(id,-32601,'Method not found'));
