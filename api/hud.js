@@ -292,9 +292,8 @@ async function importProperties(supabase, properties, stateCode, dry_run, job_id
 // someone opens the gallery, then kept in properties.images so later opens are instant.
 const PHOTO_HOST = 'https://res.cloudinary.com/'
 const DEFAULT_PHOTO_BASE = 'https://res.cloudinary.com/yardi/image/upload/q_auto,f_auto,c_limit/d_hhs:themes:common:images:NoImage.jpg/hhs/'
-// Whole links only: HUD's links carry a "NoImage.jpg" fallback setting mid-path, so the
-// file type is checked on the last path segment, not the first ".jpg" seen
-const PHOTO_URL_RE = /https?:\/\/res\.cloudinary\.com\/[^"'\s)<>\\]+/gi
+// HUD's links carry a "NoImage.jpg" fallback setting mid-path, so the file type is
+// checked on the last path segment only
 const isPhotoUrl = (url) => /\.(jpe?g|png|webp)$/i.test(fileName(url))
 const isPlaceholder = (name) => /noimage|logo|icon|sprite|placeholder/i.test(name)
 const fileName = (url) => decodeURIComponent(String(url).split('?')[0].split('/').pop() || '')
@@ -305,53 +304,34 @@ function photoBase(mainImage) {
   return m.startsWith(PHOTO_HOST) && m.includes('/hhs/') ? m.slice(0, m.lastIndexOf('/hhs/') + 5) : DEFAULT_PHOTO_BASE
 }
 
+// HUD sends the photo list as text like "Media_(27)_592188_266117815.png","Media_(28)_…png"
+// (sometimes escaped or wrapped in brackets); pull out every photo file name or link in it
 function photosFromGalleryField(gallery, base) {
   if (!gallery) return []
-  let text = String(gallery).trim()
-  // The list can arrive as a quoted string holding an escaped JSON array
-  if (text.startsWith('"') && text.endsWith('"')) text = text.slice(1, -1)
-  text = text.replace(/\\"/g, '"')
-  const quoted = [...text.matchAll(/"([^"]+)"/g)].map(m => m[1])
-  const entries = quoted.length ? quoted : text.replace(/[[\]]/g, '').split(/[,;|]/)
-  return entries
-    .map(e => e.trim())
-    .filter(e => /\.(jpe?g|png|webp)$/i.test(e.split('?')[0]))
-    .map(e => (/^https?:\/\//i.test(e) ? e : `${base}${e.replace(/^\/?(hhs\/)?/i, '')}`))
+  const text = String(gallery).replace(/\\"/g, '"')
+  const names = text.match(/https?:\/\/[^"',\s\]]+|[^"',\s[\]\\]+\.(?:jpe?g|png|webp)/gi) || []
+  return names.map(e => (/^https?:\/\//i.test(e) ? e : `${base}${e.replace(/^\/?(hhs\/)?/i, '')}`))
+}
+
+// HUD's listing search, by case number first (one result), then by state
+async function hudListingFor(caseNumber, state) {
+  const sources = [caseNumber, state].filter(Boolean)
+  for (const citystate of sources) {
+    try {
+      const listings = parseRawListings(await fetchHudHtml(citystate))
+      const raw = listings.find(p => p.propertyCaseNumber === caseNumber)
+      if (raw) return raw
+    } catch (e) {
+      console.warn(`[hud/gallery] listing search "${citystate}" failed:`, e.message)
+    }
+  }
+  return null
 }
 
 async function hudGalleryFor(property) {
-  const caseNumber = property.case_number
   const base = photoBase(property.main_image)
-  const found = []
-  const headers = {
-    'User-Agent': HUD_UA,
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.5',
-  }
-
-  // 1) The home's own HUD page lists its photos
-  try {
-    const r = await fetch(`${HUD_BASE_URL}/propertydetail?caseNumber=${encodeURIComponent(caseNumber)}`, { headers, signal: AbortSignal.timeout(15000) })
-    if (r.ok) {
-      const html = (await r.text()).replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\\\//g, '/')
-      found.push(...(html.match(PHOTO_URL_RE) || []).filter(isPhotoUrl))
-      const field = html.match(/galleryImages["']?\s*[:=]\s*("(?:[^"\\]|\\.)*"|\[[^\]]*\])/i)
-      if (field) found.push(...photosFromGalleryField(field[1], base))
-    }
-  } catch (e) {
-    console.warn('[hud/gallery] detail page failed:', e.message)
-  }
-
-  // 2) Otherwise, the state listing data the daily scrape reads
-  if (!found.some(u => !isPlaceholder(fileName(u))) && property.state) {
-    try {
-      const listings = parseRawListings(await fetchHudHtml(property.state))
-      const raw = listings.find(p => p.propertyCaseNumber === caseNumber)
-      if (raw) found.push(...photosFromGalleryField(raw.galleryImages, base), ...(raw.propertyThumb ? [raw.propertyThumb] : []))
-    } catch (e) {
-      console.warn('[hud/gallery] state listing failed:', e.message)
-    }
-  }
+  const raw = await hudListingFor(property.case_number, property.state)
+  const found = raw ? [...photosFromGalleryField(raw.galleryImages, base), ...(raw.propertyThumb ? [raw.propertyThumb] : [])] : []
 
   // Main photo first, one entry per file, no placeholders
   const seen = new Set()
@@ -363,28 +343,16 @@ async function hudGalleryFor(property) {
   }).slice(0, 80)
 }
 
-// TEMPORARY: shows what HUD returns so the gallery parser can be matched to it
+// TEMPORARY: shows which HUD searches find a home and how its photos are listed
 async function galleryDiagnostics(caseNumber, state) {
   const out = {}
-  const headers = { 'User-Agent': HUD_UA, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5' }
-  try {
-    const r = await fetch(`${HUD_BASE_URL}/propertydetail?caseNumber=${encodeURIComponent(caseNumber)}`, { headers, signal: AbortSignal.timeout(15000) })
-    const html = await r.text()
-    const around = (re) => { const m = html.search(re); return m < 0 ? null : html.slice(Math.max(0, m - 200), m + 600) }
-    out.detail = {
-      status: r.status, url: r.url, length: html.length,
-      cloudinary: (html.match(/res\.cloudinary\.com[^"'\s)<>]{0,200}/gi) || []).slice(0, 15),
-      gallery: around(/gallery/i), photo: around(/photo/i), media: around(/Media_/i), image: around(/\.jpe?g|\.png/i),
-      scripts: (html.match(/<script[^>]+src=["'][^"']+/gi) || []).slice(0, 15),
-    }
-  } catch (e) { out.detail = { error: e.message } }
-  try {
-    const listings = parseRawListings(await fetchHudHtml(state))
-    const raw = listings.find(p => p.propertyCaseNumber === caseNumber)
-    out.state = { listings: listings.length, found: !!raw, keys: raw ? Object.keys(raw) : (listings[0] ? Object.keys(listings[0]) : []),
-      galleryImages: raw ? String(raw.galleryImages ?? '').slice(0, 800) : null, thumb: raw?.propertyThumb ?? null,
-      imageish: raw ? Object.fromEntries(Object.entries(raw).filter(([k]) => /img|image|photo|gallery|thumb|media|pic/i.test(k)).map(([k, v]) => [k, String(v).slice(0, 400)])) : null }
-  } catch (e) { out.state = { error: e.message } }
+  for (const citystate of [caseNumber, state]) {
+    try {
+      const listings = parseRawListings(await fetchHudHtml(citystate))
+      const raw = listings.find(p => p.propertyCaseNumber === caseNumber)
+      out[citystate] = { listings: listings.length, found: !!raw, photos: raw ? photosFromGalleryField(raw.galleryImages, '').length : 0 }
+    } catch (e) { out[citystate] = { error: e.message } }
+  }
   return out
 }
 
@@ -416,7 +384,8 @@ async function handleGallery(req, res) {
     const { error: saveErr } = await supabase.from('properties').update({ images }).eq('id', property.id)
     if (saveErr) console.warn('[hud/gallery] could not save photos:', saveErr.message)
   }
-  res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400')
+  // Don't let a short answer (HUD busy or the home not found) stick in the CDN
+  res.setHeader('Cache-Control', images.length > 1 ? 'public, s-maxage=3600, stale-while-revalidate=86400' : 'no-store')
   return res.status(200).json({ success: true, caseNumber, images, source: 'hud' })
 }
 
