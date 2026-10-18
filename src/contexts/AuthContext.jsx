@@ -50,53 +50,25 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem('userProfile', JSON.stringify(result.data.profile))
         }
       } else {
-        // Fallback to legacy localStorage auth (temporary during transition)
-        const legacyAuth = localStorage.getItem('isAuthenticated')
-        const legacyRole = localStorage.getItem('userRole')
-        const legacyEmail = localStorage.getItem('userEmail')
-        
-        if (legacyAuth === 'true' && legacyRole) {
-          console.log('Using legacy auth during transition')
-          // Create a mock user object for legacy auth
-          setUser({ email: legacyEmail || 'legacy@user.com' })
-          setProfile({ 
-            email: legacyEmail || 'legacy@user.com',
-            role: legacyRole,
-            first_name: 'Legacy',
-            last_name: 'User'
-          })
-          setRole(legacyRole)
-        } else {
-          setUser(null)
-          setProfile(null)
-          setRole(null)
-          localStorage.removeItem('userRole')
-          localStorage.removeItem('userProfile')
-        }
+        // Never trust localStorage for authentication or authorization.
+        setUser(null)
+        setProfile(null)
+        setRole(null)
+        localStorage.removeItem('isAuthenticated')
+        localStorage.removeItem('userRole')
+        localStorage.removeItem('userProfile')
+        localStorage.removeItem('userEmail')
       }
     } catch (error) {
       console.error('Error initializing auth:', error)
       
-      // Fallback to legacy auth on error
-      const legacyAuth = localStorage.getItem('isAuthenticated')
-      const legacyRole = localStorage.getItem('userRole')
-      const legacyEmail = localStorage.getItem('userEmail')
-      
-      if (legacyAuth === 'true' && legacyRole) {
-        console.log('Using legacy auth after error')
-        setUser({ email: legacyEmail || 'legacy@user.com' })
-        setProfile({ 
-          email: legacyEmail || 'legacy@user.com',
-          role: legacyRole,
-          first_name: 'Legacy',
-          last_name: 'User'
-        })
-        setRole(legacyRole)
-      } else {
-        setUser(null)
-        setProfile(null)
-        setRole(null)
-      }
+      setUser(null)
+      setProfile(null)
+      setRole(null)
+      localStorage.removeItem('isAuthenticated')
+      localStorage.removeItem('userRole')
+      localStorage.removeItem('userProfile')
+      localStorage.removeItem('userEmail')
     } finally {
       setLoading(false)
       setInitialized(true)
