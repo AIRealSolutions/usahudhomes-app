@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useActiveClient } from '../contexts/ActiveClientContext';
 import { consultationService } from '../services/database/consultationService';
 import { listPicks, addPicks, markPicks, removePick } from '../services/propertyPicks';
 import { suggestedReplies, labelFor } from '../services/leadReplies';
@@ -164,6 +165,7 @@ export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { profile, user } = useAuth();
+  const { start: startClientMode, refreshPicks: refreshClientPicks } = useActiveClient();
 
   const [lead, setLead] = useState(null);
   const [property, setProperty] = useState(null);
@@ -214,6 +216,8 @@ export default function LeadDetail() {
       };
       setLead(merged);
       setForm(merged);
+      // While on this lead, every save or share across the site goes to this client
+      startClientMode(merged);
       let prop = data.property;
       if (!prop && data.case_number) {
         const { data: byCase } = await supabase.from('properties').select('*').eq('case_number', data.case_number).maybeSingle();
@@ -222,7 +226,7 @@ export default function LeadDetail() {
       setProperty(prop || null);
     }
     setLoading(false);
-  }, [id]);
+  }, [id, startClientMode]);
 
   const fetchTimeline = useCallback(async () => {
     const [events, activity] = await Promise.all([
@@ -243,11 +247,12 @@ export default function LeadDetail() {
   const fetchPicks = useCallback(async () => {
     try {
       setPicks(await listPicks(id));
+      refreshClientPicks();
     } catch (e) {
       console.error('Could not load picks:', e);
       setPicks([]);
     }
-  }, [id]);
+  }, [id, refreshClientPicks]);
 
   useEffect(() => {
     fetchLead();
@@ -586,6 +591,7 @@ export default function LeadDetail() {
                         maxPrice: lead.price_range_max || lead.budget_max || '',
                       }}
                       onAddToClients={addHomes}
+                      actionLabel={`Save to ${lead.first_name || 'this client'}`}
                     />
                   </Suspense>
                   <p className="mt-3 text-xs text-gray-500">"Add to clients" here adds the homes straight to {lead.first_name || 'this client'}'s picks.</p>

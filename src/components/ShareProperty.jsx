@@ -5,8 +5,13 @@
  * the address stays behind the login.
  */
 
-import React, { useEffect, useRef, useState } from 'react'
-import { Share2, Link as LinkIcon, Mail, MessageSquare, Download, Check, X } from 'lucide-react'
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { Share2, Link as LinkIcon, Mail, MessageSquare, Download, Check, X, UserCheck } from 'lucide-react'
+import { useActiveClient } from '../contexts/ActiveClientContext'
+import { markPicks } from '../services/propertyPicks'
+
+const EmailComposer = lazy(() => import('./broker/EmailComposer'))
+const SMSComposer = lazy(() => import('./broker/SMSComposer'))
 
 const SITE = 'https://www.usahudhomes.com'
 
@@ -25,7 +30,9 @@ export function propertyShareText(property) {
 export default function ShareProperty({ property, className = '' }) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [composer, setComposer] = useState(null) // 'email' | 'sms' while sending to the active client
   const ref = useRef(null)
+  const { client, clientFirstName, ensurePick } = useActiveClient()
 
   const url = `${SITE}/property/${property.case_number}`
   const text = propertyShareText(property)
@@ -79,6 +86,24 @@ export default function ShareProperty({ property, className = '' }) {
             <button onClick={() => setOpen(false)} aria-label="Close" className="p-1 rounded hover:bg-gray-100"><X className="h-4 w-4" /></button>
           </div>
 
+          {/* Working for a client: send it to them (and add it to their picks) */}
+          {client && (
+            <div className="mb-4 rounded-lg bg-indigo-50 border border-indigo-200 p-3">
+              <p className="text-sm font-semibold text-indigo-900 flex items-center gap-1.5 mb-2"><UserCheck className="h-4 w-4" /> Send to {clientFirstName}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => { setComposer('email'); setOpen(false) }} disabled={!client.email}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-40">
+                  <Mail className="h-4 w-4" /> Email
+                </button>
+                <button onClick={() => { setComposer('sms'); setOpen(false) }} disabled={!client.phone}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-40">
+                  <MessageSquare className="h-4 w-4" /> Text
+                </button>
+              </div>
+              <p className="text-[11px] text-indigo-800 mt-2">Sending also adds this home to {clientFirstName}'s picks.</p>
+            </div>
+          )}
+
           {/* What people will see in the post */}
           <img src={imageUrl} alt="Share preview" loading="lazy" className="w-full aspect-[1200/630] object-cover rounded-lg border bg-gray-100 mb-3" />
           <p className="text-xs text-gray-500 mb-3">{text}. The street address is only shown to signed-in buyers.</p>
@@ -115,6 +140,39 @@ export default function ShareProperty({ property, className = '' }) {
             </a>
           </div>
         </div>
+      )}
+
+      {composer && client && (
+        <Suspense fallback={null}>
+          {composer === 'email' ? (
+            <EmailComposer
+              consultation={client}
+              customer={client}
+              property={property}
+              initialSubject={`A HUD home in ${property.city || 'your area'} for you`}
+              initialBody={`Hi ${client.first_name || 'there'},\n\nHere's a HUD home I think you'll like:\n${text}\n${url}\n\nSign in (or create a free account) on that page to see the full address and your estimated payment. Want to go see it?`}
+              onSend={async () => {
+                setComposer(null)
+                const pickId = await ensurePick(property).catch(() => null)
+                if (pickId) markPicks([pickId], 'sent').catch(() => {})
+              }}
+              onCancel={() => setComposer(null)}
+            />
+          ) : (
+            <SMSComposer
+              consultation={client}
+              customer={client}
+              property={property}
+              initialMessage={`Hi ${client.first_name || 'there'}, here's a HUD home I think you'll like: ${text} ${url}`}
+              onSend={async () => {
+                setComposer(null)
+                const pickId = await ensurePick(property).catch(() => null)
+                if (pickId) markPicks([pickId], 'sent').catch(() => {})
+              }}
+              onCancel={() => setComposer(null)}
+            />
+          )}
+        </Suspense>
       )}
     </div>
   )

@@ -7,6 +7,7 @@
 import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useActiveClient } from '../contexts/ActiveClientContext'
 import { supabase } from '../config/supabase'
 import { consultationService } from '../services/database/consultationService'
 import { agentService } from '../services/database'
@@ -391,6 +392,7 @@ function AIAssistantPanel({ agentId }) {
 
 // ── Find Properties Panel ─────────────────────────────────────────────────────
 function FindPropertiesPanel({ agentId }) {
+  const { client: activeClient } = useActiveClient()
   const [selectedConsultation, setSelectedConsultation] = useState(null)
   const [tab, setTab] = useState('search') // 'search' | 'ai'
   const [adding, setAdding] = useState(null) // { properties, onDone }
@@ -453,7 +455,7 @@ function FindPropertiesPanel({ agentId }) {
           <AddToClientsModal
             agentId={agentId}
             properties={adding.properties}
-            defaultConsultationId={selectedConsultation?.id}
+            defaultConsultationId={selectedConsultation?.id || activeClient?.id}
             onDone={() => adding.onDone?.()}
             onClose={() => setAdding(null)}
           />

@@ -16,7 +16,7 @@ const money = (v) => (v || v === 0 ? `$${Number(v).toLocaleString()}` : '—')
 
 const EMPTY = { state: 'NC', city: '', minPrice: '', maxPrice: '', minBeds: '', hideUnderContract: true }
 
-export default function BrokerPropertySearch({ initialFilters, onAddToClients }) {
+export default function BrokerPropertySearch({ initialFilters, onAddToClients, actionLabel = 'Add to clients' }) {
   const [filters, setFilters] = useState(() => ({ ...EMPTY, ...withValues(initialFilters) }))
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -114,7 +114,7 @@ export default function BrokerPropertySearch({ initialFilters, onAddToClients })
               onClick={() => onAddToClients([...selected.values()], () => setSelected(new Map()))}
               className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700"
             >
-              <UserPlus className="w-4 h-4" /> Add to clients
+              <UserPlus className="w-4 h-4" /> {actionLabel}
             </button>
           </div>
         </div>

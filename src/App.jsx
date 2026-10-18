@@ -47,6 +47,8 @@ import SignUpGate from './components/SignUpGate'
 import LenderSpotlight, { GetQualifiedButton } from './components/GetQualified'
 import ShareProperty, { propertyShareText } from './components/ShareProperty'
 import { SavedHomesProvider } from './contexts/SavedHomesContext'
+import { ActiveClientProvider } from './contexts/ActiveClientContext'
+import ClientModeBanner from './components/ClientModeBanner'
 import { fetchOffersByCase, isUnderContract, priceChange } from './services/acceptedOffers'
 import RoleSelector from './components/RoleSelector'
 
@@ -1194,10 +1196,12 @@ export default function App() {
       <HelmetProvider>
       <AuthProvider>
       <SavedHomesProvider>
+      <ActiveClientProvider>
         <Router>
         <DefaultSEO />
         <div className="min-h-screen flex flex-col">
           <Header />
+          <ClientModeBanner />
           <main className="flex-1">
             <Routes>
               <Route path="/" element={<HomePage />} />
@@ -1233,6 +1237,7 @@ export default function App() {
           <Footer />
         </div>
         </Router>
+      </ActiveClientProvider>
       </SavedHomesProvider>
       </AuthProvider>
       </HelmetProvider>

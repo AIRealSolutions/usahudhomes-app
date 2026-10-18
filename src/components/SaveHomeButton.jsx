@@ -1,18 +1,22 @@
 /**
  * Heart button that saves a home to the buyer's profile.
  * Visitors without an account are sent to sign up and brought back to the home.
+ * While a broker is working for a client, it saves the home to that client instead.
  */
 
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heart } from 'lucide-react'
 import { useSavedHomes } from '../contexts/SavedHomesContext'
+import { useActiveClient } from '../contexts/ActiveClientContext'
 
 export default function SaveHomeButton({ property, variant = 'icon', className = '' }) {
   const { savedIds, toggleSaved, signedIn } = useSavedHomes()
+  const { client, clientFirstName, isPicked, togglePick } = useActiveClient()
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
-  const saved = savedIds.has(property?.id)
+  const forClient = !!client
+  const saved = forClient ? isPicked(property?.case_number) : savedIds.has(property?.id)
 
   const onClick = async (e) => {
     e.preventDefault()
@@ -22,11 +26,17 @@ export default function SaveHomeButton({ property, variant = 'icon', className =
       return
     }
     setBusy(true)
-    await toggleSaved(property)
+    try {
+      await (forClient ? togglePick(property) : toggleSaved(property))
+    } catch (err) {
+      alert(err.message || 'Could not save this home.')
+    }
     setBusy(false)
   }
 
-  const label = saved ? 'Saved' : 'Save home'
+  const label = forClient
+    ? (saved ? `Saved for ${clientFirstName}` : `Save for ${clientFirstName}`)
+    : (saved ? 'Saved' : 'Save home')
   if (variant === 'button') {
     return (
       <button onClick={onClick} disabled={busy} aria-pressed={saved}
