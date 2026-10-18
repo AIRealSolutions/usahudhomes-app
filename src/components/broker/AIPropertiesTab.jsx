@@ -30,7 +30,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 
-const AIPropertiesTab = ({ lead }) => {
+const AIPropertiesTab = ({ lead, onAddToClients }) => {
   const { profile } = useAuth()
   const [properties, setProperties] = useState([])
   const [aiRecommendations, setAiRecommendations] = useState([])
@@ -466,6 +466,18 @@ const AIPropertiesTab = ({ lead }) => {
             >
               Clear Selection
             </button>
+            {onAddToClients && (
+              <button
+                onClick={() => onAddToClients(
+                  aiRecommendations.filter(p => selectedForSharing.includes(p.id)),
+                  () => setSelectedForSharing([])
+                )}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+              >
+                <Heart className="w-4 h-4" />
+                Add to clients
+              </button>
+            )}
             <button
               onClick={handleShareSelected}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"

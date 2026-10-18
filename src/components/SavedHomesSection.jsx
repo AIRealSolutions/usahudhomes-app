@@ -90,6 +90,9 @@ export default function SavedHomesSection() {
                     <span className="absolute top-2 left-2 bg-amber-500 text-white text-xs font-bold uppercase px-2 py-1 rounded">Under Contract</span>
                   )}
                   <SaveHomeButton property={p} className="absolute top-2 right-2" />
+                  {row.recommended_by_agent_id && (
+                    <span className="absolute bottom-2 left-2 bg-indigo-600 text-white text-xs font-semibold px-2 py-1 rounded">Picked by your agent</span>
+                  )}
                 </Link>
                 <div className="p-4 flex-1 flex flex-col">
                   <Link to={`/property/${p.case_number}`} className="font-semibold text-gray-900 hover:text-blue-600">{p.address}</Link>
@@ -103,7 +106,7 @@ export default function SavedHomesSection() {
                     )}
                   </div>
                   <p className="text-xs text-gray-500 mb-3">
-                    Saved {formatDate(row.created_at)}
+                    {row.recommended_by_agent_id ? 'Added by your agent' : 'Saved'} {formatDate(row.created_at)}
                     {act && <> · {ACTIVITY_TEXT[act.event] || 'Update'} {formatDate(act.occurred_at)}</>}
                   </p>
                   <BidHistorySummary property={p} offers={offers.get(p.case_number)} signedIn />

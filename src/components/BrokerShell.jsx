@@ -27,6 +27,8 @@ const AIPropertiesTab        = lazy(() => import('./broker/AIPropertiesTab'))
 const PropertyShareAnalytics = lazy(() => import('./broker/PropertyShareAnalytics'))
 const EmailComposer          = lazy(() => import('./broker/EmailComposer'))
 const SMSComposer            = lazy(() => import('./broker/SMSComposer'))
+const BrokerPropertySearch   = lazy(() => import('./broker/BrokerPropertySearch'))
+const AddToClientsModal      = lazy(() => import('./broker/AddToClientsModal'))
 
 // ── Navigation config ─────────────────────────────────────────────────────────
 const NAV_SECTIONS = [
@@ -390,24 +392,73 @@ function AIAssistantPanel({ agentId }) {
 // ── Find Properties Panel ─────────────────────────────────────────────────────
 function FindPropertiesPanel({ agentId }) {
   const [selectedConsultation, setSelectedConsultation] = useState(null)
+  const [tab, setTab] = useState('search') // 'search' | 'ai'
+  const [adding, setAdding] = useState(null) // { properties, onDone }
   const lead = selectedConsultation ? consultationToLead(selectedConsultation) : null
+
+  // Suggested filters from the chosen client's preferences
+  const c = selectedConsultation
+  const leadFilters = c ? {
+    state: (c.state || c.customer?.state || '').toUpperCase().slice(0, 2),
+    city: c.preferred_location || c.customer?.city || '',
+    minPrice: c.price_range_min || c.budget_min || '',
+    maxPrice: c.price_range_max || c.budget_max || '',
+  } : null
+
+  const addToClients = (properties, onDone) => setAdding({ properties, onDone })
 
   return (
     <div className="space-y-5">
-      <h2 className="text-xl font-bold text-gray-900">Find Properties</h2>
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">Find Properties</h2>
+        <p className="text-sm text-gray-500">Search HUD homes, select the ones that fit, and add them to your clients. They show up on the client's lead card, in their Saved Homes if they have an account, and in the email and text composers.</p>
+      </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Select Lead (optional — AI matches properties to lead preferences)
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Searching for a client? (optional: fills in their state and budget)
           </label>
-          <LeadPicker agentId={agentId} onSelect={setSelectedConsultation} selectedId={selectedConsultation?.id} />
+          {selectedConsultation && (
+            <button onClick={() => { setSelectedConsultation(null); setTab('search') }} className="text-xs font-medium text-blue-700 hover:underline">
+              Clear
+            </button>
+          )}
         </div>
+        <LeadPicker agentId={agentId} onSelect={setSelectedConsultation} selectedId={selectedConsultation?.id} />
+      </div>
+
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+        {[{ id: 'search', label: 'Search' }, { id: 'ai', label: 'AI matches', disabled: !lead }].map(t => (
+          <button
+            key={t.id}
+            onClick={() => !t.disabled && setTab(t.id)}
+            disabled={t.disabled}
+            title={t.disabled ? 'Pick a client first' : undefined}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-40 ${tab === t.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       <Suspense fallback={<PanelFallback />}>
-        <AIPropertiesTab lead={lead} />
+        {tab === 'ai' && lead
+          ? <AIPropertiesTab lead={lead} onAddToClients={addToClients} />
+          : <BrokerPropertySearch initialFilters={leadFilters} onAddToClients={addToClients} />}
       </Suspense>
+
+      {adding && (
+        <Suspense fallback={null}>
+          <AddToClientsModal
+            agentId={agentId}
+            properties={adding.properties}
+            defaultConsultationId={selectedConsultation?.id}
+            onDone={() => adding.onDone?.()}
+            onClose={() => setAdding(null)}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

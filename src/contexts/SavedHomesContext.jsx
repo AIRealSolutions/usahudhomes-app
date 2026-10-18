@@ -16,7 +16,8 @@ export function SavedHomesProvider({ children }) {
   useEffect(() => {
     if (!user) { setSavedIds(new Set()); return }
     let cancelled = false
-    supabase.from('saved_properties').select('property_id').then(({ data, error }) => {
+    // Admins can read everyone's saved homes, so always scope to this user
+    supabase.from('saved_properties').select('property_id').eq('user_id', user.id).then(({ data, error }) => {
       if (error) console.error('Error loading saved homes:', error)
       else if (!cancelled) setSavedIds(new Set((data || []).map(r => r.property_id)))
     })
@@ -33,7 +34,7 @@ export function SavedHomesProvider({ children }) {
       return next
     })
     const { error } = wasSaved
-      ? await supabase.from('saved_properties').delete().eq('property_id', property.id)
+      ? await supabase.from('saved_properties').delete().eq('user_id', user.id).eq('property_id', property.id)
       : await supabase.from('saved_properties').insert({
           property_id: property.id, case_number: property.case_number, price_at_save: property.price ?? null,
         })
@@ -62,9 +63,12 @@ export function useSavedHomes() {
 
 /** Saved homes with their current listing, newest saved first */
 export async function listSavedHomes() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
   const { data, error } = await supabase
     .from('saved_properties')
-    .select('id, case_number, price_at_save, created_at, properties (id, case_number, address, city, state, zip_code, price, original_list_price, status, is_active, beds, baths, sq_ft, main_image, under_contract_at)')
+    .select('id, case_number, price_at_save, created_at, recommended_by_agent_id, properties (id, case_number, address, city, state, zip_code, price, original_list_price, status, is_active, beds, baths, sq_ft, main_image, under_contract_at)')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false })
   if (error) throw error
   return data || []

@@ -7,7 +7,8 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../config/supabase'
-import { Heart, FileText, MessageSquare, User, ChevronDown, ChevronUp, Loader } from 'lucide-react'
+import { removePick } from '../../services/propertyPicks'
+import { Heart, FileText, MessageSquare, User, ChevronDown, ChevronUp, Loader, Star, X } from 'lucide-react'
 
 const money = (v) => (v || v === 0 ? `$${Number(v).toLocaleString()}` : null)
 const date = (v) => (v ? new Date(v).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '')
@@ -43,7 +44,7 @@ function Section({ icon, title, count, children }) {
   )
 }
 
-function PropertyLine({ caseNumber, address, city, state, price, status, note, at }) {
+function PropertyLine({ caseNumber, address, city, state, price, status, note, at, action }) {
   const where = [address, [city, state].filter(Boolean).join(', ')].filter(Boolean).join(', ')
   return (
     <li className="text-sm border border-gray-100 rounded-lg p-2.5">
@@ -61,7 +62,7 @@ function PropertyLine({ caseNumber, address, city, state, price, status, note, a
           </p>
           {note && <p className="text-xs text-gray-700 mt-1 italic">"{note}"</p>}
         </div>
-        <span className="text-xs text-gray-400 whitespace-nowrap">{date(at)}</span>
+        <span className="flex items-center gap-1 text-xs text-gray-400 whitespace-nowrap">{date(at)}{action}</span>
       </div>
     </li>
   )
@@ -103,10 +104,10 @@ export default function ClientActivity({ consultationId }) {
       >
         <span className="flex items-center gap-2">
           <Heart className="w-4 h-4 text-pink-500" />
-          Client activity: saved homes, requests &amp; inquiries
+          Client activity: picks, saved homes, requests &amp; inquiries
           {data && (
             <span className="text-xs font-normal text-gray-500">
-              {data.saved.length} saved · {data.requests.length} requests · {data.inquiries.length} inquiries
+              {data.picks?.length || 0} picked · {data.saved.length} saved · {data.requests.length} requests · {data.inquiries.length} inquiries
             </span>
           )}
         </span>
@@ -138,6 +139,40 @@ export default function ClientActivity({ consultationId }) {
                   <span className="text-gray-500">No website account for this email yet.</span>
                 )}
               </div>
+
+              <Section icon={Star} title="Homes you picked" count={data.picks?.length || 0}>
+                <ul className="space-y-2">
+                  {(data.picks || []).map(pick => (
+                    <PropertyLine
+                        key={pick.id}
+                        caseNumber={pick.case_number}
+                        address={pick.property?.address}
+                        city={pick.property?.city}
+                        state={pick.property?.state}
+                        price={pick.property?.price}
+                        status={pick.status === 'sent' ? `sent ${date(pick.sent_at)}` : pick.property?.status || 'not yet sent'}
+                        note={pick.note}
+                        at={pick.created_at}
+                        action={<button
+                        type="button"
+                        title="Remove from this client's picks"
+                        onClick={async () => {
+                          try {
+                            await removePick(pick.id)
+                            setData(d => ({ ...d, picks: d.picks.filter(x => x.id !== pick.id) }))
+                          } catch (e) {
+                            setError(e.message)
+                          }
+                        }}
+                        className="p-0.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>}
+                    />
+                  ))}
+                </ul>
+                <p className="text-xs text-gray-500 mt-1">Add more from Find Properties. Insert them into an email or text from the composer.</p>
+              </Section>
 
               <Section icon={Heart} title="Saved homes" count={data.saved.length}>
                 <ul className="space-y-2">

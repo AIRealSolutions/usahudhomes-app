@@ -3,6 +3,8 @@ import { sendLeadEmail } from '../../services/leadMessaging'
 import { useAuth } from '../../contexts/AuthContext'
 import { consultationService } from '../../services/database/consultationService'
 import { listTemplates, applyTemplate } from '../../services/emailTemplates'
+import { markPicks } from '../../services/propertyPicks'
+import InsertPicksButton from './InsertPicksButton'
 import { X, Mail, Send, FileText, Sparkles } from 'lucide-react'
 
 const EmailComposer = ({ consultation, customer, property, onSend, onCancel }) => {
@@ -27,6 +29,7 @@ const EmailComposer = ({ consultation, customer, property, onSend, onCancel }) =
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [sending, setSending] = useState(false)
   const [savedTemplates, setSavedTemplates] = useState([])
+  const [insertedPickIds, setInsertedPickIds] = useState([])
 
   // Templates managed in Admin → Email Templates
   useEffect(() => {
@@ -256,6 +259,9 @@ ${sender.email}`
       } else {
         console.error('Email sent but not logged:', result.error)
       }
+      if (insertedPickIds.length) {
+        markPicks(insertedPickIds, 'sent').catch(err => console.error('Could not mark picks sent:', err))
+      }
       alert(`Email sent to ${customer.email}`)
       onSend()
     } catch (error) {
@@ -336,9 +342,18 @@ ${sender.email}`
 
             {/* Body */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Message <span className="text-red-600">*</span>
-              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Message <span className="text-red-600">*</span>
+                </label>
+                <InsertPicksButton
+                  consultationId={consultation?.id}
+                  onInsert={(text, ids) => {
+                    setBody(b => (b.trim() ? `${b.trimEnd()}\n\n` : '') + text)
+                    setInsertedPickIds(prev => [...new Set([...prev, ...ids])])
+                  }}
+                />
+              </div>
               <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}

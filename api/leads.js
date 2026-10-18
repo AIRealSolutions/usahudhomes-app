@@ -12,6 +12,7 @@
  *   POST ?action=outcome         — update consultation outcome
  *   GET  ?action=referrals            — get all referrals for an agent
  *   GET  ?action=client-activity      — a lead's saved homes, property requests and inquiries
+ *   GET/POST/PATCH/DELETE ?action=property-picks — homes a broker picked for clients (Find Properties)
  *   POST ?action=process-expired      — expire overdue referrals
  *   POST ?action=purge-under-contract — hard-delete stale UNDER CONTRACT properties
  */
@@ -207,6 +208,27 @@ const PROPERTY_FIELDS = 'id, case_number, address, city, state, zip_code, price,
 // Case-insensitive exact match: escape LIKE wildcards (an "_" in an email would match any character)
 const likeExact = (v) => v.replace(/[\\%_]/g, m => '\\' + m)
 
+// The lead (consultation) if the caller is an admin or the broker it belongs to, else null
+async function leadForCaller(supabase, caller, consultationId) {
+  const { data: lead, error } = await supabase
+    .from('consultations')
+    .select('id, agent_id, assigned_broker_id, customer_id, customer_email, email, customers(email)')
+    .eq('id', consultationId)
+    .maybeSingle()
+  if (error) throw error
+  if (!lead) return null
+  const ownerId = lead.agent_id || lead.assigned_broker_id
+  if (caller.role !== 'admin' && !(ownerId && await canActForAgent(supabase, caller, ownerId))) return null
+  return { ...lead, ownerId, buyerEmail: (lead.customers?.email || lead.customer_email || lead.email || '').trim().toLowerCase() }
+}
+
+// The buyer's website account for a lead's email, if they have one
+async function buyerAccount(supabase, email) {
+  if (!email) return null
+  const { data } = await supabase.from('users').select('id').ilike('email', likeExact(email)).maybeSingle()
+  return data || null
+}
+
 async function handleClientActivity(req, res) {
   const supabase = getSupabase()
   const caller = await requireRole(req, res, supabase, ['admin', 'broker'])
@@ -214,20 +236,11 @@ async function handleClientActivity(req, res) {
   const consultationId = req.query?.consultationId
   if (!consultationId) return res.status(400).json({ success: false, error: 'consultationId query param required' })
 
-  const { data: lead, error: leadErr } = await supabase
-    .from('consultations')
-    .select('id, agent_id, assigned_broker_id, customer_email, email, customers(email)')
-    .eq('id', consultationId)
-    .maybeSingle()
-  if (leadErr) throw leadErr
+  const lead = await leadForCaller(supabase, caller, consultationId)
   if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' })
-  const ownerId = lead.agent_id || lead.assigned_broker_id
-  if (caller.role !== 'admin' && !(ownerId && await canActForAgent(supabase, caller, ownerId))) {
-    return res.status(403).json({ success: false, error: 'You can only view your own leads.' })
-  }
 
-  const rawEmail = (lead.customers?.email || lead.customer_email || lead.email || '').trim().toLowerCase()
-  if (!rawEmail) return res.status(200).json({ success: true, data: { account: null, saved: [], requests: [], inquiries: [] } })
+  const rawEmail = lead.buyerEmail
+  if (!rawEmail) return res.status(200).json({ success: true, data: { account: null, saved: [], requests: [], inquiries: [], picks: await picksForLead(supabase, lead.id) } })
   const email = likeExact(rawEmail)
 
   const { data: account } = await supabase
@@ -282,8 +295,118 @@ async function handleClientActivity(req, res) {
 
   return res.status(200).json({
     success: true,
-    data: { account: account || null, saved: savedHomes, requests: requestsRes.data || [], inquiries },
+    data: { account: account || null, saved: savedHomes, requests: requestsRes.data || [], inquiries, picks: await picksForLead(supabase, lead.id) },
   })
+}
+
+// ─── Action: property-picks ───────────────────────────────────────────────────
+// GET    ?consultationId=      → the lead's picks with current listing details
+// POST   { consultationIds, properties: [{ id, case_number, price }], note }
+//        → add the homes to each lead's picks, and to the buyer's saved homes when
+//          they have a website account
+// PATCH  { ids, status }       → e.g. mark picks 'sent' after an email/text
+// DELETE ?id=                  → remove a pick (the buyer's saved home is kept)
+const PICK_STATUSES = ['picked', 'sent', 'interested', 'not_interested']
+
+async function picksForLead(supabase, consultationId) {
+  const { data, error } = await supabase
+    .from('client_property_picks')
+    .select('id, case_number, property_id, note, status, sent_at, created_at')
+    .eq('consultation_id', consultationId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  const ids = (data || []).map(p => p.property_id).filter(Boolean)
+  const { data: props } = ids.length ? await supabase.from('properties').select(PROPERTY_FIELDS).in('id', ids) : { data: [] }
+  return (data || []).map(p => ({ ...p, property: (props || []).find(x => x.id === p.property_id) || null }))
+}
+
+async function handlePropertyPicks(req, res) {
+  const supabase = getSupabase()
+  const caller = await requireRole(req, res, supabase, ['admin', 'broker'])
+  if (!caller) return
+
+  if (req.method === 'GET') {
+    const lead = await leadForCaller(supabase, caller, req.query?.consultationId)
+    if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' })
+    return res.status(200).json({ success: true, data: await picksForLead(supabase, lead.id) })
+  }
+
+  if (req.method === 'POST') {
+    const { consultationIds = [], properties = [], note } = req.body || {}
+    const homes = properties.filter(p => p?.case_number).slice(0, 50)
+    if (!Array.isArray(consultationIds) || !consultationIds.length || !homes.length) {
+      return res.status(400).json({ success: false, error: 'Choose at least one client and one home.' })
+    }
+    const results = []
+    for (const consultationId of consultationIds.slice(0, 50)) {
+      const lead = await leadForCaller(supabase, caller, consultationId)
+      if (!lead) { results.push({ consultationId, error: 'not your lead' }); continue }
+      const account = await buyerAccount(supabase, lead.buyerEmail)
+      const rows = homes.map(h => ({
+        consultation_id: lead.id,
+        customer_id: lead.customer_id || null,
+        user_id: account?.id || null,
+        agent_id: lead.ownerId || null,
+        property_id: h.id || null,
+        case_number: String(h.case_number),
+        note: note ? String(note).slice(0, 500) : null,
+      }))
+      const { data: added, error } = await supabase
+        .from('client_property_picks')
+        .upsert(rows, { onConflict: 'consultation_id,case_number', ignoreDuplicates: true })
+        .select('id')
+      if (error) throw error
+
+      let savedToAccount = 0
+      if (account) {
+        const saved = homes.filter(h => h.id).map(h => ({
+          user_id: account.id, property_id: h.id, case_number: String(h.case_number),
+          price_at_save: h.price ?? null, recommended_by_agent_id: lead.ownerId || null,
+        }))
+        if (saved.length) {
+          const { data: savedRows, error: savedErr } = await supabase
+            .from('saved_properties')
+            .upsert(saved, { onConflict: 'user_id,property_id', ignoreDuplicates: true })
+            .select('id')
+          if (savedErr) console.warn('[property-picks] saved homes not updated:', savedErr.message)
+          savedToAccount = savedRows?.length || 0
+        }
+      }
+      results.push({ consultationId, added: added?.length || 0, alreadyPicked: rows.length - (added?.length || 0), hasAccount: !!account, savedToAccount })
+    }
+    return res.status(200).json({ success: true, data: results })
+  }
+
+  if (req.method === 'PATCH') {
+    const { ids = [], status } = req.body || {}
+    if (!PICK_STATUSES.includes(status) || !Array.isArray(ids) || !ids.length) {
+      return res.status(400).json({ success: false, error: 'ids and a valid status are required' })
+    }
+    const { data: picks, error } = await supabase.from('client_property_picks').select('id, consultation_id').in('id', ids.slice(0, 100))
+    if (error) throw error
+    const allowed = []
+    for (const p of picks || []) if (await leadForCaller(supabase, caller, p.consultation_id)) allowed.push(p.id)
+    if (allowed.length) {
+      const { error: updErr } = await supabase
+        .from('client_property_picks')
+        .update({ status, ...(status === 'sent' ? { sent_at: new Date().toISOString() } : {}) })
+        .in('id', allowed)
+      if (updErr) throw updErr
+    }
+    return res.status(200).json({ success: true, data: { updated: allowed.length } })
+  }
+
+  if (req.method === 'DELETE') {
+    const { data: pick } = await supabase.from('client_property_picks').select('id, consultation_id').eq('id', req.query?.id || '').maybeSingle()
+    if (!pick || !(await leadForCaller(supabase, caller, pick.consultation_id))) {
+      return res.status(404).json({ success: false, error: 'Pick not found' })
+    }
+    const { error } = await supabase.from('client_property_picks').delete().eq('id', pick.id)
+    if (error) throw error
+    return res.status(200).json({ success: true })
+  }
+
+  return res.status(405).json({ success: false, error: 'Method not allowed' })
 }
 
 // ─── Action: purge-under-contract ───────────────────────────────────────────
@@ -434,7 +557,7 @@ async function handleProcessExpired(req, res) {
 // ─── Main router ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   if (req.method === 'OPTIONS') return res.status(200).end()
 
@@ -448,13 +571,14 @@ export default async function handler(req, res) {
     if (action === 'outcome')          return await handleOutcome(req, res)
     if (action === 'referrals')        return await handleGetReferrals(req, res)
     if (action === 'client-activity')  return await handleClientActivity(req, res)
+    if (action === 'property-picks')   return await handlePropertyPicks(req, res)
     if (action === 'process-expired')       return await handleProcessExpired(req, res)
     if (action === 'purge-under-contract')  return await handlePurgeUnderContract(req, res)
 
     return res.status(400).json({
       success: false,
       error: 'Missing or unknown ?action= parameter',
-      valid_actions: ['delete', 'assign', 'accept', 'decline', 'outcome', 'referrals', 'client-activity', 'process-expired', 'purge-under-contract'],
+      valid_actions: ['delete', 'assign', 'accept', 'decline', 'outcome', 'referrals', 'client-activity', 'property-picks', 'process-expired', 'purge-under-contract'],
     })
   } catch (err) {
     console.error(`[leads/${action}] Error:`, err)

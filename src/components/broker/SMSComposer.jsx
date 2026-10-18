@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import { sendLeadText } from '../../services/leadMessaging'
 import { useAuth } from '../../contexts/AuthContext'
 import { consultationService } from '../../services/database/consultationService'
+import { markPicks } from '../../services/propertyPicks'
+import InsertPicksButton from './InsertPicksButton'
 import { X, MessageSquare, Send, Sparkles } from 'lucide-react'
 
 const SMSComposer = ({ consultation, customer, property, onSend, onCancel }) => {
@@ -22,6 +24,7 @@ const SMSComposer = ({ consultation, customer, property, onSend, onCancel }) => 
   }
   customer = { ...(customer || {}), first_name: customer?.first_name || String(customer?.name || consultation?.customer_name || '').split(' ')[0] || 'there' }
   const [message, setMessage] = useState('')
+  const [insertedPickIds, setInsertedPickIds] = useState([])
   const [sending, setSending] = useState(false)
 
   const maxLength = 160
@@ -114,6 +117,9 @@ const SMSComposer = ({ consultation, customer, property, onSend, onCancel }) => 
       } else {
         console.error('Text sent but not logged:', result.error)
       }
+      if (insertedPickIds.length) {
+        markPicks(insertedPickIds, 'sent').catch(err => console.error('Could not mark picks sent:', err))
+      }
       if (sent.via === 'twilio') alert(`Text sent to ${customer.phone}`)
       onSend()
     } catch (error) {
@@ -182,6 +188,16 @@ const SMSComposer = ({ consultation, customer, property, onSend, onCancel }) => 
                 <span className={`text-xs ${isOverLimit ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
                   {characterCount}/{maxLength}
                 </span>
+              </div>
+              <div className="mb-2">
+                <InsertPicksButton
+                  consultationId={consultation?.id}
+                  sms
+                  onInsert={(text, ids) => {
+                    setMessage(m => (m.trim() ? `${m.trimEnd()}\n` : '') + text)
+                    setInsertedPickIds(prev => [...new Set([...prev, ...ids])])
+                  }}
+                />
               </div>
               <textarea
                 value={message}
