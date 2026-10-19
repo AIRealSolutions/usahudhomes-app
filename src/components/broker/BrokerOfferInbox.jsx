@@ -1,6 +1,6 @@
 import React,{useEffect,useState} from 'react'
 import {Link} from 'react-router-dom'
-import {supabase} from '../lib/supabase'
+import {supabase} from '../../lib/supabase'
 const money=n=>Number(n||0).toLocaleString('en-US',{style:'currency',currency:'USD'})
 export default function BrokerOfferInbox({agentId,consultationId}){
  const [offers,setOffers]=useState([]),[error,setError]=useState('')
