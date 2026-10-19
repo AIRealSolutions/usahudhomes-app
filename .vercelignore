@@ -1,0 +1,8 @@
+# Local/background HUD scraping scripts are not Vercel HTTP functions.
+# Keep these in GitHub for external/manual execution.
+api/*.py
+api/__pycache__/
+
+# One-time agent bootstrap is not a public production API.
+# Agent onboarding uses the normal registration workflow.
+api/init-agent.js
