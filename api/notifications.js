@@ -15,7 +15,6 @@
  *   POST ?action=lead-sms   — broker/admin texts a lead via Twilio (Bearer token required)
  *   POST ?action=consultation-request — signed-in buyer asks for an agent callback (saved as a lead)
  *   POST ?action=agent-invite — admin creates an agent login (invite email, or reset link if it exists)
- *   POST ?action=buyer-register — public: "Connect Me With a Broker" creates a confirmed buyer login
  *   POST ?action=lead-submitted — public forms: announce a new lead to admins (looked up by id, once)
  *   GET/POST ?action=send-alerts — daily cron (CRON_SECRET) or an admin: email HUD home alert matches
  *   GET  ?action=unsubscribe&token= — one-click unsubscribe link in alert emails
@@ -657,54 +656,6 @@ async function handleAgentInvite(req, res) {
   })
 }
 
-// ─── Action: buyer register (public) ──────────────────────────────────────────
-// "Connect Me With a Broker" creates a buyer login so they land on their dashboard
-// right away instead of waiting on a confirmation email. The on_auth_user_created
-// trigger always files these as end_user, whatever the metadata says.
-async function handleBuyerRegister(req, res) {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ success: false, error: 'Server is not configured.' })
-
-  const b = req.body || {}
-  const str = (v, max = 80) => (v ? String(v).trim().slice(0, max) : '')
-  const email = str(b.email, 200).toLowerCase()
-  const password = typeof b.password === 'string' ? b.password : ''
-  const firstName = str(b.firstName)
-  const lastName  = str(b.lastName)
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ success: false, error: 'A valid email is required.' })
-  if (password.length < 8 || password.length > 72) return res.status(400).json({ success: false, error: 'Password must be 8 to 72 characters.' })
-  if (!firstName || !lastName) return res.status(400).json({ success: false, error: 'First and last name are required.' })
-
-  const created = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
-    method: 'POST',
-    headers: {
-      apikey: SUPABASE_SERVICE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        first_name: firstName,
-        last_name: lastName,
-        phone: str(b.phone, 40) || undefined,
-        state: /^[A-Z]{2}$/i.test(str(b.state)) ? str(b.state).toUpperCase() : undefined,
-        broker_requested_at: new Date().toISOString(),
-      },
-    }),
-  })
-  if (created.ok) return res.status(200).json({ success: true })
-
-  const err = await created.json().catch(() => ({}))
-  const msg = err.msg || err.message || err.error_description || ''
-  if (created.status === 422 || /already/i.test(msg)) {
-    return res.status(409).json({ success: false, existingAccount: true, error: 'An account with this email already exists. Please sign in to continue.' })
-  }
-  console.error('[buyer-register] create failed:', created.status, msg)
-  return res.status(502).json({ success: false, error: msg || 'Could not create your account.' })
-}
-
 // ─── Lead routing ─────────────────────────────────────────────────────────────
 // Every lead stays in the admin Leads list. When routing is switched on in
 // lead_routing_settings and the lead's state is one of the chosen states, the lead
@@ -1018,7 +969,6 @@ export default async function handler(req, res) {
     if (action === 'lead-sms')    return await handleLeadSms(req, res)
     if (action === 'consultation-request') return await handleConsultationRequest(req, res)
     if (action === 'agent-invite') return await handleAgentInvite(req, res)
-    if (action === 'buyer-register') return await handleBuyerRegister(req, res)
     if (action === 'lead-submitted') return await handleLeadSubmitted(req, res)
     if (action === 'send-alerts') return await handleSendAlerts(req, res)
 

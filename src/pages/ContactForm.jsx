@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { notifyLeadSubmitted } from '../services/leadMessaging';
 import { useAuth } from '../contexts/AuthContext';
+import authService from '../services/authService';
 import { stateName, stateCode, rememberProfileDetails, TIMELINE_FROM_PROFILE, TIMELINE_TO_PROFILE } from '../services/buyerProfile';
 
 // Signed-in buyers: these fields come from their profile
@@ -25,7 +26,9 @@ import { Home, Phone, Mail, MapPin, DollarSign, Calendar, MessageSquare, CheckCi
 
 export default function ContactForm() {
   const navigate = useNavigate();
-  const { user, profile, applyProfile, signIn } = useAuth();
+  const { user, profile, applyProfile, signUp } = useAuth();
+  const [verifyEmail, setVerifyEmail] = useState('');
+  const [resendStatus, setResendStatus] = useState('');
   const touched = useRef(false);
   const [formData, setFormData] = useState(() => ({
     first_name: '',
@@ -127,35 +130,26 @@ export default function ContactForm() {
     try {
       setSubmitting(true);
 
-      // Signed-out visitors get an account first, so they land on their dashboard
-      // (saved homes, alerts, tools) while the broker gets in touch.
-      let account = { user, profile };
+      // Signed-out visitors create an account; once they verify their email they land on
+      // their dashboard (saved homes, alerts, tools) while the broker gets in touch.
+      const brokerRequestedAt = new Date().toISOString();
       if (!user) {
-        const res = await fetch('/api/notifications?action=buyer-register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: formData.email.trim(),
-            password: formData.password,
-            firstName: formData.first_name.trim(),
-            lastName: formData.last_name.trim(),
-            phone: formData.phone.trim(),
-            state: stateCode(formData.state) || '',
-          }),
+        const reg = await signUp({
+          email: formData.email.trim(),
+          password: formData.password,
+          firstName: formData.first_name.trim(),
+          lastName: formData.last_name.trim(),
+          phone: formData.phone.trim(),
+          state: stateCode(formData.state) || undefined,
+          recordLead: false, // the broker request below is the lead
+          metadata: { broker_requested_at: brokerRequestedAt },
         });
-        const reg = await res.json().catch(() => ({}));
-        if (!res.ok || !reg.success) {
-          setErrors({ submit: reg.error || 'Could not create your account. Please try again.', existingAccount: !!reg.existingAccount });
+        if (!reg?.success) {
+          setErrors({ submit: reg?.error || 'Could not create your account. Please try again.', existingAccount: !!reg?.existingAccount });
           return;
         }
-        const login = await signIn(formData.email.trim(), formData.password);
-        if (!login?.success) {
-          setErrors({ submit: 'Your account was created, but we could not sign you in. Please sign in to finish your request.', existingAccount: true });
-          return;
-        }
-        account = { user: login.data.user, profile: login.data.profile };
       } else {
-        supabase.auth.updateUser({ data: { broker_requested_at: new Date().toISOString() } })
+        supabase.auth.updateUser({ data: { broker_requested_at: brokerRequestedAt } })
           .catch(err => console.error('Could not mark broker request:', err));
       }
 
@@ -198,14 +192,19 @@ export default function ContactForm() {
 
       notifyLeadSubmitted(leadData.id);
 
-      if (account.user) {
-        rememberProfileDetails(account.user.id, account.profile, {
+      if (user) {
+        rememberProfileDetails(user.id, profile, {
           first_name: formData.first_name, last_name: formData.last_name, phone: formData.phone, state: formData.state,
           price_range_min: formData.budget_min, price_range_max: formData.budget_max,
           timeline: TIMELINE_TO_PROFILE[formData.timeline] || '',
         }).then(applyProfile);
       }
 
+      if (!user) {
+        setVerifyEmail(formData.email.trim());
+        window.scrollTo(0, 0);
+        return;
+      }
       navigate('/dashboard', {
         state: { brokerRequested: true, name: formData.first_name }
       });
@@ -216,6 +215,43 @@ export default function ContactForm() {
       setSubmitting(false);
     }
   };
+
+  const resend = async () => {
+    setResendStatus('sending');
+    const result = await authService.resendConfirmation(verifyEmail);
+    setResendStatus(result.success ? 'sent' : 'failed');
+  };
+
+  if (verifyEmail) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-12">
+        <div className="max-w-xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12 text-center">
+            <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+              <Mail className="h-8 w-8 text-green-600" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-3">Check your email</h1>
+            <p className="text-gray-700 mb-2">
+              Your broker request is in. A HUD-registered broker will contact you within 24 hours.
+            </p>
+            <p className="text-gray-700 mb-6">
+              We sent a verification link to <strong>{verifyEmail}</strong>. Click it to open your dashboard, where you can save homes, create home alerts and use our buyer tools while you wait.
+            </p>
+            <p className="text-sm text-gray-500">
+              Don't see it? Check your spam folder or{' '}
+              <button type="button" onClick={resend} disabled={resendStatus === 'sending' || resendStatus === 'sent'} className="text-blue-600 font-medium hover:underline disabled:opacity-60">
+                {resendStatus === 'sent' ? 'link sent again' : resendStatus === 'sending' ? 'sending...' : 'resend the link'}
+              </button>
+              {resendStatus === 'failed' && <span className="block mt-1 text-red-600">Could not resend right now. Please try again in a minute.</span>}
+            </p>
+            <Link to="/search" className="inline-block mt-6 text-blue-600 font-semibold hover:underline">
+              Browse HUD homes in the meantime →
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-12">
@@ -346,7 +382,7 @@ export default function ContactForm() {
                   Create Your Account
                 </h2>
                 <p className="text-gray-600 mb-6">
-                  While you wait for your broker, your free dashboard lets you save homes, set up price and listing alerts, and use our buyer tools.
+                  While you wait for your broker, your free dashboard lets you save homes, set up home alerts, and use our buyer tools. We'll email you a link to verify your address.
                   Already have an account? <Link to="/login" state={{ from: { pathname: '/contact' } }} className="text-blue-600 font-medium hover:underline">Sign in</Link>
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

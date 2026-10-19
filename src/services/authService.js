@@ -9,10 +9,11 @@ import { notifyLeadSubmitted } from './leadMessaging'
 class AuthService {
   /**
    * Sign up new user
-   * @param {Object} userData - User registration data (property: the listing they signed up from, optional)
+   * @param {Object} userData - User registration data (property: the listing they signed up from, optional;
+   *   recordLead: false when the caller files its own lead; metadata: extra auth user_metadata)
    * @returns {Promise<Object>} Result with user, profile, and session (null until the email is confirmed)
    */
-  async signUp({ email, password, firstName, lastName, role = 'end_user', phone, state, address, property }) {
+  async signUp({ email, password, firstName, lastName, role = 'end_user', phone, state, address, property, recordLead = true, metadata }) {
     try {
       // Safety check
       if (!supabase || !supabase.auth) {
@@ -23,6 +24,8 @@ class AuthService {
         email,
         password,
         options: {
+          // The confirmation link signs them in on /login, which forwards to their dashboard
+          emailRedirectTo: `${window.location.origin}/login`,
           // Saved to the profile by the on_auth_user_created trigger, even before email confirmation
           data: {
             first_name: firstName,
@@ -30,7 +33,8 @@ class AuthService {
             phone: phone || undefined,
             state: state || undefined,
             address: address || undefined,
-            role: role
+            role: role,
+            ...metadata
           }
         }
       })
@@ -49,7 +53,7 @@ class AuthService {
         return { success: false, existingAccount: true, error: 'An account with this email already exists. Please sign in instead.', data: null }
       }
 
-      if (role === 'end_user') await this.recordSignupLead({ email, firstName, lastName, phone, state, property })
+      if (role === 'end_user' && recordLead) await this.recordSignupLead({ email, firstName, lastName, phone, state, property })
 
       // Create user record in database
       const { data: profileData, error: profileError } = await supabase
