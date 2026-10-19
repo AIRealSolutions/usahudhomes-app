@@ -19,7 +19,8 @@ import {
   Eye,
   UserPlus,
   Edit,
-  Save
+  Save,
+  Trash2
 } from 'lucide-react'
 import { consultationService, customerService, propertyService, agentService, referralService } from '../../services/database'
 
@@ -35,10 +36,10 @@ function ConsultationAdmin() {
   const [editForm, setEditForm] = useState({})
   const [stats, setStats] = useState({
     total: 0,
-    pending: 0,
-    scheduled: 0,
-    completed: 0,
-    cancelled: 0
+    new: 0,
+    referred: 0,
+    accepted: 0,
+    declined: 0
   })
 
   useEffect(() => {
@@ -73,11 +74,22 @@ function ConsultationAdmin() {
   function calculateStats(data) {
     setStats({
       total: data.length,
-      pending: data.filter(c => c.status === 'pending').length,
-      scheduled: data.filter(c => c.status === 'scheduled').length,
-      completed: data.filter(c => c.status === 'completed').length,
-      cancelled: data.filter(c => c.status === 'cancelled').length
+      new: data.filter(c => c.status === 'new' || c.status === 'pending').length,
+      referred: data.filter(c => c.status === 'referred').length,
+      accepted: data.filter(c => c.status === 'accepted').length,
+      declined: data.filter(c => c.status === 'declined').length
     })
+  }
+
+  // Newer leads store first_name/last_name/email/phone; older ones use customer_* columns
+  function leadName(c) {
+    return c.customer_name || [c.first_name, c.last_name].filter(Boolean).join(' ').trim()
+  }
+  function leadEmail(c) {
+    return c.customer_email || c.email
+  }
+  function leadPhone(c) {
+    return c.customer_phone || c.phone
   }
 
   function filterConsultations() {
@@ -87,9 +99,9 @@ function ConsultationAdmin() {
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(c =>
-        c.customer_name?.toLowerCase().includes(query) ||
-        c.customer_email?.toLowerCase().includes(query) ||
-        c.customer_phone?.toLowerCase().includes(query) ||
+        leadName(c)?.toLowerCase().includes(query) ||
+        leadEmail(c)?.toLowerCase().includes(query) ||
+        leadPhone(c)?.toLowerCase().includes(query) ||
         c.case_number?.toLowerCase().includes(query) ||
         c.message?.toLowerCase().includes(query)
       )
@@ -111,7 +123,7 @@ function ConsultationAdmin() {
   function openEditModal(consultation) {
     setEditingConsultation(consultation)
     setEditForm({
-      status: consultation.status || 'pending',
+      status: consultation.status || 'new',
       consultation_type: consultation.consultation_type || 'general',
       agent_id: consultation.agent_id || '',
       case_number: consultation.case_number || '',
@@ -174,6 +186,16 @@ function ConsultationAdmin() {
     }
   }
 
+  async function deleteLead(consultation) {
+    if (!window.confirm(`Delete ${leadName(consultation) || 'this lead'}? This removes it from Assigned Leads.`)) return
+    const result = await consultationService.deleteConsultation(consultation.id)
+    if (result.success) {
+      loadConsultations()
+    } else {
+      alert('Failed to delete lead: ' + (result.error || 'Unknown error'))
+    }
+  }
+
   function formatDate(dateString) {
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', { 
@@ -187,7 +209,10 @@ function ConsultationAdmin() {
 
   function getStatusBadge(status) {
     const badges = {
+      new: <Badge className="bg-yellow-100 text-yellow-800">New</Badge>,
       pending: <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>,
+      accepted: <Badge className="bg-green-100 text-green-800">Accepted</Badge>,
+      declined: <Badge className="bg-red-100 text-red-800">Declined</Badge>,
       referred: <Badge className="bg-yellow-100 text-yellow-800">Referred</Badge>,
       scheduled: <Badge className="bg-blue-100 text-blue-800">Scheduled</Badge>,
       completed: <Badge className="bg-green-100 text-green-800">Completed</Badge>,
@@ -209,9 +234,9 @@ function ConsultationAdmin() {
   async function exportToCSV() {
     const csvData = filteredConsultations.map(c => ({
       'Date': formatDate(c.created_at),
-      'Customer': c.customer_name,
-      'Email': c.customer_email,
-      'Phone': c.customer_phone,
+      'Customer': leadName(c),
+      'Email': leadEmail(c),
+      'Phone': leadPhone(c),
       'Status': c.status,
       'Type': c.consultation_type,
       'Case Number': c.case_number || '',
@@ -237,8 +262,8 @@ function ConsultationAdmin() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold">Lead Requests</h2>
-        <p className="text-gray-600">Manage and respond to customer lead requests</p>
+        <h2 className="text-2xl font-bold">Assigned Leads</h2>
+        <p className="text-gray-600">Leads referred to brokers — assign, track and remove them here</p>
       </div>
 
       {/* Stats */}
@@ -251,26 +276,26 @@ function ConsultationAdmin() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-            <div className="text-sm text-gray-600">Pending</div>
+            <div className="text-2xl font-bold text-yellow-600">{stats.new}</div>
+            <div className="text-sm text-gray-600">New</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">{stats.scheduled}</div>
-            <div className="text-sm text-gray-600">Scheduled</div>
+            <div className="text-2xl font-bold text-blue-600">{stats.referred}</div>
+            <div className="text-sm text-gray-600">Referred</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-            <div className="text-sm text-gray-600">Completed</div>
+            <div className="text-2xl font-bold text-green-600">{stats.accepted}</div>
+            <div className="text-sm text-gray-600">Accepted</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">{stats.cancelled}</div>
-            <div className="text-sm text-gray-600">Cancelled</div>
+            <div className="text-2xl font-bold text-red-600">{stats.declined}</div>
+            <div className="text-sm text-gray-600">Declined</div>
           </CardContent>
         </Card>
       </div>
@@ -293,6 +318,10 @@ function ConsultationAdmin() {
           className="px-4 py-2 border rounded-md bg-white"
         >
           <option value="all">All Status</option>
+          <option value="new">New</option>
+          <option value="referred">Referred</option>
+          <option value="accepted">Accepted</option>
+          <option value="declined">Declined</option>
           <option value="pending">Pending</option>
           <option value="scheduled">Scheduled</option>
           <option value="completed">Completed</option>
@@ -342,7 +371,7 @@ function ConsultationAdmin() {
                           <User className="h-5 w-5 text-blue-600" />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-lg">{consultation.customer_name}</h3>
+                          <h3 className="font-semibold text-lg">{leadName(consultation)}</h3>
                           <p className="text-sm text-gray-500">{formatDate(consultation.created_at)}</p>
                         </div>
                       </div>
@@ -355,14 +384,14 @@ function ConsultationAdmin() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                       <div className="flex items-center gap-2 text-gray-600">
                         <Mail className="h-4 w-4" />
-                        <a href={`mailto:${consultation.customer_email}`} className="hover:text-blue-600">
-                          {consultation.customer_email}
+                        <a href={`mailto:${leadEmail(consultation)}`} className="hover:text-blue-600">
+                          {leadEmail(consultation)}
                         </a>
                       </div>
                       <div className="flex items-center gap-2 text-gray-600">
                         <Phone className="h-4 w-4" />
-                        <a href={`tel:${consultation.customer_phone}`} className="hover:text-blue-600">
-                          {consultation.customer_phone}
+                        <a href={`tel:${leadPhone(consultation)}`} className="hover:text-blue-600">
+                          {leadPhone(consultation)}
                         </a>
                       </div>
                       {consultation.case_number && (
@@ -398,7 +427,7 @@ function ConsultationAdmin() {
                       <Edit className="h-4 w-4 mr-1" />
                       Update
                     </Button>
-                    {consultation.status === 'pending' && (
+                    {(consultation.status === 'pending' || consultation.status === 'new') && (
                       <>
                         <Button
                           size="sm"
@@ -428,7 +457,7 @@ function ConsultationAdmin() {
                         Complete
                       </Button>
                     )}
-                    {(consultation.status === 'pending' || consultation.status === 'scheduled') && (
+                    {['pending', 'new', 'scheduled'].includes(consultation.status) && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -439,6 +468,15 @@ function ConsultationAdmin() {
                         Cancel
                       </Button>
                     )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => deleteLead(consultation)}
+                      className="text-gray-500 hover:text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -460,9 +498,9 @@ function ConsultationAdmin() {
               {/* Customer Info (Read-only) */}
               <div className="bg-gray-50 p-4 rounded-md space-y-2">
                 <h4 className="font-semibold">Customer Information</h4>
-                <p className="text-sm"><strong>Name:</strong> {editingConsultation.customer_name}</p>
-                <p className="text-sm"><strong>Email:</strong> {editingConsultation.customer_email}</p>
-                <p className="text-sm"><strong>Phone:</strong> {editingConsultation.customer_phone}</p>
+                <p className="text-sm"><strong>Name:</strong> {leadName(editingConsultation)}</p>
+                <p className="text-sm"><strong>Email:</strong> {leadEmail(editingConsultation)}</p>
+                <p className="text-sm"><strong>Phone:</strong> {leadPhone(editingConsultation)}</p>
               </div>
 
               {/* Status */}
@@ -473,8 +511,11 @@ function ConsultationAdmin() {
                   onChange={(e) => setEditForm({...editForm, status: e.target.value})}
                   className="w-full px-3 py-2 border rounded-md"
                 >
-                  <option value="pending">Pending</option>
+                  <option value="new">New</option>
                   <option value="referred">Referred</option>
+                  <option value="accepted">Accepted</option>
+                  <option value="declined">Declined</option>
+                  <option value="pending">Pending</option>
                   <option value="scheduled">Scheduled</option>
                   <option value="completed">Completed</option>
                   <option value="cancelled">Cancelled</option>

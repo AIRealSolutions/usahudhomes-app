@@ -9,7 +9,7 @@
  *   property-search   → PropertySearchTab
  *   leads             → LeadAdmin
  *   customers         → CustomerAdmin
- *   referrals         → ReferralManagement
+ *   referrals         → ConsultationAdmin (merged into Assigned Leads)
  *   consultations     → ConsultationAdmin
  *   email-templates   → EmailTemplateEditor
  *   agents            → AgentAdmin
@@ -31,7 +31,7 @@ import { supabase } from '../config/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Home, Database, Search,
-  MessageSquare, Users, GitMerge, PhoneCall, Mail,
+  MessageSquare, Users, PhoneCall, Mail,
   UserCog, FileText, DollarSign, Gavel,
   Film, Zap, BookOpen, Layout,
   Facebook, Bot, HardDrive, Trash2,
@@ -46,7 +46,6 @@ const HUDScrapeManager    = lazy(() => import('./admin/HUDScrapeManager'))
 const PropertySearchTab   = lazy(() => import('./admin/PropertySearchTab'))
 const LeadAdmin           = lazy(() => import('./admin/LeadsHub'))
 const CustomerAdmin       = lazy(() => import('./admin/CustomerAdmin'))
-const ReferralManagement  = lazy(() => import('./admin/ReferralManagement'))
 const OfferReferralMarketplace = lazy(() => import('./broker/OfferReferralMarketplace'))
 const ConsultationAdmin   = lazy(() => import('./admin/ConsultationAdmin'))
 const EmailTemplateEditor = lazy(() => import('./admin/EmailTemplateEditor'))
@@ -88,7 +87,6 @@ const NAV = [
     items: [
       { id: 'leads',            label: 'Leads',             icon: MessageSquare, color: 'text-orange-500', alertKey: 'newLeads' },
       { id: 'customers',        label: 'Customers',         icon: Users,         color: 'text-blue-500' },
-      { id: 'referrals',        label: 'Referrals',         icon: GitMerge,      color: 'text-purple-500' },
       { id: 'offer-referrals', label: 'Unassigned Offers', icon: Gavel, color: 'text-amber-600' },
       { id: 'consultations',    label: 'Assigned Leads', icon: PhoneCall,     color: 'text-green-500' },
       { id: 'email-templates',  label: 'Email Templates', icon: Mail,         color: 'text-sky-500' },
@@ -129,7 +127,7 @@ const COMPONENT_MAP = {
   'property-search':   PropertySearchTab,
   'leads':             LeadAdmin, // LeadManagement — queries leads table
   'customers':         CustomerAdmin,
-  'referrals':         ReferralManagement,
+  'referrals':         ConsultationAdmin, // legacy tab id — Referrals merged into Assigned Leads
   'offer-referrals':   () => <OfferReferralMarketplace admin />,
   'consultations':     ConsultationAdmin,
   'email-templates':   EmailTemplateEditor,
