@@ -5,8 +5,14 @@ import { Link, useSearchParams } from 'react-router-dom'
 const initial = { case_number:'', asking_price:'', offer_price:'', occupancy:'owner', financing:'fha', closing_cost_percent:0, earnest_money:1000, notes:'', referral_consent:false }
 const percent = n => Math.max(0, Math.min(100, Number(n) || 0))
 const money = n => Number(n || 0).toLocaleString('en-US',{style:'currency',currency:'USD'})
+const median = values => { const a=values.filter(Number.isFinite).sort((x,y)=>x-y);if(!a.length)return null;const m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2 }
+const pct = n => Number.isFinite(n)?(n*100).toFixed(1)+'%':'—'
 export default function BuyerBidBuilder({ user, property }) {
  const [searchParams,setSearchParams]=useSearchParams()
+ const [historical,setHistorical]=useState([])
+ const [statsError,setStatsError]=useState('')
+ const [statsLoading,setStatsLoading]=useState(false)
+ const [listing,setListing]=useState(null)
  const offerId=searchParams.get('offer')
  const editingRef=useRef(null)
  const [commission,setCommission]=useState({listing:3,buyer:3}), [form,setForm]=useState(initial), [bids,setBids]=useState([]), [busy,setBusy]=useState(false), [message,setMessage]=useState('')
@@ -33,11 +39,39 @@ export default function BuyerBidBuilder({ user, property }) {
   if(selected.case_number!==property?.case_number)return
   if(editingRef.current!==selected.id)editDraft(selected)
  },[offerId,bids,property?.case_number])
+ useEffect(()=>{
+  if(!property?.case_number)return
+  let active=true;setStatsLoading(true);setStatsError('');setHistorical([]);setListing(null)
+  Promise.all([
+   supabase.from('properties').select('case_number,city,county,state,price').eq('case_number',property.case_number).maybeSingle(),
+   supabase.from('accepted_offers').select('case_number,city,county,state,net_to_hud,list_price_used,list_price_at_acceptance,original_list_price,purchaser_type').limit(1000)
+  ]).then(([p,a])=>{if(!active)return;setStatsLoading(false);if(p.error||a.error){setStatsError(p.error?.message||a.error?.message);return}setListing(p.data);setHistorical(a.data||[])}).catch(e=>{if(active){setStatsLoading(false);setStatsError(e.message)}})
+  return()=>{active=false}
+ },[property?.case_number])
+ const state=String(listing?.state||property?.state||'').toUpperCase()
+ const city=String(listing?.city||property?.city||'').trim().toLowerCase()
+ const county=String(listing?.county||property?.county||'').trim().toLowerCase()
+ const valid=historical.filter(x=>x.case_number!==form.case_number&&Number(x.net_to_hud)>0&&Number(x.list_price_used||x.list_price_at_acceptance||x.original_list_price)>0)
+ const stateMatches=valid.filter(x=>String(x.state||'').toUpperCase()===state)
+ const typeMatches=rows=>rows.filter(x=>!x.purchaser_type||String(x.purchaser_type).toLowerCase().includes(form.occupancy==='owner'?'owner':'investor'))
+ const cohorts=[
+  {name:'City',rows:city?typeMatches(stateMatches.filter(x=>String(x.city||'').trim().toLowerCase()===city)):[]},
+  {name:'County',rows:county?typeMatches(stateMatches.filter(x=>String(x.county||'').trim().toLowerCase()===county)):[]},
+  {name:'State',rows:typeMatches(stateMatches)},
+  {name:'State, all purchaser types',rows:stateMatches}
+ ]
+ const comparison=cohorts.find(x=>x.rows.length>=5)||cohorts.find(x=>x.rows.length>0)
+ const ratios=(comparison?.rows||[]).map(x=>Number(x.net_to_hud)/Number(x.list_price_used||x.list_price_at_acceptance||x.original_list_price)).filter(x=>Number.isFinite(x)&&x>0&&x<3)
+ const historicalMedian=median(ratios)
+ const asking=Number(listing?.price||form.asking_price||property?.price)||0
  const offerAmount=Number(form.offer_price)||0
  const assistance=offerAmount*percent(form.closing_cost_percent)/100
  const listingCommission=offerAmount*percent(commission.listing)/100
  const buyerCommission=offerAmount*percent(commission.buyer)/100
  const hudNet=offerAmount-assistance-listingCommission-buyerCommission
+ const netRatio=asking>0?hudNet/asking:null
+ const percentile=netRatio!==null&&ratios.length?Math.round(100*ratios.filter(x=>x<=netRatio).length/ratios.length):null
+ const assessment=ratios.length<5||netRatio===null?'Insufficient comparable data':percentile>=65?'Above historical median':percentile>=35?'Near historical median':'Below historical median'
  const save=async(status)=>{
   if(!user?.id)return setMessage('Please sign in to save an offer.')
   if(!/^\d{3}-\d{6}$/.test(form.case_number.trim()))return setMessage('Enter a valid HUD case number (000-000000).')
@@ -73,6 +107,20 @@ export default function BuyerBidBuilder({ user, property }) {
   </div>
   <label className="block text-sm font-medium">Notes for broker<textarea className="block w-full border rounded-lg p-2 mt-1" value={form.notes} onChange={e=>change('notes',e.target.value)} /></label>
   <div className="bg-blue-50 p-4 rounded-lg space-y-1"><p>Gross offer: <strong>{money(offerAmount)}</strong></p><p>Less requested closing assistance ({percent(form.closing_cost_percent)}%): −{money(assistance)}</p><p>Less listing commission ({percent(commission.listing)}%): −{money(listingCommission)}</p><p>Less buyer broker commission ({percent(commission.buyer)}%): −{money(buyerCommission)}</p><p className="border-t border-blue-200 pt-2 font-bold">Estimated net to HUD: {money(hudNet)}</p><p className="text-xs mt-2">Illustrative calculation only. All percentages are based on gross offer price. Commissions and assistance must be approved and may be subject to HUD limits; broker must verify actual bid amounts and other deductions.</p></div>
+  <div className="border rounded-xl p-4 space-y-3">
+   <h3 className="text-lg font-bold">Offer competitiveness &amp; statistics</h3>
+   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+    <div><p className="text-gray-500">Asking price</p><strong>{asking?money(asking):'Unavailable'}</strong></div>
+    <div><p className="text-gray-500">Estimated net to HUD</p><strong>{money(hudNet)}</strong></div>
+    <div><p className="text-gray-500">Your net / asking</p><strong>{netRatio!==null?pct(netRatio):'Unavailable'}</strong></div>
+    <div><p className="text-gray-500">Historical median net / list</p><strong>{historicalMedian!==null?pct(historicalMedian):'Unavailable'}</strong></div>
+   </div>
+   {statsLoading?<p>Loading historical statistics…</p>:statsError?<p role="status">Statistics unavailable: {statsError}</p>:<>
+    <p className="font-semibold">{assessment}</p>
+    <p className="text-sm">{comparison?<>Comparison: {ratios.length} accepted offers matched by {comparison.name.toLowerCase()}. {percentile!==null&&ratios.length>=5?<>Your net-to-list ratio is at or above {percentile}% of this accepted-offer sample.</>:null}</>:'No comparable accepted offers found.'}</p>
+   </>}
+   <p className="text-xs text-gray-500">Historical accepted offers only; not an acceptance probability. Matches prioritize city, county, then state and purchaser type where recorded. Competing bids, eligibility, listing period and HUD decisions are unknown. Commission and closing assistance assumptions must be verified by a HUD-authorized broker.</p>
+  </div>
   {message&&<p role="status" className="text-blue-800">{message}</p>}
   <label className="flex gap-2 items-start text-sm"><input type="checkbox" checked={!!form.referral_consent} onChange={e=>change("referral_consent",e.target.checked)} /> If no broker is assigned, I authorize USAHUDhomes to share a limited, non-identifying offer summary with eligible brokers for referral matching. Buyer contact information stays private until assignment.</label>
   <div className="flex flex-wrap gap-3"><button disabled={busy} onClick={()=>save('draft')} className="bg-gray-800 text-white rounded-lg px-4 py-2 disabled:opacity-50">{form.id?'Update draft':'Save draft'}</button><button disabled={busy} onClick={()=>save('submitted')} className="bg-blue-700 text-white rounded-lg px-4 py-2 disabled:opacity-50">Send proposal for review</button></div>
