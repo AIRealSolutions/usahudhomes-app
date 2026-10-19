@@ -13,9 +13,47 @@ export default function BuyerBidBuilder({ user, property }) {
  const [statsError,setStatsError]=useState('')
  const [statsLoading,setStatsLoading]=useState(false)
  const [listing,setListing]=useState(null)
+ const [secure,setSecure]=useState({deed_legal_name:'',deed_mailing_address:'',preferred_closing_agent_id:''})
+ const [agents,setAgents]=useState([])
+ const [documents,setDocuments]=useState([])
+ const [secureBusy,setSecureBusy]=useState(false)
+ const [secureMessage,setSecureMessage]=useState('')
  const offerId=searchParams.get('offer')
  const editingRef=useRef(null)
  const [commission,setCommission]=useState({listing:3,buyer:3}), [form,setForm]=useState(initial), [bids,setBids]=useState([]), [busy,setBusy]=useState(false), [message,setMessage]=useState('')
+ useEffect(()=>{supabase.from('closing_agents').select('id,company_name,city,state').eq('active',true).order('company_name').limit(500).then(({data})=>setAgents(data||[]))},[])
+ useEffect(()=>{
+  if(!form.id||!user?.id){setSecure({deed_legal_name:'',deed_mailing_address:'',preferred_closing_agent_id:''});setDocuments([]);return}
+  let active=true
+  Promise.all([
+   supabase.from('buyer_offer_secure_details').select('deed_legal_name,deed_mailing_address,preferred_closing_agent_id').eq('offer_id',form.id).maybeSingle(),
+   supabase.storage.from('buyer-offer-private').list(user.id+'/'+form.id,{limit:100})
+  ]).then(([details,files])=>{if(!active)return;if(details.data)setSecure({deed_legal_name:details.data.deed_legal_name||'',deed_mailing_address:details.data.deed_mailing_address||'',preferred_closing_agent_id:details.data.preferred_closing_agent_id||''});setDocuments(files.data||[])}).catch(e=>{if(active)setSecureMessage(e.message)})
+  return()=>{active=false}
+ },[form.id,user?.id])
+ const saveSecure=async()=>{
+  if(!form.id||!user?.id)return
+  setSecureBusy(true);setSecureMessage('')
+  const {error}=await supabase.from('buyer_offer_secure_details').upsert({offer_id:form.id,buyer_id:user.id,deed_legal_name:secure.deed_legal_name.trim(),deed_mailing_address:secure.deed_mailing_address.trim(),preferred_closing_agent_id:secure.preferred_closing_agent_id||null,updated_at:new Date().toISOString()},{onConflict:'offer_id'})
+  setSecureBusy(false);setSecureMessage(error?error.message:'Private buyer details saved.')
+ }
+ const uploadDocument=async(event,kind)=>{
+  const file=event.target.files?.[0];event.target.value=''
+  if(!file||!form.id||!user?.id)return
+  if(!['application/pdf','image/jpeg','image/png'].includes(file.type)||file.size>10485760){setSecureMessage('Use PDF, JPG or PNG files up to 10 MB.');return}
+  setSecureBusy(true);setSecureMessage('')
+  const path=user.id+'/'+form.id+'/'+kind+'-'+crypto.randomUUID()+'.'+(file.type==='application/pdf'?'pdf':file.type==='image/png'?'png':'jpg')
+  const {error}=await supabase.storage.from('buyer-offer-private').upload(path,file,{contentType:file.type,upsert:false})
+  if(!error){const result=await supabase.storage.from('buyer-offer-private').list(user.id+'/'+form.id,{limit:100});setDocuments(result.data||[])}
+  setSecureBusy(false);setSecureMessage(error?error.message:'Document uploaded to private storage.')
+ }
+ const removeDocument=async(name)=>{
+  if(!form.id||!user?.id||!window.confirm('Delete this uploaded document permanently?'))return
+  setSecureBusy(true)
+  const {error}=await supabase.storage.from('buyer-offer-private').remove([user.id+'/'+form.id+'/'+name])
+  setSecureBusy(false);setSecureMessage(error?error.message:'Document removed.')
+  if(!error)setDocuments(old=>old.filter(x=>x.name!==name))
+ }
  const change=(key,value)=>setForm(old=>({...old,[key]:value}))
  const chooseBuyerType=(type)=>{
   if(!['owner','investor'].includes(type))return
@@ -155,6 +193,21 @@ export default function BuyerBidBuilder({ user, property }) {
   <label className="flex gap-2 items-start text-sm"><input type="checkbox" checked={!!form.referral_consent} onChange={e=>change("referral_consent",e.target.checked)} /> If no broker is assigned, I authorize USAHUDhomes to share a limited, non-identifying offer summary with eligible brokers for referral matching. Buyer contact information stays private until assignment.</label>
   <div className="flex flex-wrap gap-3"><button disabled={busy} onClick={()=>save('draft')} className="bg-gray-800 text-white rounded-lg px-4 py-2 disabled:opacity-50">{form.id?'Update draft':'Save draft'}</button><button disabled={busy} onClick={()=>save('submitted')} className="bg-blue-700 text-white rounded-lg px-4 py-2 disabled:opacity-50">Send proposal for review</button></div>
   </>}
+  {form.id&&['draft','changes_requested'].includes(form.status)&&<div className="border rounded-xl p-4 space-y-4">
+   <h3 className="text-lg font-bold">Private buyer details &amp; supporting documents</h3>
+   <p className="text-sm text-gray-600">These details are kept separate from referral listings. Save the draft first. Only the signed-in buyer can access these records and files through this section.</p>
+   <label className="block text-sm font-medium">Full legal name(s) exactly as title should be vested on the deed<input className="mt-1 w-full border rounded-lg p-2" value={secure.deed_legal_name} onChange={e=>setSecure(old=>({...old,deed_legal_name:e.target.value}))} placeholder="Full legal name(s) — confirm with closing attorney" /></label>
+   <label className="block text-sm font-medium">Deed mailing address<textarea className="mt-1 w-full border rounded-lg p-2" value={secure.deed_mailing_address} onChange={e=>setSecure(old=>({...old,deed_mailing_address:e.target.value}))} placeholder="Street, city, state, ZIP" /></label>
+   <label className="block text-sm font-medium">Preferred closing attorney<select className="mt-1 w-full border rounded-lg p-2" value={secure.preferred_closing_agent_id} onChange={e=>setSecure(old=>({...old,preferred_closing_agent_id:e.target.value}))}><option value="">No preference / select later</option>{agents.map(a=><option key={a.id} value={a.id}>{a.company_name} — {a.city}, {a.state}</option>)}</select></label>
+   <button type="button" disabled={secureBusy} onClick={saveSecure} className="bg-gray-800 text-white rounded-lg px-4 py-2 disabled:opacity-50">Save private details</button>
+   <div className="grid sm:grid-cols-2 gap-4">
+    <label className="block border rounded-lg p-3 text-sm font-medium">Prequalification letter / proof of funds<input type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={secureBusy} onChange={e=>uploadDocument(e,'financing')} className="mt-2 block w-full text-sm" /></label>
+    <label className="block border rounded-lg p-3 text-sm font-medium">Earnest money check copy<input type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={secureBusy} onChange={e=>uploadDocument(e,'earnest')} className="mt-2 block w-full text-sm" /><span className="block mt-2 text-xs text-amber-700">Redact bank account and routing numbers before uploading.</span></label>
+   </div>
+   {documents.length>0&&<div className="space-y-2"><h4 className="font-semibold text-sm">Private uploads</h4>{documents.map(d=><div key={d.name} className="flex justify-between gap-2 text-sm border-b pb-2"><span className="break-all">{d.name}</span><button type="button" disabled={secureBusy} className="text-red-700 underline" onClick={()=>removeDocument(d.name)}>Delete</button></div>)}</div>}
+   <p className="text-xs text-amber-800">Do not enter or upload Social Security numbers, tax identification numbers, unredacted checks, or tax returns here. Your assigned closing attorney should request tax IDs through a separate verified secure intake process. These documents are not automatically shared with brokers or attorneys.</p>
+   {secureMessage&&<p role="status" className="text-sm">{secureMessage}</p>}
+  </div>}
   <div className="border-t pt-4"><h3 className="font-bold mb-3">Your saved proposals</h3>{bids.length===0?<p className="text-gray-500">No proposals yet.</p>:<div className="space-y-2">{bids.filter(b=>b.case_number===property?.case_number).map(b=><div key={b.id} className="border rounded-lg p-3 flex justify-between items-center gap-3"><div><Link className="text-blue-700 font-semibold" to={`/property/${b.case_number}`}>{b.case_number}</Link><p>{money(b.offer_price)} · {b.status.replaceAll('_',' ')}</p></div><div className="flex gap-3 items-center">{['draft','changes_requested'].includes(b.status)&&<button className="text-blue-700 underline" onClick={()=>{editDraft(b);setSearchParams(old=>{const next=new URLSearchParams(old);next.set('offer',b.id);return next},{replace:true})}}>Edit</button>}{b.status==='draft'&&<button type="button" disabled={busy} className="text-red-700 underline disabled:opacity-50" onClick={()=>deleteDraft(b)}>Delete</button>}</div></div>)}</div>}</div>
  </section>
 }
