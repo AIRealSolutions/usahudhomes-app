@@ -8,6 +8,8 @@ import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useActiveClient } from '../contexts/ActiveClientContext'
+import BrokerOfferInbox from './broker/BrokerOfferInbox'
+import OfferReferralMarketplace from './broker/OfferReferralMarketplace'
 import { supabase } from '../config/supabase'
 import { consultationService } from '../services/database/consultationService'
 import { agentService } from '../services/database'
@@ -44,6 +46,7 @@ const NAV_SECTIONS = [
     items: [
       { id: 'active-leads',    label: 'Active Leads',      icon: Users,           color: 'text-green-500',  alertKey: 'activeLeads' },
       { id: 'referrals',       label: 'Referral Inbox',    icon: Inbox,           color: 'text-orange-500', alertKey: 'pendingReferrals' },
+      { id: 'offer-marketplace', label: 'Offer-Ready Referrals', icon: Gavel, color: 'text-amber-600' },
     ]
   },
   {
@@ -1424,7 +1427,7 @@ export default function BrokerShell({ user, showAdminAccess }) {
     if (loadingAgent) return <PanelFallback />
     switch (activePanel) {
       case 'overview':
-        return <BrokerControlPanel agentId={agentId} agentName={agentName} onNavigate={setActivePanel} />
+        return <><BrokerControlPanel agentId={agentId} agentName={agentName} onNavigate={setActivePanel} />{agentId&&<BrokerOfferInbox agentId={agentId} />}</>
       case 'active-leads':
         return <ActiveLeadsPanel agentId={agentId} />
       case 'referrals':
@@ -1433,6 +1436,8 @@ export default function BrokerShell({ user, showAdminAccess }) {
             <BrokerReferralInbox />
           </Suspense>
         )
+      case 'offer-marketplace':
+        return <OfferReferralMarketplace />
       case 'ai-properties':
         return <FindPropertiesPanel agentId={agentId} />
       case 'share-analytics':
