@@ -62,6 +62,12 @@ async function canActForAgent(supabase, caller, agentId) {
   return !!data
 }
 
+// Leads record their broker in agent_id (set by admin assignment); older rows
+// may only have assigned_broker_id. Match either. agentId goes into a PostgREST
+// filter string, so it must be a UUID.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const assignedTo = (agentId) => `agent_id.eq.${agentId},assigned_broker_id.eq.${agentId}`
+
 // activities has no consultation_id column; the consultation goes in metadata.
 async function logActivity(supabase, consultation, agentId, activityType, description, metadata = {}) {
   if (!consultation?.customer_id) return
@@ -123,6 +129,7 @@ async function handleAccept(req, res) {
   if (!consultationId || !agentId) {
     return res.status(400).json({ success: false, error: 'consultationId and agentId required' })
   }
+  if (!UUID_RE.test(agentId)) return res.status(400).json({ success: false, error: 'Invalid agentId' })
   if (!(await canActForAgent(supabase, caller, agentId))) {
     return res.status(403).json({ success: false, error: 'You can only accept your own referrals.' })
   }
@@ -131,7 +138,7 @@ async function handleAccept(req, res) {
     .from('consultations')
     .update({ accepted_at: now, status: 'accepted', updated_at: now, ...(notes ? { notes } : {}) })
     .eq('id', consultationId)
-    .eq('assigned_broker_id', agentId)
+    .or(assignedTo(agentId))
     .select().single()
   if (error) throw error
   await logActivity(supabase, data, agentId, 'referral_accepted', 'Referral accepted')
@@ -147,6 +154,7 @@ async function handleDecline(req, res) {
   if (!consultationId || !agentId) {
     return res.status(400).json({ success: false, error: 'consultationId and agentId required' })
   }
+  if (!UUID_RE.test(agentId)) return res.status(400).json({ success: false, error: 'Invalid agentId' })
   if (!(await canActForAgent(supabase, caller, agentId))) {
     return res.status(403).json({ success: false, error: 'You can only decline your own referrals.' })
   }
@@ -155,7 +163,7 @@ async function handleDecline(req, res) {
     .from('consultations')
     .update({ declined_at: now, decline_reason: reason, decline_notes: notes, status: 'declined', updated_at: now })
     .eq('id', consultationId)
-    .eq('assigned_broker_id', agentId)
+    .or(assignedTo(agentId))
     .select().single()
   if (error) throw error
   await logActivity(supabase, data, agentId, 'referral_declined', 'Referral declined', { reason, notes })
@@ -186,13 +194,14 @@ async function handleGetReferrals(req, res) {
   if (!caller) return
   const agentId = req.query?.agentId
   if (!agentId) return res.status(400).json({ success: false, error: 'agentId query param required' })
+  if (!UUID_RE.test(agentId)) return res.status(400).json({ success: false, error: 'Invalid agentId' })
   if (!(await canActForAgent(supabase, caller, agentId))) {
     return res.status(403).json({ success: false, error: 'You can only view your own referrals.' })
   }
   const { data, error } = await supabase
     .from('consultations')
     .select('*, customers(*), properties(*)')
-    .eq('assigned_broker_id', agentId)
+    .or(assignedTo(agentId))
     .eq('is_deleted', false)
     .order('assigned_at', { ascending: false })
   if (error) throw error

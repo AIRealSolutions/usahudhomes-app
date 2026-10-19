@@ -1433,7 +1433,7 @@ export default function BrokerShell({ user, showAdminAccess }) {
       case 'referrals':
         return (
           <Suspense fallback={<PanelFallback />}>
-            <BrokerReferralInbox />
+            <BrokerReferralInbox agentId={agentId} />
           </Suspense>
         )
       case 'offer-marketplace':

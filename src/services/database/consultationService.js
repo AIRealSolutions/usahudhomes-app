@@ -7,7 +7,6 @@ import { supabase, TABLES, formatSupabaseResponse } from '../../config/supabase'
 import { sendConsultationNotification } from '../notificationService'
 import { autoAssignService } from './autoAssignService'
 import { agentService } from './agentService'
-import { referralService } from './referralService'
 
 class ConsultationService {
   /**
@@ -664,20 +663,7 @@ class ConsultationService {
    * @returns {Promise<Object>} Result
    */
   async acceptReferral(consultationId, brokerId, notes = null) {
-    try {
-      // Use referralService.acceptReferral which directly updates the status
-      const result = await referralService.acceptReferral(consultationId, brokerId)
-      
-      // If notes provided, update them separately
-      if (result.success && notes) {
-        await this.updateConsultation(consultationId, { notes })
-      }
-      
-      return result
-    } catch (error) {
-      console.error('Error accepting referral:', error)
-      return { success: false, error: error.message }
-    }
+    return this.postLeadsAction('accept', { consultationId, agentId: brokerId, notes })
   }
 
   /**
@@ -689,19 +675,35 @@ class ConsultationService {
    * @returns {Promise<Object>} Result
    */
   async declineReferral(consultationId, brokerId, reason, notes = null) {
+    return this.postLeadsAction('decline', { consultationId, agentId: brokerId, reason, notes })
+  }
+
+  /**
+   * POST to the leads serverless API, which verifies the caller may act for the
+   * broker and matches the lead on agent_id or assigned_broker_id.
+   * @param {string} action - ?action= value
+   * @param {Object} body - JSON body
+   * @returns {Promise<Object>} Result
+   */
+  async postLeadsAction(action, body) {
     try {
-      const { data, error} = await supabase.rpc('decline_referral', {
-        p_consultation_id: consultationId,
-        p_broker_id: brokerId,
-        p_reason: reason,
-        p_notes: notes
+      const { data: { session } } = await supabase.auth.getSession()
+      const r = await fetch(`/api/leads?action=${action}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify(body),
       })
-
-      if (error) throw error
-
-      return { success: true, data }
+      const result = await r.json()
+      if (!r.ok || !result.success) {
+        console.error(`leads ${action} API error:`, result)
+        return { success: false, error: result.error || `${action} failed` }
+      }
+      return { success: true, data: result.data }
     } catch (error) {
-      console.error('Error declining referral:', error)
+      console.error(`Error in leads ${action}:`, error)
       return { success: false, error: error.message }
     }
   }

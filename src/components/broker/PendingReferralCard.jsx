@@ -26,10 +26,10 @@ const PendingReferralCard = ({ referral, agentId, onAction }) => {
 
   // Use joined customer data if available, otherwise fallback to embedded fields
   const customer = referral.customer || {
-    first_name: referral.customer_name?.split(' ')[0] || '',
-    last_name: referral.customer_name?.split(' ').slice(1).join(' ') || '',
-    email: referral.customer_email || '',
-    phone: referral.customer_phone || ''
+    first_name: referral.first_name || referral.customer_name?.split(' ')[0] || '',
+    last_name: referral.last_name || referral.customer_name?.split(' ').slice(1).join(' ') || '',
+    email: referral.email || referral.customer_email || '',
+    phone: referral.phone || referral.customer_phone || ''
   }
   const property = referral.property || {}
 
