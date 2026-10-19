@@ -8,7 +8,7 @@
  *   hud-scraper       → HUDScrapeManager
  *   property-search   → PropertySearchTab
  *   leads             → LeadAdmin
- *   customers         → CustomerAdmin
+ *   customers         → LeadAdmin (legacy id; Customers tab on Leads)
  *   referrals         → LeadAdmin (legacy id; merged into Leads)
  *   consultations     → LeadAdmin (legacy id; Assigned Leads tab on Leads)
  *   email-templates   → EmailTemplateEditor
@@ -31,7 +31,7 @@ import { supabase } from '../config/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Home, Database, Search,
-  MessageSquare, Users, Mail,
+  MessageSquare, Mail,
   UserCog, FileText, DollarSign, Gavel,
   Film, Zap, BookOpen, Layout,
   Facebook, Bot, HardDrive, Trash2,
@@ -45,7 +45,6 @@ const PropertyAdmin       = lazy(() => import('./admin/PropertyAdmin'))
 const HUDScrapeManager    = lazy(() => import('./admin/HUDScrapeManager'))
 const PropertySearchTab   = lazy(() => import('./admin/PropertySearchTab'))
 const LeadAdmin           = lazy(() => import('./admin/LeadsHub'))
-const CustomerAdmin       = lazy(() => import('./admin/CustomerAdmin'))
 const OfferReferralMarketplace = lazy(() => import('./broker/OfferReferralMarketplace'))
 const EmailTemplateEditor = lazy(() => import('./admin/EmailTemplateEditor'))
 const AgentAdmin          = lazy(() => import('./admin/AgentAdmin'))
@@ -85,7 +84,6 @@ const NAV = [
     group: 'Leads & Customers',
     items: [
       { id: 'leads',            label: 'Leads',             icon: MessageSquare, color: 'text-orange-500', alertKey: 'newLeads' },
-      { id: 'customers',        label: 'Customers',         icon: Users,         color: 'text-blue-500' },
       { id: 'offer-referrals', label: 'Unassigned Offers', icon: Gavel, color: 'text-amber-600' },
       { id: 'email-templates',  label: 'Email Templates', icon: Mail,         color: 'text-sky-500' },
     ]
@@ -124,7 +122,7 @@ const COMPONENT_MAP = {
   'hud-scraper':       HUDScrapeManager,
   'property-search':   PropertySearchTab,
   'leads':             LeadAdmin, // LeadManagement — queries leads table
-  'customers':         CustomerAdmin,
+  'customers':         LeadAdmin, // legacy tab id — Customers is a tab on Leads
   'referrals':         LeadAdmin, // legacy tab id — Referrals merged into Leads
   'offer-referrals':   () => <OfferReferralMarketplace admin />,
   'consultations':     LeadAdmin, // legacy tab id — Assigned Leads is a tab on Leads

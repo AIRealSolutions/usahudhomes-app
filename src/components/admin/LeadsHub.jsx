@@ -8,7 +8,7 @@
  * This component:
  *  - Tab 1 "New Leads"    → queries `leads` table (status = new_lead, etc.)
  *  - Tab 2 "Assigned Leads"→ queries `consultations` table (assigned to brokers)
- *  - Tab 3 "Customers"    → queries `customers` table (linked from leads)
+ *  - Tab 3 "Customers"    → CustomerAdmin (add, edit, delete, export customers)
  *  Clicking a lead row navigates to /admin/leads/:id (LeadDetailsPage).
  */
 
@@ -18,6 +18,7 @@ import { supabase } from '../../config/supabase'
 import { assignLeadToAgent } from '../../services/database/leadService'
 import { consultationService, referralService } from '../../services/database'
 import AddLeadModal from './AddLeadModal'
+import CustomerAdmin from './CustomerAdmin'
 import AlertSignupsTab from './AlertSignupsTab'
 import LeadRoutingSettings from './LeadRoutingSettings'
 import {
@@ -548,116 +549,6 @@ function ConsultationsTab() {
   )
 }
 
-// ── Customers Tab ─────────────────────────────────────────────────────────────
-function CustomersTab() {
-  const [customers, setCustomers] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-
-  useEffect(() => {
-    const fetchCustomers = async () => {
-      setLoading(true)
-      try {
-        const { data } = await supabase
-          .from('customers')
-          .select('*')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-        setCustomers(data || [])
-      } catch (e) {
-        console.error(e)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchCustomers()
-  }, [])
-
-  const filtered = customers.filter(c => {
-    const q = search.toLowerCase()
-    return !search ||
-      `${c.first_name} ${c.last_name}`.toLowerCase().includes(q) ||
-      c.email?.toLowerCase().includes(q) ||
-      c.phone?.includes(q)
-  })
-
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Total Customers" value={customers.length} color="text-gray-900" />
-        <StatCard label="Active"          value={customers.filter(c => c.status === 'active').length} color="text-green-600" />
-        <StatCard label="Onboarded"       value={customers.filter(c => c.status === 'onboarded').length} color="text-emerald-600" />
-        <StatCard label="With Leads"      value={customers.filter(c => c.lead_source).length} color="text-blue-600" />
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search customers…"
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500" />
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <RefreshCw className="w-6 h-6 text-blue-600 animate-spin" />
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-100">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Customer', 'Contact', 'Source', 'Status', 'Added'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filtered.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-400">No customers found</td></tr>
-                ) : filtered.map(c => (
-                  <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <p className="text-sm font-semibold text-gray-900">{c.first_name} {c.last_name}</p>
-                      {c.state && <p className="text-xs text-gray-400">{c.state}</p>}
-                    </td>
-                    <td className="px-4 py-3">
-                      {c.email && <p className="text-xs text-gray-700">{c.email}</p>}
-                      {c.phone && <p className="text-xs text-gray-500">{c.phone}</p>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
-                        {(c.lead_source || 'unknown').replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        c.status === 'active' ? 'bg-green-100 text-green-700' :
-                        c.status === 'onboarded' ? 'bg-emerald-100 text-emerald-700' :
-                        'bg-gray-100 text-gray-600'
-                      }`}>
-                        {c.status || 'unknown'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-xs text-gray-500">{timeAgo(c.created_at)}</p>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-400">
-          Showing {filtered.length} of {customers.length} customers
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Main LeadsHub ─────────────────────────────────────────────────────────────
 export default function LeadsHub({ onNavigate }) {
   const [tab, setTab] = useState('leads')
@@ -698,7 +589,7 @@ export default function LeadsHub({ onNavigate }) {
       {/* Content */}
       {tab === 'leads'         && <NewLeadsTab onNavigate={onNavigate} />}
       {tab === 'consultations' && <ConsultationsTab />}
-      {tab === 'customers'     && <CustomersTab />}
+      {tab === 'customers'     && <CustomerAdmin />}
       {tab === 'alerts'        && <AlertSignupsTab />}
     </div>
   )
