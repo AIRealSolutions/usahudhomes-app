@@ -259,12 +259,6 @@ export default function AdminControlPanel({ onNavigate }) {
             sub={`${stats.videoQueued ?? 0} queued`}
             onClick={() => onNavigate('video-studio')}
           />
-          <StatCard
-            icon={Database} label="HUD Sync" color="blue"
-            value={lastHudSync ? '✓' : '—'}
-            sub={lastHudSync ? `Last: ${timeAgo(lastHudSync.ran_at)} · ${lastHudSync.state}` : 'No runs yet'}
-            onClick={() => onNavigate('hud-scraper')}
-          />
         </div>
       </div>
 
@@ -272,11 +266,6 @@ export default function AdminControlPanel({ onNavigate }) {
       <div>
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Quick Actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <QuickAction
-            icon={Database} label="Run HUD Scraper" color="bg-blue-600"
-            desc="Scrape & import new listings"
-            onClick={() => onNavigate('hud-scraper')}
-          />
           <QuickAction
             icon={Film} label="Bulk Media Generator" color="bg-purple-600"
             desc="Generate videos for properties"
@@ -395,32 +384,6 @@ export default function AdminControlPanel({ onNavigate }) {
               ))}
             </div>
           )}
-        </div>
-      </div>
-
-      {/* ── HUD Sync Status ────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-5 text-white">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 rounded-lg p-2">
-              <Database className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="font-semibold">HUD Scraper</p>
-              <p className="text-sm text-blue-100">
-                {lastHudSync
-                  ? `Last sync: ${timeAgo(lastHudSync.ran_at)} · ${lastHudSync.new_properties ?? 0} new · ${lastHudSync.updated_properties ?? 0} updated`
-                  : 'No sync runs recorded yet — run the migration SQL first'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => onNavigate('hud-scraper')}
-            className="flex items-center gap-2 bg-white text-blue-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition-colors"
-          >
-            <Database className="w-4 h-4" />
-            Open Scraper
-          </button>
         </div>
       </div>
 
