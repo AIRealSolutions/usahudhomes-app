@@ -16,6 +16,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../config/supabase'
 import { assignLeadToAgent } from '../../services/database/leadService'
+import { consultationService, referralService } from '../../services/database'
 import AddLeadModal from './AddLeadModal'
 import AlertSignupsTab from './AlertSignupsTab'
 import LeadRoutingSettings from './LeadRoutingSettings'
@@ -23,7 +24,7 @@ import {
   Search, Filter, Eye, Calendar, MapPin, DollarSign, Home,
   AlertCircle, Phone, Mail, User, Clock, CheckCircle,
   RefreshCw, Download, UserPlus, ArrowRight, MessageSquare,
-  Users, Inbox, ChevronDown, X, Bell
+  Users, Inbox, ChevronDown, X, Bell, Trash2
 } from 'lucide-react'
 
 // ── Status helpers ────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ const CONSULT_STATUSES = [
   { value: 'new',       label: 'New',       color: 'bg-yellow-100 text-yellow-800' },
   { value: 'referred',  label: 'Referred',  color: 'bg-blue-100 text-blue-800' },
   { value: 'accepted',  label: 'Accepted',  color: 'bg-green-100 text-green-800' },
+  { value: 'declined',  label: 'Declined',  color: 'bg-red-100 text-red-800' },
   { value: 'scheduled', label: 'Scheduled', color: 'bg-purple-100 text-purple-800' },
   { value: 'completed', label: 'Completed', color: 'bg-emerald-100 text-emerald-800' },
   { value: 'cancelled', label: 'Cancelled', color: 'bg-red-100 text-red-800' },
@@ -360,26 +362,55 @@ function ConsultationsTab() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [agents, setAgents] = useState([])
+  const [busyId, setBusyId] = useState(null)
+
+  const fetchConsultations = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('consultations')
+        .select('*, customer:customers(first_name,last_name,email,phone), agent:agents!agent_id(first_name,last_name)')
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setConsultations(data || [])
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    const fetchConsultations = async () => {
-      setLoading(true)
-      try {
-        const { data, error } = await supabase
-          .from('consultations')
-          .select('*, customer:customers(first_name,last_name,email,phone), agent:agents!agent_id(first_name,last_name)')
-          .eq('is_deleted', false)
-          .order('created_at', { ascending: false })
-        if (error) throw error
-        setConsultations(data || [])
-      } catch (e) {
-        console.error(e)
-      } finally {
-        setLoading(false)
-      }
-    }
     fetchConsultations()
-  }, [])
+    supabase
+      .from('agents')
+      .select('id, first_name, last_name')
+      .eq('status', 'approved')
+      .eq('is_active', true)
+      .then(({ data }) => setAgents(data || []))
+  }, [fetchConsultations])
+
+  // Reassign: sets agent_id and status 'referred' so it lands in that broker's Referral Inbox
+  const reassign = async (c, agentId, name) => {
+    const agent = agents.find(a => a.id === agentId)
+    if (!agent || !window.confirm(`Assign ${name} to ${agent.first_name} ${agent.last_name}?`)) return
+    setBusyId(c.id)
+    const result = await referralService.assignConsultationToAgent(c.id, agentId)
+    setBusyId(null)
+    if (!result.success) alert('Failed to assign lead: ' + (result.error || 'Unknown error'))
+    fetchConsultations()
+  }
+
+  const remove = async (c, name) => {
+    if (!window.confirm(`Delete ${name}? This removes it from Assigned Leads.`)) return
+    setBusyId(c.id)
+    const result = await consultationService.deleteConsultation(c.id)
+    setBusyId(null)
+    if (!result.success) alert('Failed to delete lead: ' + (result.error || 'Unknown error'))
+    fetchConsultations()
+  }
 
   const filtered = consultations.filter(c => {
     const name = c.customer ? `${c.customer.first_name} ${c.customer.last_name}` : `${c.first_name || ''} ${c.last_name || ''}`
@@ -395,17 +426,19 @@ function ConsultationsTab() {
     new:       consultations.filter(c => c.status === 'new').length,
     referred:  consultations.filter(c => c.status === 'referred').length,
     accepted:  consultations.filter(c => c.status === 'accepted').length,
+    declined:  consultations.filter(c => c.status === 'declined').length,
     completed: consultations.filter(c => c.status === 'completed').length,
   }
 
   return (
     <div className="space-y-5">
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard label="Total"     value={stats.total}     color="text-gray-900" />
         <StatCard label="New"       value={stats.new}       color="text-yellow-600" onClick={() => setStatusFilter('new')} />
         <StatCard label="Referred"  value={stats.referred}  color="text-blue-600"   onClick={() => setStatusFilter('referred')} />
         <StatCard label="Accepted"  value={stats.accepted}  color="text-green-600"  onClick={() => setStatusFilter('accepted')} />
+        <StatCard label="Declined"  value={stats.declined}  color="text-red-600"    onClick={() => setStatusFilter('declined')} />
         <StatCard label="Completed" value={stats.completed} color="text-emerald-600" onClick={() => setStatusFilter('completed')} />
       </div>
 
@@ -448,6 +481,7 @@ function ConsultationsTab() {
                 {filtered.map(c => {
                   const customer = c.customer || { first_name: c.first_name, last_name: c.last_name, email: c.email, phone: c.phone }
                   const agent = c.agent
+                  const name = `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'this lead'
                   return (
                     <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
@@ -470,12 +504,34 @@ function ConsultationsTab() {
                         <p className="text-xs text-gray-500">{timeAgo(c.created_at)}</p>
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => navigate(`/lead/${c.id}`)}
-                          className="text-xs px-2 py-1 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 font-medium flex items-center gap-1"
-                        >
-                          <Eye className="w-3 h-3" /> View
-                        </button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            onClick={() => navigate(`/lead/${c.id}`)}
+                            className="text-xs px-2 py-1 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 font-medium flex items-center gap-1"
+                          >
+                            <Eye className="w-3 h-3" /> View
+                          </button>
+                          {agents.length > 0 && (
+                            <select
+                              disabled={busyId === c.id}
+                              onChange={e => reassign(c, e.target.value, name)}
+                              value=""
+                              className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                            >
+                              <option value="" disabled>{agent ? 'Reassign…' : 'Assign broker…'}</option>
+                              {agents.map(a => (
+                                <option key={a.id} value={a.id}>{a.first_name} {a.last_name}</option>
+                              ))}
+                            </select>
+                          )}
+                          <button
+                            onClick={() => remove(c, name)}
+                            disabled={busyId === c.id}
+                            className="text-xs px-2 py-1 text-gray-500 rounded-lg hover:bg-red-50 hover:text-red-600 font-medium flex items-center gap-1 disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3 h-3" /> Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
