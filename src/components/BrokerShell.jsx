@@ -19,7 +19,7 @@ import {
   ChevronLeft, ChevronRight, Menu, X, LogOut, Bell, RefreshCw,
   Phone, Mail, CheckCircle, Clock, AlertCircle,
   ArrowRight, Inbox, Share2, User, BarChart2, Shield,
-  ChevronDown, Search, Trash2, AlertTriangle, CheckSquare, Square, Briefcase
+  ChevronDown, Search, Trash2, AlertTriangle, CheckSquare, Square, Briefcase, Gavel
 } from 'lucide-react'
 
 // ── Lazy-loaded leaf components ───────────────────────────────────────────────
