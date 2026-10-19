@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Users, Filter, Plus, Search, Mail, Phone, MapPin, DollarSign, Calendar, ExternalLink, ChevronDown, ChevronUp, Clock, MessageSquare, User } from 'lucide-react'
+import { Users, Filter, Plus, Search, Mail, Phone, MapPin, DollarSign, Calendar, ExternalLink, ChevronDown, ChevronUp, Clock, MessageSquare, User, Trash2 } from 'lucide-react'
 
 const ReferralManagement = () => {
   const [referrals, setReferrals] = useState([])
@@ -132,6 +132,24 @@ const ReferralManagement = () => {
     }
   }
 
+  const deleteReferral = async (referral) => {
+    if (!window.confirm(`Permanently delete ${referral.first_name} ${referral.last_name}? This cannot be undone.`)) return
+    try {
+      const { error } = await supabase
+        .from('referrals')
+        .delete()
+        .eq('id', referral.id)
+
+      if (error) throw error
+
+      if (expandedRow === referral.id) setExpandedRow(null)
+      loadReferrals()
+    } catch (error) {
+      console.error('Error deleting referral:', error)
+      alert('Failed to delete referral')
+    }
+  }
+
   const filteredReferrals = referrals.filter(referral => {
     if (!searchTerm) return true
     const search = searchTerm.toLowerCase()
@@ -173,8 +191,8 @@ const ReferralManagement = () => {
       {/* Header */}
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Lead Management</h1>
-          <p className="text-gray-600">Manage and assign leads to brokers</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Referrals</h1>
+          <p className="text-gray-600">Legacy referral records — new website leads appear under Leads</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
@@ -349,6 +367,16 @@ const ReferralManagement = () => {
                             Assign
                           </button>
                         )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            deleteReferral(referral)
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-600"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
                         {isExpanded ? (
                           <ChevronUp className="h-5 w-5 text-gray-400" />
                         ) : (
