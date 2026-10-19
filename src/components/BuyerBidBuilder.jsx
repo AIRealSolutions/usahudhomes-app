@@ -100,6 +100,18 @@ export default function BuyerBidBuilder({ user, property }) {
   setSearchParams(old=>{const next=new URLSearchParams(old);next.delete('offer');return next},{replace:true})
   setForm({...initial,case_number:property.case_number,asking_price:property.price??'',offer_price:property.price??''});await load()
  }
+ const deleteDraft=async(draft)=>{
+  if(draft.status!=='draft'||!user?.id||busy)return
+  if(!window.confirm('Permanently delete this draft offer for HUD '+draft.case_number+'? This cannot be undone.'))return
+  setBusy(true);setMessage('')
+  const {data,error}=await supabase.from('buyer_bid_drafts').delete().eq('id',draft.id).eq('buyer_id',user.id).eq('status','draft').select('id')
+  setBusy(false)
+  if(error){setMessage(error.message);return}
+  if(!data?.length){setMessage('Draft could not be deleted. Refresh and check its status.');return}
+  setBids(old=>old.filter(b=>b.id!==draft.id))
+  if(form.id===draft.id){editingRef.current=null;setSearchParams(old=>{const next=new URLSearchParams(old);next.delete('offer');return next},{replace:true});setForm({...initial,case_number:property.case_number,asking_price:property.price??'',offer_price:property.price??''})}
+  setMessage('Draft deleted.')
+ }
  const field=(label,key,type='text')=><label className="block text-sm font-medium text-gray-700">{label}<input className="mt-1 w-full border rounded-lg p-2" type={type} value={form[key]} onChange={e=>change(key,e.target.value)} /></label>
  return <section className="bg-white rounded-xl shadow p-6 mb-8 space-y-5">
   <div><h2 className="text-2xl font-bold">{form.id?'Edit Draft Offer':'My HUD Offers'}</h2><p className="text-gray-600">Prepare an offer for broker review. Only a HUD-authorized broker can submit an official HUD bid.</p></div>
@@ -143,6 +155,6 @@ export default function BuyerBidBuilder({ user, property }) {
   <label className="flex gap-2 items-start text-sm"><input type="checkbox" checked={!!form.referral_consent} onChange={e=>change("referral_consent",e.target.checked)} /> If no broker is assigned, I authorize USAHUDhomes to share a limited, non-identifying offer summary with eligible brokers for referral matching. Buyer contact information stays private until assignment.</label>
   <div className="flex flex-wrap gap-3"><button disabled={busy} onClick={()=>save('draft')} className="bg-gray-800 text-white rounded-lg px-4 py-2 disabled:opacity-50">{form.id?'Update draft':'Save draft'}</button><button disabled={busy} onClick={()=>save('submitted')} className="bg-blue-700 text-white rounded-lg px-4 py-2 disabled:opacity-50">Send proposal for review</button></div>
   </>}
-  <div className="border-t pt-4"><h3 className="font-bold mb-3">Your saved proposals</h3>{bids.length===0?<p className="text-gray-500">No proposals yet.</p>:<div className="space-y-2">{bids.filter(b=>b.case_number===property?.case_number).map(b=><div key={b.id} className="border rounded-lg p-3 flex justify-between items-center gap-3"><div><Link className="text-blue-700 font-semibold" to={`/property/${b.case_number}`}>{b.case_number}</Link><p>{money(b.offer_price)} · {b.status.replaceAll('_',' ')}</p></div>{['draft','changes_requested'].includes(b.status)&&<button className="text-blue-700 underline" onClick={()=>{editDraft(b);setSearchParams(old=>{const next=new URLSearchParams(old);next.set('offer',b.id);return next},{replace:true})}}>Edit</button>}</div>)}</div>}</div>
+  <div className="border-t pt-4"><h3 className="font-bold mb-3">Your saved proposals</h3>{bids.length===0?<p className="text-gray-500">No proposals yet.</p>:<div className="space-y-2">{bids.filter(b=>b.case_number===property?.case_number).map(b=><div key={b.id} className="border rounded-lg p-3 flex justify-between items-center gap-3"><div><Link className="text-blue-700 font-semibold" to={`/property/${b.case_number}`}>{b.case_number}</Link><p>{money(b.offer_price)} · {b.status.replaceAll('_',' ')}</p></div><div className="flex gap-3 items-center">{['draft','changes_requested'].includes(b.status)&&<button className="text-blue-700 underline" onClick={()=>{editDraft(b);setSearchParams(old=>{const next=new URLSearchParams(old);next.set('offer',b.id);return next},{replace:true})}}>Edit</button>}{b.status==='draft'&&<button type="button" disabled={busy} className="text-red-700 underline disabled:opacity-50" onClick={()=>deleteDraft(b)}>Delete</button>}</div></div>)}</div>}</div>
  </section>
 }
