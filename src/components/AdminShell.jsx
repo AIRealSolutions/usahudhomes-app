@@ -59,6 +59,7 @@ const VideoLibrary        = lazy(() => import('./admin/VideoLibrary'))
 const VideoTemplateBuilder= lazy(() => import('./admin/VideoTemplateBuilder'))
 const FacebookLeadsImport = lazy(() => import('./admin/FacebookLeadsImport'))
 const AIMarketingAssistant= lazy(() => import('./admin/AIMarketingAssistant'))
+const ClosingAgentsAdmin = lazy(() => import('../pages/admin/ClosingAgentsAdmin'))
 const DatabaseReset        = lazy(() => import('./admin/DatabaseReset'))
 const PurgeUnderContract   = lazy(() => import('./admin/PurgeUnderContract'))
 
@@ -113,6 +114,7 @@ const NAV = [
     items: [
       { id: 'facebook-import',  label: 'Facebook Leads',    icon: Facebook,      color: 'text-blue-600' },
       { id: 'ai-assistant',     label: 'AI Assistant',      icon: Bot,           color: 'text-indigo-600' },
+      { id: 'closing-agents',   label: 'Closing Agents',   icon: UserCog,       color: 'text-teal-600' },
       { id: 'database',         label: 'Database Tools',    icon: HardDrive,     color: 'text-red-500' },
     ]
   },
@@ -138,6 +140,7 @@ const COMPONENT_MAP = {
   'template-builder':  VideoTemplateBuilder,
   'facebook-import':   FacebookLeadsImport,
   'ai-assistant':      AIMarketingAssistant,
+  'closing-agents':    ClosingAgentsAdmin,
   'database':          DatabaseReset,
   'purge-contracts':   PurgeUnderContract,
 }
