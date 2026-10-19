@@ -7,7 +7,8 @@ const phone=/(?:\+1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/
 const zip=/\b\d{5}(?:-\d{4})?\b/
 const stateZip=/\b([A-Z]{2})\s+(\d{5}(?:-\d{4})?)\b/i
 export function parseClosingAgentText(text,{state='',source_url=''}={}){
- const chunks=trim(text).split(/\n\s*\n|\n(?=(?:Firm|Company(?: Name)?|Closing Agent|Attorney)\s*:)/i).map(trim).filter(Boolean)
+ const normalized=trim(text).replace(/\r/g,'').replace(/(?:Company Name|Office Address|Office Number|Escrow Officer Name|Escrow Officer Number|Escrow Officer Email|Service State)\s*\n\s*/gi,'const chunks=trim(text).split(/\n\s*\n|\n(?=(?:Firm|Company(?: Name)?|Closing Agent|Attorney)\s*:)/i).map(trim).filter(Boolean)').replace(/(Company Name|Office Address|Office Number|Escrow Officer Name|Escrow Officer Number|Escrow Officer Email|Service State)\s*\n/gi,'$1: ')
+ const chunks=normalized.split(/\n\s*\n|\n(?=(?:Firm|Company(?: Name)?|Closing Agent|Attorney)\s*:)/i).map(trim).filter(Boolean)
  return chunks.map((block,index)=>{
   const lines=block.split(/\n/).map(trim).filter(Boolean)
   const labeled=(names)=>{const r=lines.find(l=>new RegExp('^(?:'+names+')\\s*:', 'i').test(l));return r?r.replace(/^[^:]+:\s*/,''):''}
