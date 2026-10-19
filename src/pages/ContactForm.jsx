@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { notifyLeadSubmitted } from '../services/leadMessaging';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,11 +21,11 @@ function contactFieldsFromProfile(profile, user) {
   };
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v));
 }
-import { Home, Phone, Mail, MapPin, DollarSign, Calendar, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
+import { Home, Phone, Mail, MapPin, DollarSign, Calendar, MessageSquare, CheckCircle, AlertCircle, Lock } from 'lucide-react';
 
 export default function ContactForm() {
   const navigate = useNavigate();
-  const { user, profile, applyProfile } = useAuth();
+  const { user, profile, applyProfile, signIn } = useAuth();
   const touched = useRef(false);
   const [formData, setFormData] = useState(() => ({
     first_name: '',
@@ -37,6 +37,8 @@ export default function ContactForm() {
     budget_max: '',
     timeline: '',
     message: '',
+    password: '',
+    confirm_password: '',
     ...contactFieldsFromProfile(profile, user)
   }));
   const [errors, setErrors] = useState({});
@@ -82,6 +84,12 @@ export default function ContactForm() {
     }
     if (!formData.state) newErrors.state = 'Please select a state';
 
+    if (!user) {
+      if (formData.password.length < 8) newErrors.password = 'Password must be at least 8 characters';
+      else if (formData.password.length > 72) newErrors.password = 'Password must be 72 characters or fewer';
+      if (formData.confirm_password !== formData.password) newErrors.confirm_password = 'Passwords do not match';
+    }
+
     if (formData.budget_min && formData.budget_max) {
       const min = parseInt(formData.budget_min);
       const max = parseInt(formData.budget_max);
@@ -118,6 +126,38 @@ export default function ContactForm() {
 
     try {
       setSubmitting(true);
+
+      // Signed-out visitors get an account first, so they land on their dashboard
+      // (saved homes, alerts, tools) while the broker gets in touch.
+      let account = { user, profile };
+      if (!user) {
+        const res = await fetch('/api/notifications?action=buyer-register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email.trim(),
+            password: formData.password,
+            firstName: formData.first_name.trim(),
+            lastName: formData.last_name.trim(),
+            phone: formData.phone.trim(),
+            state: stateCode(formData.state) || '',
+          }),
+        });
+        const reg = await res.json().catch(() => ({}));
+        if (!res.ok || !reg.success) {
+          setErrors({ submit: reg.error || 'Could not create your account. Please try again.', existingAccount: !!reg.existingAccount });
+          return;
+        }
+        const login = await signIn(formData.email.trim(), formData.password);
+        if (!login?.success) {
+          setErrors({ submit: 'Your account was created, but we could not sign you in. Please sign in to finish your request.', existingAccount: true });
+          return;
+        }
+        account = { user: login.data.user, profile: login.data.profile };
+      } else {
+        supabase.auth.updateUser({ data: { broker_requested_at: new Date().toISOString() } })
+          .catch(err => console.error('Could not mark broker request:', err));
+      }
 
       // Create lead in leads table
       // Signed-out visitors can insert leads but not read them back, so the id is generated here.
@@ -158,24 +198,16 @@ export default function ContactForm() {
 
       notifyLeadSubmitted(leadData.id);
 
-      if (user) {
-        rememberProfileDetails(user.id, profile, {
+      if (account.user) {
+        rememberProfileDetails(account.user.id, account.profile, {
           first_name: formData.first_name, last_name: formData.last_name, phone: formData.phone, state: formData.state,
           price_range_min: formData.budget_min, price_range_max: formData.budget_max,
           timeline: TIMELINE_TO_PROFILE[formData.timeline] || '',
         }).then(applyProfile);
       }
 
-      const data = leadData;
-      const error = null;
-
-      if (error) throw error;
-
-      navigate('/contact/thank-you', { 
-        state: { 
-          name: formData.first_name,
-          referralId: data.id 
-        } 
+      navigate('/dashboard', {
+        state: { brokerRequested: true, name: formData.first_name }
       });
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -210,6 +242,11 @@ export default function ContactForm() {
                 <div>
                   <h3 className="text-sm font-medium text-red-800">Error</h3>
                   <p className="text-sm text-red-700 mt-1">{errors.submit}</p>
+                  {errors.existingAccount && (
+                    <Link to="/login" state={{ from: { pathname: '/contact' } }} className="inline-block mt-2 text-sm font-semibold text-blue-700 hover:underline">
+                      Sign in to continue →
+                    </Link>
+                  )}
                 </div>
               </div>
             )}
@@ -301,6 +338,61 @@ export default function ContactForm() {
                 </div>
               </div>
             </div>
+
+            {!user && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center">
+                  <Lock className="h-6 w-6 mr-2 text-blue-600" />
+                  Create Your Account
+                </h2>
+                <p className="text-gray-600 mb-6">
+                  While you wait for your broker, your free dashboard lets you save homes, set up price and listing alerts, and use our buyer tools.
+                  Already have an account? <Link to="/login" state={{ from: { pathname: '/contact' } }} className="text-blue-600 font-medium hover:underline">Sign in</Link>
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                      Password *
+                    </label>
+                    <input
+                      type="password"
+                      id="password"
+                      name="password"
+                      autoComplete="new-password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        errors.password ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="At least 8 characters"
+                    />
+                    {errors.password && (
+                      <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="confirm_password" className="block text-sm font-medium text-gray-700 mb-2">
+                      Confirm Password *
+                    </label>
+                    <input
+                      type="password"
+                      id="confirm_password"
+                      name="confirm_password"
+                      autoComplete="new-password"
+                      value={formData.confirm_password}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        errors.confirm_password ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    {errors.confirm_password && (
+                      <p className="mt-1 text-sm text-red-600">{errors.confirm_password}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">

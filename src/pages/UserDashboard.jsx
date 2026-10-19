@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Mail, Phone, MapPin, DollarSign, Calendar, Home as HomeIcon } from 'lucide-react'
+import { Mail, Phone, MapPin, DollarSign, Calendar, Home as HomeIcon, CheckCircle, Search, Bell, Heart, BookOpen } from 'lucide-react'
 import SavedHomesSection from '../components/SavedHomesSection'
 import BuyerOfferSummary from '../components/BuyerOfferSummary'
 import { useAuth } from '../contexts/AuthContext'
@@ -140,6 +140,8 @@ export default function UserDashboard({ user }) {
           </div>
         </div>
       </div>
+
+      <BrokerRequestCard user={user} />
 
       {/* Profile: forms across the site fill in from it */}
       <ProfileCard />
@@ -282,6 +284,50 @@ function ProfileCard() {
       <Link to="/profile" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
         {pct < 100 ? 'Complete my profile' : 'Edit my profile'}
       </Link>
+    </div>
+  )
+}
+
+// Shown after "Connect Me With a Broker": the request is in, and here's what to do meanwhile
+function BrokerRequestCard({ user }) {
+  const location = useLocation()
+  const requestedAt = user?.user_metadata?.broker_requested_at
+  if (!location.state?.brokerRequested && !requestedAt) return null
+  const justSent = !!location.state?.brokerRequested
+  const when = requestedAt
+    ? new Date(requestedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : null
+  const tools = [
+    { to: '/search', icon: Search, title: 'Browse HUD homes', text: 'Search listings, photos, prices and bid deadlines.' },
+    { to: '/search', icon: Heart, title: 'Save homes you like', text: 'Tap the heart on any listing; your broker sees what you saved.' },
+    { to: '/alerts', icon: Bell, title: 'Create a home alert', text: 'Get emailed when new HUD homes match your area and budget.' },
+    { to: '/how-it-works', icon: BookOpen, title: 'Learn how HUD bidding works', text: 'Owner-occupant periods, incentives and the bid process.' },
+  ]
+  return (
+    <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
+      <div className="flex items-start gap-3">
+        <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">
+            {justSent ? `You're all set${location.state?.name ? `, ${location.state.name}` : ''}! ` : ''}Your broker request is in.
+          </h2>
+          <p className="text-gray-700 mt-1">
+            A HUD-registered broker will contact you within 24 hours{when ? ` (requested ${when})` : ''}. While you wait, get a head start:
+          </p>
+        </div>
+      </div>
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {tools.map((tool) => {
+          const ToolIcon = tool.icon
+          return (
+            <Link key={tool.title} to={tool.to} className="bg-white rounded-lg border border-green-100 p-4 hover:shadow-md transition-shadow">
+              <ToolIcon className="h-6 w-6 text-blue-600 mb-2" />
+              <p className="font-semibold text-gray-900">{tool.title}</p>
+              <p className="text-sm text-gray-600 mt-1">{tool.text}</p>
+            </Link>
+          )
+        })}
+      </div>
     </div>
   )
 }
