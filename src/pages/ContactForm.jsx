@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { notifyLeadSubmitted } from '../services/leadMessaging';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,11 +21,11 @@ function contactFieldsFromProfile(profile, user) {
   };
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v));
 }
-import { Home, Phone, Mail, MapPin, DollarSign, Calendar, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react';
+import { Home, Phone, Mail, MapPin, DollarSign, Calendar, MessageSquare, CheckCircle, AlertCircle, Lock } from 'lucide-react';
 
 export default function ContactForm() {
   const navigate = useNavigate();
-  const { user, profile, applyProfile } = useAuth();
+  const { user, profile, applyProfile, signUp } = useAuth();
   const touched = useRef(false);
   const [formData, setFormData] = useState(() => ({
     first_name: '',
@@ -37,6 +37,8 @@ export default function ContactForm() {
     budget_max: '',
     timeline: '',
     message: '',
+    password: '',
+    password_confirm: '',
     ...contactFieldsFromProfile(profile, user)
   }));
   const [errors, setErrors] = useState({});
@@ -81,6 +83,12 @@ export default function ContactForm() {
       newErrors.phone = 'Please enter a valid phone number';
     }
     if (!formData.state) newErrors.state = 'Please select a state';
+
+    // Signed-out visitors set a password so the request also creates their buyer account
+    if (!user) {
+      if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+      else if (formData.password !== formData.password_confirm) newErrors.password_confirm = 'Passwords do not match';
+    }
 
     if (formData.budget_min && formData.budget_max) {
       const min = parseInt(formData.budget_min);
@@ -158,6 +166,27 @@ export default function ContactForm() {
 
       notifyLeadSubmitted(leadData.id);
 
+      // The lead is saved; a failed signup only changes what the thank-you page says
+      let account = null;
+      if (!user) {
+        const result = await signUp({
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password,
+          firstName: formData.first_name.trim(),
+          lastName: formData.last_name.trim(),
+          phone: formData.phone.trim(),
+          state: stateCode(formData.state) || null,
+          role: 'end_user'
+        });
+        const created = result.success ? result.data?.user : null;
+        account = {
+          email: formData.email.trim().toLowerCase(),
+          // Supabase returns a user with no identities when the email is already registered
+          status: !created ? 'failed' : created.identities?.length === 0 ? 'exists' : created.email_confirmed_at ? 'ready' : 'confirm',
+          error: result.success ? null : result.error
+        };
+      }
+
       if (user) {
         rememberProfileDetails(user.id, profile, {
           first_name: formData.first_name, last_name: formData.last_name, phone: formData.phone, state: formData.state,
@@ -174,7 +203,8 @@ export default function ContactForm() {
       navigate('/contact/thank-you', { 
         state: { 
           name: formData.first_name,
-          referralId: data.id 
+          referralId: data.id,
+          account
         } 
       });
     } catch (error) {
@@ -416,6 +446,63 @@ export default function ContactForm() {
                 />
               </div>
             </div>
+
+            {!user && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center">
+                  <Lock className="h-6 w-6 mr-2 text-blue-600" />
+                  Create Your Account
+                </h2>
+                <p className="text-gray-600 mb-6">
+                  Choose a password to save homes, see full property addresses and track your request. You'll sign in with your email.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                      Password *
+                    </label>
+                    <input
+                      type="password"
+                      id="password"
+                      name="password"
+                      autoComplete="new-password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        errors.password ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="At least 6 characters"
+                    />
+                    {errors.password && (
+                      <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="password_confirm" className="block text-sm font-medium text-gray-700 mb-2">
+                      Confirm Password *
+                    </label>
+                    <input
+                      type="password"
+                      id="password_confirm"
+                      name="password_confirm"
+                      autoComplete="new-password"
+                      value={formData.password_confirm}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        errors.password_confirm ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    {errors.password_confirm && (
+                      <p className="mt-1 text-sm text-red-600">{errors.password_confirm}</p>
+                    )}
+                  </div>
+                </div>
+                <p className="mt-3 text-sm text-gray-500">
+                  Already have an account? <Link to="/login" className="text-blue-600 hover:underline">Sign in</Link> first and we'll fill in your details.
+                </p>
+              </div>
+            )}
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-gray-700">
