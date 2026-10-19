@@ -242,12 +242,6 @@ export default function AdminControlPanel({ onNavigate }) {
             onClick={() => onNavigate('leads')}
           />
           <StatCard
-            icon={Activity} label="Active Consults" color="purple"
-            value={stats.consultations}
-            sub="Being worked"
-            onClick={() => onNavigate('leads')}
-          />
-          <StatCard
             icon={UserCog} label="Active Agents" color="blue"
             value={stats.agents}
             sub="Approved brokers"
@@ -264,12 +258,6 @@ export default function AdminControlPanel({ onNavigate }) {
             value={stats.videoJobs}
             sub={`${stats.videoQueued ?? 0} queued`}
             onClick={() => onNavigate('video-studio')}
-          />
-          <StatCard
-            icon={DollarSign} label="Bid Results" color="green"
-            value={stats.bidResults}
-            sub="Tracked outcomes"
-            onClick={() => onNavigate('bid-results')}
           />
           <StatCard
             icon={Database} label="HUD Sync" color="blue"
@@ -303,11 +291,6 @@ export default function AdminControlPanel({ onNavigate }) {
             icon={Upload} label="Import Facebook Leads" color="bg-blue-500"
             desc="Upload CSV from Facebook Ads"
             onClick={() => onNavigate('facebook-import')}
-          />
-          <QuickAction
-            icon={TrendingUp} label="Bid Results" color="bg-green-600"
-            desc="Log and track bid outcomes"
-            onClick={() => onNavigate('bid-results')}
           />
           <QuickAction
             icon={Zap} label="AI Marketing Assistant" color="bg-indigo-600"
