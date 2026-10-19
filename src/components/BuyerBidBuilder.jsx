@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { Link, useSearchParams } from 'react-router-dom'
 
-const initial = { case_number:'', asking_price:'', offer_price:'', occupancy:'owner', financing:'fha', closing_cost_percent:0, earnest_money:1000, notes:'', referral_consent:false }
+const initial = { case_number:'', asking_price:'', offer_price:'', occupancy:'', financing:'fha', closing_cost_percent:0, earnest_money:1000, notes:'', referral_consent:false }
 const percent = n => Math.max(0, Math.min(100, Number(n) || 0))
 const money = n => Number(n || 0).toLocaleString('en-US',{style:'currency',currency:'USD'})
 const median = values => { const a=values.filter(Number.isFinite).sort((x,y)=>x-y);if(!a.length)return null;const m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2 }
@@ -17,6 +17,11 @@ export default function BuyerBidBuilder({ user, property }) {
  const editingRef=useRef(null)
  const [commission,setCommission]=useState({listing:3,buyer:3}), [form,setForm]=useState(initial), [bids,setBids]=useState([]), [busy,setBusy]=useState(false), [message,setMessage]=useState('')
  const change=(key,value)=>setForm(old=>({...old,[key]:value}))
+ const chooseBuyerType=(type)=>{
+  if(!['owner','investor'].includes(type))return
+  setForm(old=>({...old,occupancy:type,financing:type==='investor'&&['fha','203k'].includes(old.financing)?'cash':old.financing,closing_cost_percent:type==='investor'?0:old.closing_cost_percent}))
+  setMessage('')
+ }
  const load=async()=>{ if(!user?.id)return; const {data,error}=await supabase.from('buyer_bid_drafts').select('*').eq('buyer_id',user.id).order('created_at',{ascending:false}); if(error)setMessage(error.message);else setBids(data||[]) }
  useEffect(()=>{load()},[user?.id])
  const editDraft=(draft)=>{
@@ -53,12 +58,14 @@ export default function BuyerBidBuilder({ user, property }) {
  const county=String(listing?.county||property?.county||'').trim().toLowerCase()
  const valid=historical.filter(x=>x.case_number!==form.case_number&&Number(x.net_to_hud)>0&&Number(x.list_price_used||x.list_price_at_acceptance||x.original_list_price)>0)
  const stateMatches=valid.filter(x=>String(x.state||'').toUpperCase()===state)
- const typeMatches=rows=>rows.filter(x=>!x.purchaser_type||String(x.purchaser_type).toLowerCase().includes(form.occupancy==='owner'?'owner':'investor'))
+ const typeMatches=rows=>rows.filter(x=>{
+  const type=String(x.purchaser_type||'').toLowerCase().replace(/[^a-z]/g,'')
+  return form.occupancy==='owner'?['owneroccupant','owner','owneroccupied'].includes(type):form.occupancy==='investor'?['investor','nonowneroccupant'].includes(type):false
+ })
  const cohorts=[
   {name:'City',rows:city?typeMatches(stateMatches.filter(x=>String(x.city||'').trim().toLowerCase()===city)):[]},
   {name:'County',rows:county?typeMatches(stateMatches.filter(x=>String(x.county||'').trim().toLowerCase()===county)):[]},
-  {name:'State',rows:typeMatches(stateMatches)},
-  {name:'State, all purchaser types',rows:stateMatches}
+  {name:'State',rows:typeMatches(stateMatches)}
  ]
  const comparison=cohorts.find(x=>x.rows.length>=5)||cohorts.find(x=>x.rows.length>0)
  const ratios=(comparison?.rows||[]).map(x=>Number(x.net_to_hud)/Number(x.list_price_used||x.list_price_at_acceptance||x.original_list_price)).filter(x=>Number.isFinite(x)&&x>0&&x<3)
@@ -74,9 +81,12 @@ export default function BuyerBidBuilder({ user, property }) {
  const assessment=ratios.length<5||netRatio===null?'Insufficient comparable data':percentile>=65?'Above historical median':percentile>=35?'Near historical median':'Below historical median'
  const save=async(status)=>{
   if(!user?.id)return setMessage('Please sign in to save an offer.')
+  if(!['owner','investor'].includes(form.occupancy))return setMessage('Choose owner occupant or investor before continuing.')
   if(!/^\d{3}-\d{6}$/.test(form.case_number.trim()))return setMessage('Enter a valid HUD case number (000-000000).')
   if(!(Number(form.offer_price)>0))return setMessage('Enter an offer greater than zero.')
   if([commission.listing,commission.buyer].some(v=>!Number.isFinite(Number(v))||Number(v)<0||Number(v)>100))return setMessage('Commission rates must be between 0 and 100%.')
+  if(form.occupancy==='investor'&&Number(form.closing_cost_percent)!==0)return setMessage('Investor offers cannot request HUD-paid closing cost assistance.')
+  if(form.occupancy==='investor'&&['fha','203k'].includes(form.financing))return setMessage('Investor offers cannot use owner-occupant FHA financing.')
   if(Number(form.closing_cost_percent)<0||Number(form.closing_cost_percent)>3)return setMessage('Closing assistance must be between 0 and 3%.')
   setBusy(true);setMessage('')
   const {id,created_at,updated_at,submitted_at,buyer_id,consultation_id,assigned_broker_id,status:oldStatus,...offerFields}=form
@@ -94,14 +104,22 @@ export default function BuyerBidBuilder({ user, property }) {
  return <section className="bg-white rounded-xl shadow p-6 mb-8 space-y-5">
   <div><h2 className="text-2xl font-bold">{form.id?'Edit Draft Offer':'My HUD Offers'}</h2><p className="text-gray-600">Prepare an offer for broker review. Only a HUD-authorized broker can submit an official HUD bid.</p></div>
   {form.id&&<button type="button" className="text-blue-700 underline text-sm" onClick={()=>{editingRef.current=null;setSearchParams(old=>{const next=new URLSearchParams(old);next.delete('offer');return next},{replace:true});setForm({...initial,case_number:property.case_number,asking_price:property.price??'',offer_price:property.price??''});setCommission({listing:3,buyer:3});setMessage('Edit cancelled.')}}>Cancel editing</button>}
+  <fieldset className="border rounded-xl p-4 space-y-3">
+   <legend className="font-bold text-lg px-1">1. Are you buying this HUD home to live in or as an investment?</legend>
+   <div className="grid sm:grid-cols-2 gap-3">
+    <button type="button" aria-pressed={form.occupancy==='owner'} onClick={()=>chooseBuyerType('owner')} className={`rounded-xl border-2 p-4 text-left ${form.occupancy==='owner'?'border-blue-700 bg-blue-50':'border-gray-200 hover:border-blue-300'}`}><strong className="block">Owner Occupant</strong><span className="text-sm text-gray-600">I plan to live in the property as my primary residence. FHA financing and eligible owner-occupant incentives may be available.</span></button>
+    <button type="button" aria-pressed={form.occupancy==='investor'} onClick={()=>chooseBuyerType('investor')} className={`rounded-xl border-2 p-4 text-left ${form.occupancy==='investor'?'border-blue-700 bg-blue-50':'border-gray-200 hover:border-blue-300'}`}><strong className="block">Investor</strong><span className="text-sm text-gray-600">I am purchasing for investment. No HUD-paid closing assistance or owner-occupant FHA incentives; eligibility depends on the listing period.</span></button>
+   </div>
+  </fieldset>
+  {['owner','investor'].includes(form.occupancy)&&<>
+  <h3 className="font-bold text-lg">2. {form.occupancy==='owner'?'Owner-occupant offer details':'Investor offer details'}</h3>
   <div className="grid md:grid-cols-2 gap-4">
    <div className="text-sm font-medium text-gray-700">HUD case number<div className="mt-1 rounded-lg border bg-gray-50 p-2">{property?.case_number}</div></div>
    <div className="text-sm font-medium text-gray-700">Current asking price<div className="mt-1 rounded-lg border bg-gray-50 p-2">{money(property?.price)}</div></div>
    {field('Your offer ($)','offer_price','number')}
    {field('Earnest money ($)','earnest_money','number')}
-   <label className="text-sm font-medium">Purchase type<select className="block border rounded-lg p-2 w-full mt-1" value={form.occupancy} onChange={e=>change('occupancy',e.target.value)}><option value="owner">Owner occupant</option><option value="investor">Investor</option><option value="other">Other eligible purchaser</option></select></label>
-   <label className="text-sm font-medium">Financing<select className="block border rounded-lg p-2 w-full mt-1" value={form.financing} onChange={e=>change('financing',e.target.value)}><option value="fha">FHA</option><option value="203k">FHA 203(k)</option><option value="conventional">Conventional</option><option value="cash">Cash</option></select></label>
-   {field('Requested closing assistance (%)','closing_cost_percent','number')}
+   <label className="text-sm font-medium">Financing<select className="block border rounded-lg p-2 w-full mt-1" value={form.financing} onChange={e=>change('financing',e.target.value)}>{form.occupancy==='owner'&&<><option value="fha">FHA</option><option value="203k">FHA 203(k)</option></>}<option value="conventional">Conventional</option><option value="cash">Cash</option></select></label>
+   {form.occupancy==='owner'?field('Requested HUD closing assistance (%)','closing_cost_percent','number'):<div className="text-sm text-gray-600 rounded-lg bg-gray-50 border p-3">HUD-paid closing assistance: <strong>0% for investor offers</strong></div>}
    <label className="block text-sm font-medium text-gray-700">Listing / seller broker commission (%)<input className="mt-1 w-full border rounded-lg p-2" type="number" min="0" max="100" step="0.1" value={commission.listing} onChange={e=>setCommission(v=>({...v,listing:e.target.value}))} /></label>
    <label className="block text-sm font-medium text-gray-700">Buyer broker commission (%)<input className="mt-1 w-full border rounded-lg p-2" type="number" min="0" max="100" step="0.1" value={commission.buyer} onChange={e=>setCommission(v=>({...v,buyer:e.target.value}))} /></label>
   </div>
@@ -119,11 +137,12 @@ export default function BuyerBidBuilder({ user, property }) {
     <p className="font-semibold">{assessment}</p>
     <p className="text-sm">{comparison?<>Comparison: {ratios.length} accepted offers matched by {comparison.name.toLowerCase()}. {percentile!==null&&ratios.length>=5?<>Your net-to-list ratio is at or above {percentile}% of this accepted-offer sample.</>:null}</>:'No comparable accepted offers found.'}</p>
    </>}
-   <p className="text-xs text-gray-500">Historical accepted offers only; not an acceptance probability. Matches prioritize city, county, then state and purchaser type where recorded. Competing bids, eligibility, listing period and HUD decisions are unknown. Commission and closing assistance assumptions must be verified by a HUD-authorized broker.</p>
+   <p className="text-xs text-gray-500">Owner-occupant and investor samples are never mixed. Historical accepted offers only; not an acceptance probability. Matches prioritize city, county, then state and purchaser type where recorded. Competing bids, eligibility, listing period and HUD decisions are unknown. Commission and closing assistance assumptions must be verified by a HUD-authorized broker.</p>
   </div>
   {message&&<p role="status" className="text-blue-800">{message}</p>}
   <label className="flex gap-2 items-start text-sm"><input type="checkbox" checked={!!form.referral_consent} onChange={e=>change("referral_consent",e.target.checked)} /> If no broker is assigned, I authorize USAHUDhomes to share a limited, non-identifying offer summary with eligible brokers for referral matching. Buyer contact information stays private until assignment.</label>
   <div className="flex flex-wrap gap-3"><button disabled={busy} onClick={()=>save('draft')} className="bg-gray-800 text-white rounded-lg px-4 py-2 disabled:opacity-50">{form.id?'Update draft':'Save draft'}</button><button disabled={busy} onClick={()=>save('submitted')} className="bg-blue-700 text-white rounded-lg px-4 py-2 disabled:opacity-50">Send proposal for review</button></div>
+  </>}
   <div className="border-t pt-4"><h3 className="font-bold mb-3">Your saved proposals</h3>{bids.length===0?<p className="text-gray-500">No proposals yet.</p>:<div className="space-y-2">{bids.filter(b=>b.case_number===property?.case_number).map(b=><div key={b.id} className="border rounded-lg p-3 flex justify-between items-center gap-3"><div><Link className="text-blue-700 font-semibold" to={`/property/${b.case_number}`}>{b.case_number}</Link><p>{money(b.offer_price)} · {b.status.replaceAll('_',' ')}</p></div>{['draft','changes_requested'].includes(b.status)&&<button className="text-blue-700 underline" onClick={()=>{editDraft(b);setSearchParams(old=>{const next=new URLSearchParams(old);next.set('offer',b.id);return next},{replace:true})}}>Edit</button>}</div>)}</div>}</div>
  </section>
 }
