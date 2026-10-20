@@ -9,6 +9,7 @@
  *  - Tab 1 "New Leads"    → queries `leads` table (status = new_lead, etc.)
  *  - Tab 2 "Assigned Leads"→ queries `consultations` table (assigned to brokers)
  *  - Tab 3 "Customers"    → CustomerAdmin (add, edit, delete, export customers)
+ *  - Tab 5 "Email Templates" → EmailTemplateEditor (saved templates for Compose Email)
  *  Clicking a lead row navigates to /admin/leads/:id (LeadDetailsPage).
  */
 
@@ -19,13 +20,14 @@ import { assignLeadToAgent } from '../../services/database/leadService'
 import { consultationService, referralService } from '../../services/database'
 import AddLeadModal from './AddLeadModal'
 import CustomerAdmin from './CustomerAdmin'
+import EmailTemplateEditor from './EmailTemplateEditor'
 import AlertSignupsTab from './AlertSignupsTab'
 import LeadRoutingSettings from './LeadRoutingSettings'
 import {
   Search, Filter, Eye, Calendar, MapPin, DollarSign, Home,
   AlertCircle, Phone, Mail, User, Clock, CheckCircle,
   RefreshCw, Download, UserPlus, ArrowRight, MessageSquare,
-  Users, Inbox, ChevronDown, X, Bell, Trash2
+  Users, Inbox, ChevronDown, X, Bell, Trash2, FileText
 } from 'lucide-react'
 
 // ── Status helpers ────────────────────────────────────────────────────────────
@@ -558,6 +560,7 @@ export default function LeadsHub({ onNavigate }) {
     { id: 'consultations', label: 'Assigned Leads', icon: Inbox },
     { id: 'customers',     label: 'Customers',      icon: Users },
     { id: 'alerts',        label: 'Alert Sign-ups', icon: Bell },
+    { id: 'templates',     label: 'Email Templates', icon: FileText },
   ]
 
   return (
@@ -591,6 +594,7 @@ export default function LeadsHub({ onNavigate }) {
       {tab === 'consultations' && <ConsultationsTab />}
       {tab === 'customers'     && <CustomerAdmin />}
       {tab === 'alerts'        && <AlertSignupsTab />}
+      {tab === 'templates'     && <EmailTemplateEditor />}
     </div>
   )
 }
