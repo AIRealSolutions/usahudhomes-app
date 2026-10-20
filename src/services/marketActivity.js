@@ -1,6 +1,6 @@
 /**
- * Market activity for dashboards: the news feed (new listings, price drops,
- * back on market, accepted offers), bid openings for the calendar, and the
+ * Market activity for dashboards: the news feed (new listings, homes opened to
+ * investor bids, price drops, back on market, accepted offers), bid openings for the calendar, and the
  * under-contract statistics on the admin Control Panel.
  *
  * property_activity and properties are public; accepted_offers is signed-in only,
@@ -40,6 +40,7 @@ export const money = (n) => (n == null ? '—' : `$${Math.round(Number(n)).toLoc
 
 export const FEED_TYPES = {
   new_listing:    { label: 'New listing' },
+  investor_eligible: { label: 'Open to investors' },
   price_drop:     { label: 'Price reduced' },
   back_on_market: { label: 'Back on market' },
   offer_accepted: { label: 'Offer accepted' },
@@ -66,8 +67,8 @@ export async function fetchActivityFeed({ states, caseNumbers, days = 7, limit =
 
   const [activity, offers] = await Promise.all([
     scope(supabase.from('property_activity')
-      .select('id, case_number, state, event, list_price, previous_price, occurred_at, properties(address, city, main_image)')
-      .in('event', ['listed', 'price_change', 'back_on_market'])
+      .select('id, case_number, state, event, list_price, previous_price, occurred_at, properties(address, city, main_image, bidder_types)')
+      .in('event', ['listed', 'investor_eligible', 'price_change', 'back_on_market'])
       .gte('occurred_at', since))
       .order('occurred_at', { ascending: false })
       .limit(limit),
@@ -82,9 +83,13 @@ export async function fetchActivityFeed({ states, caseNumbers, days = 7, limit =
   const items = []
   for (const a of activity.data || []) {
     const where = place(a.properties)
+    const investors = /investor/i.test(a.properties?.bidder_types || '')
     if (a.event === 'listed') {
       items.push({ id: a.id, type: 'new_listing', date: a.occurred_at, caseNumber: a.case_number, state: a.state,
-        title: where || `Case ${a.case_number}`, detail: `Listed at ${money(a.list_price)}`, image: a.properties?.main_image })
+        title: where || `Case ${a.case_number}`, detail: `Listed at ${money(a.list_price)}${investors ? ' · investors can bid' : ''}`, image: a.properties?.main_image })
+    } else if (a.event === 'investor_eligible') {
+      items.push({ id: a.id, type: 'investor_eligible', date: a.occurred_at, caseNumber: a.case_number, state: a.state,
+        title: where || `Case ${a.case_number}`, detail: `Exclusive period ended; investors can bid now at ${money(a.list_price)}`, image: a.properties?.main_image })
     } else if (a.event === 'price_change') {
       const drop = a.previous_price && a.list_price < a.previous_price
       if (!drop) continue
@@ -113,14 +118,16 @@ export async function fetchActivityCounts({ states, days = 7 } = {}) {
     if (states?.length) q = q.in('state', states)
     return extra(q)
   }
-  const [listed, drops, back, offers] = await Promise.all([
+  const [listed, investor, drops, back, offers] = await Promise.all([
     count('property_activity', 'occurred_at', q => q.eq('event', 'listed')),
+    count('property_activity', 'occurred_at', q => q.eq('event', 'investor_eligible')),
     count('property_activity', 'occurred_at', q => q.eq('event', 'price_change')),
     count('property_activity', 'occurred_at', q => q.eq('event', 'back_on_market')),
     count('accepted_offers', 'accepted_at', q => q),
   ])
   return {
     new_listing: listed.count ?? 0,
+    investor_eligible: investor.count ?? 0,
     price_drop: drops.count ?? 0,
     back_on_market: back.count ?? 0,
     offer_accepted: offers.error ? null : offers.count ?? 0,

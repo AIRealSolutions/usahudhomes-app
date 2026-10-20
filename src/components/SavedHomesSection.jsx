@@ -18,6 +18,7 @@ const ACTIVITY_TEXT = {
   status_change: 'Status update',
   under_contract: 'Went under contract',
   back_on_market: 'Back on the market',
+  investor_eligible: 'Investors can now bid',
 }
 
 export default function SavedHomesSection() {

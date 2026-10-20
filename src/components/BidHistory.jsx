@@ -48,6 +48,7 @@ const EVENT_STYLE = {
   under_contract:  { dot: 'bg-amber-500',   title: 'Went under contract' },
   offer_accepted:  { dot: 'bg-amber-600',   title: 'Offer accepted by HUD' },
   back_on_market:  { dot: 'bg-purple-500',  title: 'Back on the market' },
+  investor_eligible: { dot: 'bg-violet-500', title: 'Open to investor bids' },
 }
 
 function TimelineDetail({ item, property }) {
@@ -72,6 +73,8 @@ function TimelineDetail({ item, property }) {
       return <>Removed from HUD's available list at {formatMoney(item.list_price)}</>
     case 'back_on_market':
       return <>Relisted at {formatMoney(item.list_price)}; the previous contract did not close</>
+    case 'investor_eligible':
+      return <>The owner-occupant Exclusive period ended; investors can bid at {formatMoney(item.list_price)}</>
     case 'offer_accepted': {
       const o = item.offer
       const pct = percentOfList(o, property.price)
