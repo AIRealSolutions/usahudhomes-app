@@ -5,6 +5,8 @@ import ActivityFeed from '../dashboard/ActivityFeed'
 import BidCalendar from '../dashboard/BidCalendar'
 import SectionBoundary from '../dashboard/SectionBoundary'
 import { useReminders, remindersAsEvents } from '../../services/reminders'
+import { useInvestorWatches, watchesAsEvents } from '../../services/investorWatches'
+import InvestorWatchPanel from '../dashboard/InvestorWatchPanel'
 import { US_STATES } from '../../services/buyerProfile'
 import {
   Home, Users, MessageSquare, UserCog, DollarSign, Film,
@@ -75,6 +77,7 @@ export default function AdminControlPanel({ onNavigate }) {
   const [lastRefreshed, setLastRefreshed] = useState(null)
   const [marketState, setMarketState] = useState('') // '' = all states
   const reminders = useReminders()
+  const watches = useInvestorWatches()
 
   useEffect(() => { fetchAll() }, [])
 
@@ -220,9 +223,13 @@ export default function AdminControlPanel({ onNavigate }) {
         </label>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-        <SectionBoundary name="Bid Calendar">
-          <BidCalendar states={marketState ? [marketState] : undefined} extraEvents={remindersAsEvents(reminders.items)} />
-        </SectionBoundary>
+        <div className="space-y-4">
+          <SectionBoundary name="Bid Calendar">
+            <BidCalendar states={marketState ? [marketState] : undefined}
+              extraEvents={[...remindersAsEvents(reminders.items), ...watchesAsEvents(watches.items)]} />
+          </SectionBoundary>
+          <SectionBoundary name="Investor Watch"><InvestorWatchPanel watches={watches} /></SectionBoundary>
+        </div>
         <SectionBoundary name="Market News">
           <ActivityFeed states={marketState ? [marketState] : undefined} reminders={reminders} maxHeight="max-h-[620px]" />
         </SectionBoundary>

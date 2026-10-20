@@ -11,6 +11,8 @@ import { useActiveClient } from '../contexts/ActiveClientContext'
 import BrokerOfferInbox from './broker/BrokerOfferInbox'
 import SectionBoundary from './dashboard/SectionBoundary'
 import { useReminders, remindersAsEvents } from '../services/reminders'
+import { useInvestorWatches, watchesAsEvents } from '../services/investorWatches'
+import InvestorWatchPanel from './dashboard/InvestorWatchPanel'
 import OfferReferralMarketplace from './broker/OfferReferralMarketplace'
 import { supabase } from '../config/supabase'
 import { consultationService } from '../services/database/consultationService'
@@ -1202,6 +1204,7 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
   const [agentStates, setAgentStates]   = useState([])
   const [loading, setLoading]           = useState(true)
   const reminders                       = useReminders()
+  const watches                         = useInvestorWatches()
 
   const load = useCallback(async () => {
     if (!agentId) return
@@ -1243,6 +1246,7 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
   const leadName = (c) => `${c.customer?.first_name || c.first_name || ''} ${c.customer?.last_name || c.last_name || ''}`.trim() || 'Lead'
   const workflowEvents = [
     ...remindersAsEvents(reminders.items),
+    ...watchesAsEvents(watches.items),
     ...pendingReferrals.filter(c => c.referral_expires_at).map(c => ({
       date: c.referral_expires_at, label: `Respond to referral: ${leadName(c)}`,
       detail: `Accept or decline by ${new Date(c.referral_expires_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`,
@@ -1320,16 +1324,19 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
 
       {/* Daily workflow: bid calendar + market news for the broker's states */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-        <SectionBoundary name="My Calendar">
-          <Suspense fallback={<PanelFallback />}>
-            <BidCalendar
-              title="My Calendar"
-              subtitle={`Bids due in ${statesLabel}, plus your reminders, referral deadlines and appointments`}
-              states={agentStates.length ? agentStates : undefined}
-              extraEvents={workflowEvents}
-            />
-          </Suspense>
-        </SectionBoundary>
+        <div className="space-y-4">
+          <SectionBoundary name="My Calendar">
+            <Suspense fallback={<PanelFallback />}>
+              <BidCalendar
+                title="My Calendar"
+                subtitle={`Bids due in ${statesLabel}, plus your reminders, investor watches, referral deadlines and appointments`}
+                states={agentStates.length ? agentStates : undefined}
+                extraEvents={workflowEvents}
+              />
+            </Suspense>
+          </SectionBoundary>
+          <SectionBoundary name="Investor Watch"><InvestorWatchPanel watches={watches} clients={consultations} /></SectionBoundary>
+        </div>
         <SectionBoundary name="Market News">
           <Suspense fallback={<PanelFallback />}>
             <ActivityFeed

@@ -10,6 +10,7 @@ import { listSavedHomes } from '../contexts/SavedHomesContext'
 import BidCalendar from '../components/dashboard/BidCalendar'
 import ActivityFeed from '../components/dashboard/ActivityFeed'
 import SectionBoundary from '../components/dashboard/SectionBoundary'
+import { useInvestorWatches, watchesAsEvents } from '../services/investorWatches'
 
 export default function UserDashboard({ user }) {
   const [inquiries, setInquiries] = useState([])
@@ -271,6 +272,7 @@ export default function UserDashboard({ user }) {
 function MarketSection() {
   const { profile } = useAuth()
   const [saved, setSaved] = useState(null)
+  const watches = useInvestorWatches() // homes the client's agent is watching for them
 
   useEffect(() => {
     listSavedHomes()
@@ -295,12 +297,34 @@ function MarketSection() {
           {!profile?.state && <> <Link to="/profile" className="text-blue-600 hover:underline">Set your state</Link> to tailor this.</>}
         </p>
       </div>
+      {watches.items.length > 0 && (
+        <div className="mb-4 bg-violet-50 border border-violet-200 rounded-lg p-4">
+          <p className="text-sm font-semibold text-violet-900">Waiting to bid as an investor</p>
+          <ul className="mt-2 space-y-1">
+            {watches.items.map(w => (
+              <li key={w.id} className="text-sm text-violet-900">
+                <Link to={`/property/${w.case_number}`} className="font-medium hover:underline">
+                  {[w.property?.address, w.property?.city].filter(Boolean).join(', ') || `Case ${w.case_number}`}
+                </Link>
+                {' · '}
+                {w.status.kind === 'open' ? 'Open to investors now. Contact your agent to bid.'
+                  : w.status.kind === 'contract' ? 'Went under contract'
+                  : w.status.expected && w.status.expected >= new Date(new Date().setHours(0, 0, 0, 0))
+                    ? `Bids open ${w.status.expected.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}; investors can bid after if it doesn't sell`
+                  : w.status.expected ? 'Bids have opened; waiting for HUD to open it to investors'
+                  : 'Still owner-occupant only'}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <BidCalendar
           title="When bids are due"
           subtitle={`Exclusive and lottery listings · ${where}. Get your bid in by the end of the day shown.`}
           states={states.length ? states : undefined}
           highlightCases={savedCases}
+          extraEvents={watchesAsEvents(watches.items, { forClient: true })}
         />
         <ActivityFeed
           title="Market News"
