@@ -11,7 +11,7 @@
  *   customers         → LeadAdmin (legacy id; Customers tab on Leads)
  *   referrals         → LeadAdmin (legacy id; merged into Leads)
  *   consultations     → LeadAdmin (legacy id; Assigned Leads tab on Leads)
- *   email-templates   → LeadAdmin (legacy id; Email Templates tab on Leads)
+ *   email-templates   → EmailTemplateEditor (Tools)
  *   agents            → AgentAdmin
  *   applications      → AgentApplicationsAdmin
  *   accepted-offers   → AcceptedOffersAdmin
@@ -31,7 +31,7 @@ import { supabase } from '../config/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Home, Database, Search,
-  MessageSquare,
+  MessageSquare, Mail,
   UserCog, FileText, DollarSign, Gavel,
   Film, Zap, BookOpen, Layout,
   Facebook, Bot, HardDrive, Trash2,
@@ -56,6 +56,7 @@ const VideoLibrary        = lazy(() => import('./admin/VideoLibrary'))
 const VideoTemplateBuilder= lazy(() => import('./admin/VideoTemplateBuilder'))
 const FacebookLeadsImport = lazy(() => import('./admin/FacebookLeadsImport'))
 const AIMarketingAssistant= lazy(() => import('./admin/AIMarketingAssistant'))
+const EmailTemplateEditor = lazy(() => import('./admin/EmailTemplateEditor'))
 const ClosingAgentsAdmin = lazy(() => import('../pages/admin/ClosingAgentsAdmin'))
 const DatabaseReset        = lazy(() => import('./admin/DatabaseReset'))
 const PurgeUnderContract   = lazy(() => import('./admin/PurgeUnderContract'))
@@ -109,6 +110,7 @@ const NAV = [
       { id: 'facebook-import',  label: 'Facebook Leads',    icon: Facebook,      color: 'text-blue-600' },
       { id: 'ai-assistant',     label: 'AI Assistant',      icon: Bot,           color: 'text-indigo-600' },
       { id: 'closing-agents',   label: 'Closing Agents',   icon: UserCog,       color: 'text-teal-600' },
+      { id: 'email-templates',  label: 'Email Templates',   icon: Mail,          color: 'text-sky-500' },
       { id: 'database',         label: 'Database Tools',    icon: HardDrive,     color: 'text-red-500' },
     ]
   },
@@ -124,7 +126,7 @@ const COMPONENT_MAP = {
   'referrals':         LeadAdmin, // legacy tab id — Referrals merged into Leads
   'offer-referrals':   () => <OfferReferralMarketplace admin />,
   'consultations':     LeadAdmin, // legacy tab id — Assigned Leads is a tab on Leads
-  'email-templates':   LeadAdmin, // legacy tab id — Email Templates is a tab on Leads
+  'email-templates':   EmailTemplateEditor,
   'agents':            AgentAdmin,
   'applications':      AgentApplicationsAdmin,
   'accepted-offers':   AcceptedOffersAdmin,
