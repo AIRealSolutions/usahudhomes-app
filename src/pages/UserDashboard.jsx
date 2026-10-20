@@ -6,6 +6,9 @@ import SavedHomesSection from '../components/SavedHomesSection'
 import BuyerOfferSummary from '../components/BuyerOfferSummary'
 import { useAuth } from '../contexts/AuthContext'
 import { PROFILE_KEYS, OPTIONS, stateName } from '../services/buyerProfile'
+import { listSavedHomes } from '../contexts/SavedHomesContext'
+import BidCalendar from '../components/dashboard/BidCalendar'
+import ActivityFeed from '../components/dashboard/ActivityFeed'
 
 export default function UserDashboard({ user }) {
   const [inquiries, setInquiries] = useState([])
@@ -148,6 +151,9 @@ export default function UserDashboard({ user }) {
 
       <BuyerOfferSummary user={user} />
 
+      {/* When bids open, and what's happening in the buyer's market */}
+      <MarketSection />
+
       {/* Homes the buyer saved, with price and contract activity */}
       <SavedHomesSection />
 
@@ -255,6 +261,52 @@ export default function UserDashboard({ user }) {
             Email Us
           </a>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Bid calendar and market news for the buyer's state (or their saved homes' states), saved homes highlighted
+function MarketSection() {
+  const { profile } = useAuth()
+  const [saved, setSaved] = useState(null)
+
+  useEffect(() => {
+    listSavedHomes()
+      .then(rows => setSaved(rows.map(r => ({ caseNumber: r.case_number, state: r.properties?.state })).filter(r => r.caseNumber)))
+      .catch(e => { console.error('Saved homes for market section:', e); setSaved([]) })
+  }, [])
+
+  if (saved === null) return null
+  const savedCases = saved.map(s => s.caseNumber)
+  const states = profile?.state
+    ? [String(profile.state).toUpperCase()]
+    : [...new Set(saved.map(s => s.state).filter(Boolean))]
+  const where = states.length ? states.map(st => stateName(st) || st).join(', ') : 'all states'
+
+  return (
+    <div className="mb-8">
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold text-gray-900">Bids & Market News</h2>
+        <p className="text-sm text-gray-600 mt-1">
+          HUD bid openings and the latest listings, price drops and accepted offers in {where}.
+          {savedCases.length > 0 && ' Your saved homes are highlighted.'}
+          {!profile?.state && <> <Link to="/profile" className="text-blue-600 hover:underline">Set your state</Link> to tailor this.</>}
+        </p>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <BidCalendar
+          title="When bids open"
+          subtitle={`Exclusive and lottery bid openings · ${where}. Get your bid in before the opening date.`}
+          states={states.length ? states : undefined}
+          highlightCases={savedCases}
+        />
+        <ActivityFeed
+          title="Market News"
+          states={states.length ? states : undefined}
+          highlightCases={savedCases}
+          maxHeight="max-h-[520px]"
+        />
       </div>
     </div>
   )

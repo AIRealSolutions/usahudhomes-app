@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../config/supabase'
+import UnderContractInsights from '../dashboard/UnderContractInsights'
+import ActivityFeed from '../dashboard/ActivityFeed'
+import BidCalendar from '../dashboard/BidCalendar'
+import { US_STATES } from '../../services/buyerProfile'
 import {
   Home, Users, MessageSquare, UserCog, DollarSign, Film,
   Database, TrendingUp, AlertCircle, CheckCircle, Clock,
@@ -9,32 +13,28 @@ import {
 
 const StatCard = ({ icon: Icon, label, value, sub, color, onClick }) => {
   const colors = {
-    blue:   { bg: 'bg-blue-50',   icon: 'bg-blue-100',   text: 'text-blue-600',   val: 'text-blue-700'   },
-    green:  { bg: 'bg-green-50',  icon: 'bg-green-100',  text: 'text-green-600',  val: 'text-green-700'  },
-    orange: { bg: 'bg-orange-50', icon: 'bg-orange-100', text: 'text-orange-600', val: 'text-orange-700' },
-    purple: { bg: 'bg-purple-50', icon: 'bg-purple-100', text: 'text-purple-600', val: 'text-purple-700' },
-    red:    { bg: 'bg-red-50',    icon: 'bg-red-100',    text: 'text-red-600',    val: 'text-red-700'    },
-    teal:   { bg: 'bg-teal-50',   icon: 'bg-teal-100',   text: 'text-teal-600',   val: 'text-teal-700'   },
+    blue:   'bg-blue-50 text-blue-600',
+    green:  'bg-green-50 text-green-600',
+    orange: 'bg-orange-50 text-orange-600',
+    purple: 'bg-purple-50 text-purple-600',
+    red:    'bg-red-50 text-red-600',
+    teal:   'bg-teal-50 text-teal-600',
   }
-  const c = colors[color] || colors.blue
   return (
     <button
       onClick={onClick}
-      className={`${c.bg} rounded-xl p-5 text-left w-full hover:shadow-md transition-all group border border-transparent hover:border-${color}-200`}
+      className="bg-white rounded-xl border border-gray-200 px-4 py-3 text-left w-full hover:shadow-md transition-all group flex items-center gap-3"
     >
-      <div className="flex items-start justify-between">
-        <div className={`${c.icon} rounded-lg p-2.5`}>
-          <Icon className={`w-5 h-5 ${c.text}`} />
-        </div>
-        <ArrowRight className={`w-4 h-4 ${c.text} opacity-0 group-hover:opacity-100 transition-opacity mt-1`} />
+      <div className={`${colors[color] || colors.blue} rounded-lg p-2 flex-shrink-0`}>
+        <Icon className="w-4 h-4" />
       </div>
-      <div className="mt-3">
-        <p className={`text-3xl font-bold ${c.val}`}>
-          {value === null ? <span className="text-lg animate-pulse">…</span> : value?.toLocaleString()}
+      <div className="min-w-0 flex-1">
+        <p className="text-xl font-semibold text-gray-900 tabular-nums leading-tight">
+          {value === null ? <span className="text-base animate-pulse">…</span> : value?.toLocaleString()}
         </p>
-        <p className="text-sm font-semibold text-gray-700 mt-0.5">{label}</p>
-        {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
+        <p className="text-xs font-medium text-gray-600 truncate">{label}{sub ? <span className="text-gray-400"> · {sub}</span> : null}</p>
       </div>
+      <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 flex-shrink-0" />
     </button>
   )
 }
@@ -57,9 +57,6 @@ const QuickAction = ({ icon: Icon, label, desc, color, onClick }) => (
 
 export default function AdminControlPanel({ onNavigate }) {
   const [stats, setStats] = useState({
-    properties: null,
-    availableProperties: null,
-    underContract: null,
     leads: null,
     newLeads: null,
     agents: null,
@@ -74,6 +71,7 @@ export default function AdminControlPanel({ onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [lastRefreshed, setLastRefreshed] = useState(null)
+  const [marketState, setMarketState] = useState('') // '' = all states
 
   useEffect(() => { fetchAll() }, [])
 
@@ -81,15 +79,11 @@ export default function AdminControlPanel({ onNavigate }) {
     setRefreshing(true)
     try {
       const [
-        propsRes, availRes, ucRes,
         leadsRes, newLeadsRes,
         agentsRes, consultRes,
         bidRes, videoRes, videoQRes,
         recentLeadsRes, recentPropsRes
       ] = await Promise.all([
-        supabase.from('properties').select('id', { count: 'exact', head: true }),
-        supabase.from('properties').select('id', { count: 'exact', head: true }).neq('status', 'UNDER CONTRACT').eq('is_active', true),
-        supabase.from('properties').select('id', { count: 'exact', head: true }).eq('status', 'UNDER CONTRACT'),
         supabase.from('leads').select('id', { count: 'exact', head: true }),
         supabase.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'new_lead'),
         supabase.from('agents').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
@@ -102,9 +96,6 @@ export default function AdminControlPanel({ onNavigate }) {
       ])
 
       setStats({
-        properties:          propsRes.count ?? 0,
-        availableProperties: availRes.count ?? 0,
-        underContract:       ucRes.count ?? 0,
         leads:               leadsRes.count ?? 0,
         newLeads:            newLeadsRes.count ?? 0,
         agents:              agentsRes.count ?? 0,
@@ -201,96 +192,41 @@ export default function AdminControlPanel({ onNavigate }) {
         </div>
       )}
 
-      {/* ── Primary Stats ──────────────────────────────────────────────────── */}
-      <div>
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Properties</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          <StatCard
-            icon={Home} label="Total Listings" color="blue"
-            value={stats.properties}
-            sub="All states in database"
-            onClick={() => onNavigate('property-manage')}
-          />
-          <StatCard
-            icon={CheckCircle} label="Active / Available" color="green"
-            value={stats.availableProperties}
-            sub="Excluding under contract"
-            onClick={() => onNavigate('property-manage')}
-          />
-          <StatCard
-            icon={Clock} label="Under Contract" color="orange"
-            value={stats.underContract}
-            sub="No longer on HUD site"
-            onClick={() => onNavigate('property-manage')}
-          />
-        </div>
+      {/* ── Leads, agents & media (compact) ──────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard icon={AlertCircle} label="New Leads" sub="need assignment" color="red"
+          value={stats.newLeads} onClick={() => onNavigate('leads')} />
+        <StatCard icon={MessageSquare} label="Total Leads" sub="all time" color="teal"
+          value={stats.leads} onClick={() => onNavigate('leads')} />
+        <StatCard icon={UserCog} label="Active Agents" sub="approved" color="blue"
+          value={stats.agents} onClick={() => onNavigate('agents')} />
+        <StatCard icon={Film} label="Video Jobs" sub={`${stats.videoQueued ?? 0} queued`} color="purple"
+          value={stats.videoJobs} onClick={() => onNavigate('video-studio')} />
       </div>
 
-      <div>
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Leads & Agents</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard
-            icon={AlertCircle} label="New Leads" color="red"
-            value={stats.newLeads}
-            sub="Need assignment"
-            onClick={() => onNavigate('leads')}
-          />
-          <StatCard
-            icon={MessageSquare} label="Total Leads" color="teal"
-            value={stats.leads}
-            sub="All time"
-            onClick={() => onNavigate('leads')}
-          />
-          <StatCard
-            icon={UserCog} label="Active Agents" color="blue"
-            value={stats.agents}
-            sub="Approved brokers"
-            onClick={() => onNavigate('agents')}
-          />
+      {/* ── Market: under-contract insights + news feed ─────────────────────── */}
+      <div className="flex items-center justify-between gap-3 pt-2">
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Market</h2>
+        <label className="flex items-center gap-2 text-xs text-gray-500">
+          News & bids for
+          <select value={marketState} onChange={e => setMarketState(e.target.value)}
+            className="text-sm border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-800 focus:ring-2 focus:ring-blue-500">
+            <option value="">All states</option>
+            {Object.entries(US_STATES).map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+        <div className="xl:col-span-2">
+          <UnderContractInsights onNavigate={onNavigate} />
         </div>
+        <ActivityFeed states={marketState ? [marketState] : undefined} maxHeight="max-h-[760px]" />
       </div>
 
-      <div>
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Media & Results</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          <StatCard
-            icon={Film} label="Video Jobs" color="purple"
-            value={stats.videoJobs}
-            sub={`${stats.videoQueued ?? 0} queued`}
-            onClick={() => onNavigate('video-studio')}
-          />
-        </div>
-      </div>
+      {/* ── Calendar & recent activity ─────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
 
-      {/* ── Quick Actions ──────────────────────────────────────────────────── */}
-      <div>
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <QuickAction
-            icon={Film} label="Bulk Media Generator" color="bg-purple-600"
-            desc="Generate videos for properties"
-            onClick={() => onNavigate('video-studio')}
-          />
-          <QuickAction
-            icon={MessageSquare} label="Review New Leads" color="bg-orange-500"
-            desc={`${stats.newLeads ?? 0} leads need attention`}
-            onClick={() => onNavigate('leads')}
-          />
-          <QuickAction
-            icon={Upload} label="Import Facebook Leads" color="bg-blue-500"
-            desc="Upload CSV from Facebook Ads"
-            onClick={() => onNavigate('facebook-import')}
-          />
-          <QuickAction
-            icon={Zap} label="AI Marketing Assistant" color="bg-indigo-600"
-            desc="Generate marketing copy"
-            onClick={() => onNavigate('ai-assistant')}
-          />
-        </div>
-      </div>
-
-      {/* ── Recent Activity ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <BidCalendar states={marketState ? [marketState] : undefined} />
 
         {/* Recent Leads */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -384,6 +320,33 @@ export default function AdminControlPanel({ onNavigate }) {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* ── Quick Actions ──────────────────────────────────────────────────── */}
+      <div>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <QuickAction
+            icon={MessageSquare} label="Review New Leads" color="bg-orange-500"
+            desc={`${stats.newLeads ?? 0} leads need attention`}
+            onClick={() => onNavigate('leads')}
+          />
+          <QuickAction
+            icon={Film} label="Bulk Media Generator" color="bg-purple-600"
+            desc="Generate videos for properties"
+            onClick={() => onNavigate('video-studio')}
+          />
+          <QuickAction
+            icon={Upload} label="Import Facebook Leads" color="bg-blue-500"
+            desc="Upload CSV from Facebook Ads"
+            onClick={() => onNavigate('facebook-import')}
+          />
+          <QuickAction
+            icon={Zap} label="AI Marketing Assistant" color="bg-indigo-600"
+            desc="Generate marketing copy"
+            onClick={() => onNavigate('ai-assistant')}
+          />
         </div>
       </div>
 

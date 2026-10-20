@@ -32,6 +32,8 @@ const EmailComposer          = lazy(() => import('./broker/EmailComposer'))
 const SMSComposer            = lazy(() => import('./broker/SMSComposer'))
 const BrokerPropertySearch   = lazy(() => import('./broker/BrokerPropertySearch'))
 const AddToClientsModal      = lazy(() => import('./broker/AddToClientsModal'))
+const ActivityFeed           = lazy(() => import('./dashboard/ActivityFeed'))
+const BidCalendar            = lazy(() => import('./dashboard/BidCalendar'))
 
 // ── Navigation config ─────────────────────────────────────────────────────────
 const NAV_SECTIONS = [
@@ -1195,20 +1197,23 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
   const [stats, setStats]               = useState(null)
   const [consultations, setConsultations] = useState([])
   const [pendingReferrals, setPendingReferrals] = useState([])
+  const [agentStates, setAgentStates]   = useState([])
   const [loading, setLoading]           = useState(true)
 
   const load = useCallback(async () => {
     if (!agentId) return
     setLoading(true)
     try {
-      const [consultRes, referralRes] = await Promise.all([
+      const [consultRes, referralRes, agentRes] = await Promise.all([
         consultationService.getBrokerConsultations(agentId),
         consultationService.getPendingReferrals(agentId),
+        supabase.from('agents').select('states_covered').eq('id', agentId).maybeSingle(),
       ])
       const consults  = consultRes.data  || []
       const referrals = referralRes.data || []
       setConsultations(consults)
       setPendingReferrals(referrals)
+      setAgentStates(Array.isArray(agentRes.data?.states_covered) ? agentRes.data.states_covered : [])
       setStats({
         total:       consults.length,
         active:      consults.filter(c => ['new','accepted','scheduled'].includes(c.status)).length,
@@ -1230,6 +1235,22 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
   if (loading) return <PanelFallback />
 
   const recentConsults = consultations.slice(0, 5)
+
+  // Workflow items for the calendar: referrals to answer and scheduled appointments
+  const leadName = (c) => `${c.customer?.first_name || c.first_name || ''} ${c.customer?.last_name || c.last_name || ''}`.trim() || 'Lead'
+  const workflowEvents = [
+    ...pendingReferrals.filter(c => c.referral_expires_at).map(c => ({
+      date: c.referral_expires_at, label: `Respond to referral: ${leadName(c)}`,
+      detail: `Accept or decline by ${new Date(c.referral_expires_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`,
+      onClick: () => onNavigate('referrals'),
+    })),
+    ...consultations.filter(c => c.scheduled_at || c.scheduled_date).map(c => ({
+      date: c.scheduled_at || c.scheduled_date, label: `Appointment: ${leadName(c)}`,
+      detail: c.consultation_type ? `${c.consultation_type} consultation` : 'Scheduled consultation',
+      href: `/lead/${c.id}`,
+    })),
+  ]
+  const statesLabel = agentStates.length ? agentStates.join(', ') : 'all states'
 
   const StatCard = ({ icon: Icon, label, value, color, panel }) => (
     <button
@@ -1292,6 +1313,23 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
         <StatCard icon={CheckCircle} label="Completed"         value={stats?.completed} color="text-blue-600" />
         <StatCard icon={BarChart2}   label="Total Assigned"    value={stats?.total}     color="text-purple-600" />
       </div>
+
+      {/* Daily workflow: bid calendar + market news for the broker's states */}
+      <Suspense fallback={<PanelFallback />}>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+          <BidCalendar
+            title="My Calendar"
+            subtitle={`Bid openings in ${statesLabel}, plus your referral deadlines and appointments`}
+            states={agentStates.length ? agentStates : undefined}
+            extraEvents={workflowEvents}
+          />
+          <ActivityFeed
+            states={agentStates.length ? agentStates : undefined}
+            subtitle={`New listings, price drops and accepted offers · ${statesLabel}`}
+            maxHeight="max-h-[520px]"
+          />
+        </div>
+      </Suspense>
 
       {/* Quick actions */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
