@@ -9,6 +9,7 @@ import { PROFILE_KEYS, OPTIONS, stateName } from '../services/buyerProfile'
 import { listSavedHomes } from '../contexts/SavedHomesContext'
 import BidCalendar from '../components/dashboard/BidCalendar'
 import ActivityFeed from '../components/dashboard/ActivityFeed'
+import SectionBoundary from '../components/dashboard/SectionBoundary'
 
 export default function UserDashboard({ user }) {
   const [inquiries, setInquiries] = useState([])
@@ -152,7 +153,7 @@ export default function UserDashboard({ user }) {
       <BuyerOfferSummary user={user} />
 
       {/* When bids open, and what's happening in the buyer's market */}
-      <MarketSection />
+      <SectionBoundary name="Bids & Market News"><MarketSection /></SectionBoundary>
 
       {/* Homes the buyer saved, with price and contract activity */}
       <SavedHomesSection />

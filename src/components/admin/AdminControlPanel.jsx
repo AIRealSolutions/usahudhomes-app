@@ -3,6 +3,7 @@ import { supabase } from '../../config/supabase'
 import UnderContractInsights from '../dashboard/UnderContractInsights'
 import ActivityFeed from '../dashboard/ActivityFeed'
 import BidCalendar from '../dashboard/BidCalendar'
+import SectionBoundary from '../dashboard/SectionBoundary'
 import { US_STATES } from '../../services/buyerProfile'
 import {
   Home, Users, MessageSquare, UserCog, DollarSign, Film,
@@ -218,15 +219,15 @@ export default function AdminControlPanel({ onNavigate }) {
       </div>
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
         <div className="xl:col-span-2">
-          <UnderContractInsights onNavigate={onNavigate} />
+          <SectionBoundary name="Under-contract insights"><UnderContractInsights onNavigate={onNavigate} /></SectionBoundary>
         </div>
-        <ActivityFeed states={marketState ? [marketState] : undefined} maxHeight="max-h-[760px]" />
+        <SectionBoundary name="Market News"><ActivityFeed states={marketState ? [marketState] : undefined} maxHeight="max-h-[760px]" /></SectionBoundary>
       </div>
 
       {/* ── Calendar & recent activity ─────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
 
-        <BidCalendar states={marketState ? [marketState] : undefined} />
+        <SectionBoundary name="Bid Calendar"><BidCalendar states={marketState ? [marketState] : undefined} /></SectionBoundary>
 
         {/* Recent Leads */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

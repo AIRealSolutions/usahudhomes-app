@@ -30,7 +30,8 @@ export default defineConfig({
             '@radix-ui/react-switch',
             '@radix-ui/react-scroll-area',
           ],
-          'vendor-charts':  ['recharts'],
+          // recharts is left to the lazy Control Panel chunk: as a manual vendor chunk it also
+          // captured shared deps (clsx) and loaded on every page
           'vendor-motion':  ['framer-motion'],
         },
       },

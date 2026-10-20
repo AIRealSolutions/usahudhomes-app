@@ -9,6 +9,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useActiveClient } from '../contexts/ActiveClientContext'
 import BrokerOfferInbox from './broker/BrokerOfferInbox'
+import SectionBoundary from './dashboard/SectionBoundary'
 import OfferReferralMarketplace from './broker/OfferReferralMarketplace'
 import { supabase } from '../config/supabase'
 import { consultationService } from '../services/database/consultationService'
@@ -1315,21 +1316,27 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
       </div>
 
       {/* Daily workflow: bid calendar + market news for the broker's states */}
-      <Suspense fallback={<PanelFallback />}>
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-          <BidCalendar
-            title="My Calendar"
-            subtitle={`Bid openings in ${statesLabel}, plus your referral deadlines and appointments`}
-            states={agentStates.length ? agentStates : undefined}
-            extraEvents={workflowEvents}
-          />
-          <ActivityFeed
-            states={agentStates.length ? agentStates : undefined}
-            subtitle={`New listings, price drops and accepted offers · ${statesLabel}`}
-            maxHeight="max-h-[520px]"
-          />
-        </div>
-      </Suspense>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <SectionBoundary name="My Calendar">
+          <Suspense fallback={<PanelFallback />}>
+            <BidCalendar
+              title="My Calendar"
+              subtitle={`Bid openings in ${statesLabel}, plus your referral deadlines and appointments`}
+              states={agentStates.length ? agentStates : undefined}
+              extraEvents={workflowEvents}
+            />
+          </Suspense>
+        </SectionBoundary>
+        <SectionBoundary name="Market News">
+          <Suspense fallback={<PanelFallback />}>
+            <ActivityFeed
+              states={agentStates.length ? agentStates : undefined}
+              subtitle={`New listings, price drops and accepted offers · ${statesLabel}`}
+              maxHeight="max-h-[520px]"
+            />
+          </Suspense>
+        </SectionBoundary>
+      </div>
 
       {/* Quick actions */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
