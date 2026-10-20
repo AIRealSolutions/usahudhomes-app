@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useActiveClient } from '../contexts/ActiveClientContext'
 import BrokerOfferInbox from './broker/BrokerOfferInbox'
 import SectionBoundary from './dashboard/SectionBoundary'
+import { useReminders, remindersAsEvents } from '../services/reminders'
 import OfferReferralMarketplace from './broker/OfferReferralMarketplace'
 import { supabase } from '../config/supabase'
 import { consultationService } from '../services/database/consultationService'
@@ -1200,6 +1201,7 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
   const [pendingReferrals, setPendingReferrals] = useState([])
   const [agentStates, setAgentStates]   = useState([])
   const [loading, setLoading]           = useState(true)
+  const reminders                       = useReminders()
 
   const load = useCallback(async () => {
     if (!agentId) return
@@ -1240,6 +1242,7 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
   // Workflow items for the calendar: referrals to answer and scheduled appointments
   const leadName = (c) => `${c.customer?.first_name || c.first_name || ''} ${c.customer?.last_name || c.last_name || ''}`.trim() || 'Lead'
   const workflowEvents = [
+    ...remindersAsEvents(reminders.items),
     ...pendingReferrals.filter(c => c.referral_expires_at).map(c => ({
       date: c.referral_expires_at, label: `Respond to referral: ${leadName(c)}`,
       detail: `Accept or decline by ${new Date(c.referral_expires_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`,
@@ -1321,7 +1324,7 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
           <Suspense fallback={<PanelFallback />}>
             <BidCalendar
               title="My Calendar"
-              subtitle={`Bids due in ${statesLabel}, plus your referral deadlines and appointments`}
+              subtitle={`Bids due in ${statesLabel}, plus your reminders, referral deadlines and appointments`}
               states={agentStates.length ? agentStates : undefined}
               extraEvents={workflowEvents}
             />
@@ -1330,6 +1333,7 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
         <SectionBoundary name="Market News">
           <Suspense fallback={<PanelFallback />}>
             <ActivityFeed
+              reminders={reminders}
               states={agentStates.length ? agentStates : undefined}
               subtitle={`New listings, price drops and accepted offers · ${statesLabel}`}
               maxHeight="max-h-[520px]"

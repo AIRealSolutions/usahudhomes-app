@@ -4,6 +4,7 @@ import UnderContractInsights from '../dashboard/UnderContractInsights'
 import ActivityFeed from '../dashboard/ActivityFeed'
 import BidCalendar from '../dashboard/BidCalendar'
 import SectionBoundary from '../dashboard/SectionBoundary'
+import { useReminders, remindersAsEvents } from '../../services/reminders'
 import { US_STATES } from '../../services/buyerProfile'
 import {
   Home, Users, MessageSquare, UserCog, DollarSign, Film,
@@ -73,6 +74,7 @@ export default function AdminControlPanel({ onNavigate }) {
   const [refreshing, setRefreshing] = useState(false)
   const [lastRefreshed, setLastRefreshed] = useState(null)
   const [marketState, setMarketState] = useState('') // '' = all states
+  const reminders = useReminders()
 
   useEffect(() => { fetchAll() }, [])
 
@@ -205,9 +207,9 @@ export default function AdminControlPanel({ onNavigate }) {
           value={stats.videoJobs} onClick={() => onNavigate('video-studio')} />
       </div>
 
-      {/* ── Market: under-contract insights + news feed ─────────────────────── */}
+      {/* ── Today: bid calendar + Market News (with reminders) ─────────────── */}
       <div className="flex items-center justify-between gap-3 pt-2">
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Market</h2>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Today</h2>
         <label className="flex items-center gap-2 text-xs text-gray-500">
           News & bids for
           <select value={marketState} onChange={e => setMarketState(e.target.value)}
@@ -217,17 +219,21 @@ export default function AdminControlPanel({ onNavigate }) {
           </select>
         </label>
       </div>
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-        <div className="xl:col-span-2">
-          <SectionBoundary name="Under-contract insights"><UnderContractInsights onNavigate={onNavigate} /></SectionBoundary>
-        </div>
-        <SectionBoundary name="Market News"><ActivityFeed states={marketState ? [marketState] : undefined} maxHeight="max-h-[760px]" /></SectionBoundary>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <SectionBoundary name="Bid Calendar">
+          <BidCalendar states={marketState ? [marketState] : undefined} extraEvents={remindersAsEvents(reminders.items)} />
+        </SectionBoundary>
+        <SectionBoundary name="Market News">
+          <ActivityFeed states={marketState ? [marketState] : undefined} reminders={reminders} maxHeight="max-h-[620px]" />
+        </SectionBoundary>
       </div>
 
-      {/* ── Calendar & recent activity ─────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+      {/* ── Market: under-contract insights ─────────────────────────────────── */}
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-2">Market</h2>
+      <SectionBoundary name="Under-contract insights"><UnderContractInsights onNavigate={onNavigate} /></SectionBoundary>
 
-        <SectionBoundary name="Bid Calendar"><BidCalendar states={marketState ? [marketState] : undefined} /></SectionBoundary>
+      {/* ── Recent activity ─────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 
         {/* Recent Leads */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

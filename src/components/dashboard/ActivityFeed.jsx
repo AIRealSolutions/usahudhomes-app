@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Sparkles, TrendingDown, RotateCcw, Gavel, RefreshCw, Newspaper } from 'lucide-react'
 import { fetchActivityFeed, fetchActivityCounts, FEED_TYPES, dayKey } from '../../services/marketActivity'
+import RemindersPanel from './RemindersPanel'
 
 const TYPE_STYLE = {
   new_listing:    { icon: Sparkles,     chip: 'bg-blue-50 text-blue-700',     dot: 'bg-blue-600' },
@@ -34,6 +35,7 @@ export default function ActivityFeed({
   limit = 60,
   highlightCases,
   maxHeight = 'max-h-[560px]',
+  reminders, // optional useReminders() object: shows the Reminders panel on top
 }) {
   const [items, setItems] = useState([])
   const [counts, setCounts] = useState(null)
@@ -89,6 +91,8 @@ export default function ActivityFeed({
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
+
+      {reminders && <RemindersPanel reminders={reminders} />}
 
       {/* Summary counts double as filters */}
       <div className="px-5 py-3 border-b border-gray-100 flex flex-wrap gap-2">
