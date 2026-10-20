@@ -1321,7 +1321,7 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
           <Suspense fallback={<PanelFallback />}>
             <BidCalendar
               title="My Calendar"
-              subtitle={`Bid openings in ${statesLabel}, plus your referral deadlines and appointments`}
+              subtitle={`Bids due in ${statesLabel}, plus your referral deadlines and appointments`}
               states={agentStates.length ? agentStates : undefined}
               extraEvents={workflowEvents}
             />

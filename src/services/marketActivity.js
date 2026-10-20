@@ -128,9 +128,11 @@ export async function fetchActivityCounts({ states, days = 7 } = {}) {
 }
 
 /**
- * Upcoming bid openings. Exclusive and Lottery listings open bids on a set
- * date; Extended listings take bids every business day, so they aren't listed.
- * @returns {Promise<Array>} [{ date: Date, case_number, address, city, state, price, listing_period, ... }]
+ * Upcoming bid deadlines. Exclusive and Lottery listings open bids on a set
+ * date (HUD's "bids open"), overnight around 1 AM Central, so bids are due the
+ * day before; that day is `date`, and `opensOn` is the opening date. Extended
+ * listings take bids every business day, so they aren't listed.
+ * @returns {Promise<Array>} [{ date: Date, opensOn: Date, case_number, address, city, state, price, listing_period, ... }]
  */
 export async function fetchBidOpenings({ states, caseNumbers, from = new Date() } = {}) {
   const rows = await fetchAllRows(() => {
@@ -145,7 +147,11 @@ export async function fetchBidOpenings({ states, caseNumbers, from = new Date() 
   })
   const today = new Date(from.getFullYear(), from.getMonth(), from.getDate())
   return rows
-    .map(r => ({ ...r, date: parseBidsOpen(r.bids_open) }))
+    .map(r => {
+      const opensOn = parseBidsOpen(r.bids_open)
+      const date = opensOn && new Date(opensOn.getFullYear(), opensOn.getMonth(), opensOn.getDate() - 1)
+      return { ...r, opensOn, date }
+    })
     .filter(r => r.date && r.date >= today)
     .sort((a, b) => a.date - b.date)
 }

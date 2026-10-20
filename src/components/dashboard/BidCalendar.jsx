@@ -1,5 +1,5 @@
 /**
- * BidCalendar — month view of upcoming HUD bid openings (Exclusive and Lottery
+ * BidCalendar — month view of upcoming HUD bid deadlines (Exclusive and Lottery
  * listings), plus optional workflow events (e.g. a broker's referral deadlines
  * and appointments). Click a day for its agenda.
  */
@@ -83,7 +83,7 @@ export default function BidCalendar({
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
             <p className="text-xs text-gray-500 line-clamp-2">
-              {subtitle || `${next7.toLocaleString()} bid opening${next7 === 1 ? '' : 's'} in the next 7 days${statesKey ? ` · ${statesKey.replace(/,/g, ', ')}` : ''}`}
+              {subtitle || `Bids due on ${next7.toLocaleString()} home${next7 === 1 ? '' : 's'} in the next 7 days${statesKey ? ` · ${statesKey.replace(/,/g, ', ')}` : ''}`}
             </p>
           </div>
         </div>
@@ -112,15 +112,16 @@ export default function BidCalendar({
             const isSel = k === selected
             return (
               <button key={k} onClick={() => setSelected(k)}
-                className={`relative h-14 rounded-lg text-left px-1.5 py-1 transition-colors border ${
+                className={`relative h-14 rounded-lg text-left px-1.5 py-1 transition-colors border flex flex-col items-start ${
                   isSel ? 'border-blue-500 bg-blue-50' : 'border-transparent hover:bg-gray-50'
                 } ${isSameMonth(d, month) ? '' : 'opacity-40'}`}>
                 <span className={`text-xs font-medium ${k === todayKey ? 'bg-blue-600 text-white rounded-full px-1.5 py-0.5' : 'text-gray-700'}`}>
                   {d.getDate()}
                 </span>
                 {bids > 0 && (
-                  <span className={`absolute left-1.5 bottom-1 text-[10px] font-semibold rounded px-1 ${saved ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'}`}>
-                    {bids}<span className="hidden sm:inline"> bid{bids === 1 ? '' : 's'}</span>
+                  <span title={`Bids due on ${bids} home${bids === 1 ? '' : 's'}`}
+                    className={`mt-auto text-[11px] leading-4 font-semibold rounded px-1.5 tabular-nums ${saved ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'}`}>
+                    {bids}
                   </span>
                 )}
                 {events > 0 && <span className="absolute right-1.5 top-1.5 w-2 h-2 rounded-full bg-orange-500" title={`${events} task${events === 1 ? '' : 's'}`} />}
@@ -129,10 +130,10 @@ export default function BidCalendar({
           })}
         </div>
         <div className="flex flex-wrap gap-3 mt-2 px-1 text-[11px] text-gray-500">
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-blue-100" /> Bid openings</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-blue-100" /> Homes with bids due that day</span>
           {highlight.size > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-yellow-100" /> Includes a saved home</span>}
           {extraEvents.length > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500" /> Your tasks</span>}
-          <span>Extended listings take bids every business day.</span>
+          <span>Bids open overnight (about 1 AM Central) the next day. Extended listings take bids every business day.</span>
         </div>
       </div>
 
@@ -164,6 +165,11 @@ export default function BidCalendar({
                   ? <Link key={`e${i}`} to={e.href} className="block">{body}</Link>
                   : <button key={`e${i}`} onClick={e.onClick} className="block w-full text-left">{body}</button>
               })}
+              {agenda.bids.length > 0 && (
+                <p className="px-5 pt-2.5 pb-1 text-[11px] font-semibold text-blue-700 uppercase tracking-wider">
+                  Bids due · {agenda.bids.length} home{agenda.bids.length === 1 ? '' : 's'}
+                </p>
+              )}
               {agenda.bids.map(b => (
                 <Link key={b.id} to={`/property/${b.case_number}`} className="flex items-start gap-3 px-5 py-2.5 hover:bg-gray-50">
                   <Gavel className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
@@ -174,7 +180,7 @@ export default function BidCalendar({
                       {highlight.has(b.case_number) && <span className="text-[11px] font-semibold text-yellow-700 flex-shrink-0">Saved</span>}
                     </span>
                     <span className="block text-xs text-gray-500">
-                      {money(b.price)} · {b.beds ?? '—'} bd / {b.baths ?? '—'} ba · {b.listing_period} bids open
+                      {money(b.price)} · {b.beds ?? '—'} bd / {b.baths ?? '—'} ba · {b.listing_period ? `${b.listing_period} · ` : ''}bids open {b.opensOn?.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     </span>
                   </span>
                 </Link>

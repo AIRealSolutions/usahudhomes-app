@@ -152,7 +152,7 @@ export default function UserDashboard({ user }) {
 
       <BuyerOfferSummary user={user} />
 
-      {/* When bids open, and what's happening in the buyer's market */}
+      {/* When bids are due, and what's happening in the buyer's market */}
       <SectionBoundary name="Bids & Market News"><MarketSection /></SectionBoundary>
 
       {/* Homes the buyer saved, with price and contract activity */}
@@ -290,15 +290,15 @@ function MarketSection() {
       <div className="mb-4">
         <h2 className="text-xl font-semibold text-gray-900">Bids & Market News</h2>
         <p className="text-sm text-gray-600 mt-1">
-          HUD bid openings and the latest listings, price drops and accepted offers in {where}.
+          HUD bid deadlines and the latest listings, price drops and accepted offers in {where}.
           {savedCases.length > 0 && ' Your saved homes are highlighted.'}
           {!profile?.state && <> <Link to="/profile" className="text-blue-600 hover:underline">Set your state</Link> to tailor this.</>}
         </p>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <BidCalendar
-          title="When bids open"
-          subtitle={`Exclusive and lottery bid openings · ${where}. Get your bid in before the opening date.`}
+          title="When bids are due"
+          subtitle={`Exclusive and lottery listings · ${where}. Get your bid in by the end of the day shown.`}
           states={states.length ? states : undefined}
           highlightCases={savedCases}
         />
