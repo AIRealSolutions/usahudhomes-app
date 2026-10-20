@@ -1,7 +1,8 @@
 -- Log an 'investor_eligible' activity event when a listing opens to investor bids:
 -- its bidder_types newly include "Investor" (HUD moved it from the owner-occupant
 -- Exclusive period to Extended). Feeds the dashboard Market News alert.
--- Applied to production 2026-10-20.
+-- Applied to production 2026-10-20 in three steps (constraint, function, trigger);
+-- the trigger is replaced in place rather than dropped and recreated.
 alter table public.property_activity drop constraint if exists property_activity_event_check;
 alter table public.property_activity add constraint property_activity_event_check
   check (event in ('listed', 'price_change', 'status_change', 'under_contract', 'back_on_market', 'investor_eligible'));
@@ -45,6 +46,5 @@ BEGIN
 END
 $$;
 
-drop trigger if exists trg_property_activity on public.properties;
-create trigger trg_property_activity after insert or update of price, status, is_active, bidder_types on public.properties
+create or replace trigger trg_property_activity after insert or update of price, status, is_active, bidder_types on public.properties
   for each row execute function public.log_property_activity();
