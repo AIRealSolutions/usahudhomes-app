@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Calculator, Phone, Info } from 'lucide-react'
 
 // Annual FHA MIP (HUD Mortgagee Letter 2023-05), loans at or under the standard limit
@@ -29,7 +29,7 @@ const HUD_CLOSING_CREDIT = 0.03
  * Build the three owner-occupant scenarios shown on a property page.
  * `escrow` is the shared monthly housing cost: taxes, insurance, HOA, other.
  */
-function buildScenarios({ price, fhaRate, convRate, termYears, convDownPct, closingPct, escrow }) {
+function buildScenarios({ price, fhaRate, convRate, termYears, convDownPct, closingPct, hudCreditPct, escrow }) {
   const closingCosts = price * (closingPct / 100)
 
   const fha = (label, down, hudCredit) => {
@@ -37,7 +37,7 @@ function buildScenarios({ price, fhaRate, convRate, termYears, convDownPct, clos
     const ltv = (baseLoan / price) * 100
     const upfrontMip = baseLoan * FHA_UPFRONT_MIP
     const totalLoan = baseLoan + upfrontMip
-    const credit = hudCredit ? Math.min(closingCosts, price * HUD_CLOSING_CREDIT) : 0
+    const credit = hudCredit ? Math.min(closingCosts, price * Math.min(hudCreditPct, HUD_CLOSING_CREDIT * 100) / 100) : 0
     return {
       label,
       down,
@@ -69,14 +69,41 @@ function buildScenarios({ price, fhaRate, convRate, termYears, convDownPct, clos
     credit: 0,
   }
 
-  return [
-    { ...fha('HUD $100 Down FHA', 100, true), highlight: true },
-    fha('Standard FHA 3.5% Down', price * 0.035, false),
-    conventional,
-  ].map((s) => {
-    const total = s.pi + s.mi + escrow.tax + escrow.insurance + escrow.hoa + escrow.other
-    return { ...s, total, cashToClose: s.down + s.closingCosts - s.credit }
-  })
+  return withTotals([
+    { ...fha('HUD $100 Down FHA', 100, true), rate: fhaRate, highlight: true },
+    { ...fha('Standard FHA 3.5% Down', price * 0.035, false), rate: fhaRate },
+    { ...conventional, rate: convRate },
+  ], escrow)
+}
+
+const withTotals = (scenarios, escrow) => scenarios.map((s) => {
+  const total = s.pi + s.mi + escrow.tax + escrow.insurance + escrow.hoa + escrow.other
+  return { ...s, total, cashToClose: s.down + s.closingCosts - s.credit }
+})
+
+/** Investor purchase: no HUD closing help or FHA; investment-property loans at 10%, 20% and 25% down */
+const INVESTOR_DOWN = [10, 20, 25]
+function buildInvestorScenarios({ price, investorRate, termYears, closingPct, escrow }) {
+  const closingCosts = price * (closingPct / 100)
+  return withTotals(INVESTOR_DOWN.map((pct, i) => {
+    const down = price * (pct / 100)
+    const loan = price - down
+    return {
+      label: `Investor Loan ${pct}% Down`,
+      down,
+      downLabel: `${pct}%`,
+      baseLoan: loan,
+      upfrontMip: 0,
+      totalLoan: loan,
+      rate: investorRate,
+      pi: monthlyPI(loan, investorRate, termYears),
+      mi: 0,
+      miLabel: '',
+      closingCosts,
+      credit: 0,
+      highlight: i === 1,
+    }
+  }), escrow)
 }
 
 const usd = (n) => `$${Math.round(n).toLocaleString()}`
@@ -103,7 +130,7 @@ function NumberField({ label, value, onChange, prefix, suffix, step = 1, hint })
   )
 }
 
-export default function PaymentBreakdown({ property }) {
+export default function PaymentBreakdown({ property, offerTerms, onEstimate }) {
   const listPrice = Number(property?.price) || 0
   // Buyers can try a different offer; HUD homes often sell above or below list
   const [offer, setOffer] = useState(listPrice)
@@ -117,8 +144,14 @@ export default function PaymentBreakdown({ property }) {
   const [termYears, setTermYears] = useState(30)
   const [convDownPct, setConvDownPct] = useState(5)
   const [closingPct, setClosingPct] = useState(3)
+  const [investorRate, setInvestorRate] = useState(7.25)
 
-  if (!listPrice) return null
+  // Follow the offer being prepared above, so the payment matches the deal numbers
+  const termsOffer = Number(offerTerms?.offerPrice) || 0
+  useEffect(() => { if (termsOffer > 0) setOffer(termsOffer) }, [termsOffer])
+  const investor = offerTerms?.occupancy === 'investor'
+  // HUD pays the closing help the owner-occupant asks for in the offer (up to 3%)
+  const hudCreditPct = offerTerms?.occupancy === 'owner' ? Number(offerTerms.closingAssistPercent) || 0 : HUD_CLOSING_CREDIT * 100
 
   const price = Number(offer) || 0
   const annualTax = taxOverride ?? Math.round(price * 0.008)
@@ -132,22 +165,50 @@ export default function PaymentBreakdown({ property }) {
     hoa: Number(hoa) || 0,
     other: Number(otherFees) || 0,
   }
-  const scenarios = buildScenarios({
-    price,
-    fhaRate: Number(fhaRate) || 0,
-    convRate: Number(convRate) || 0,
-    termYears,
-    convDownPct,
-    closingPct: Number(closingPct) || 0,
-    escrow,
-  })
+  const scenarios = investor
+    ? buildInvestorScenarios({ price, investorRate: Number(investorRate) || 0, termYears, closingPct: Number(closingPct) || 0, escrow })
+    : buildScenarios({
+      price,
+      fhaRate: Number(fhaRate) || 0,
+      convRate: Number(convRate) || 0,
+      termYears,
+      convDownPct,
+      closingPct: Number(closingPct) || 0,
+      hudCreditPct,
+      escrow,
+    })
   const [hud, standardFha] = scenarios
+
+  // Summary saved with the buyer's offer so the broker sees the same payment picture
+  const estimate = price > 0 ? {
+    price,
+    occupancy: investor ? 'investor' : 'owner',
+    term_years: termYears,
+    closing_cost_percent: Number(closingPct) || 0,
+    annual_tax: Number(annualTax) || 0,
+    annual_insurance: Number(annualInsurance) || 0,
+    hoa_monthly: escrow.hoa,
+    other_monthly: escrow.other,
+    scenarios: scenarios.map((s) => ({
+      label: s.label,
+      rate: s.rate,
+      down: Math.round(s.down),
+      loan: Math.round(s.totalLoan),
+      principal_interest: Math.round(s.pi),
+      mortgage_insurance: Math.round(s.mi),
+      monthly_total: Math.round(s.total),
+      cash_to_close: Math.round(s.cashToClose),
+    })),
+  } : null
+  const estimateKey = JSON.stringify(estimate)
+  useEffect(() => { onEstimate?.(estimateKey === 'null' ? null : JSON.parse(estimateKey)) }, [estimateKey, onEstimate])
 
   const rows = [
     { section: 'Loan' },
     { label: 'Down payment', get: (s) => (s.downLabel ? `${usd(s.down)} (${s.downLabel})` : usd(s.down)) },
+    { label: 'Interest rate', get: (s) => `${s.rate}%` },
     { label: 'Base loan amount', get: (s) => usd(s.baseLoan) },
-    { label: 'Upfront MIP (1.75%, financed)', get: (s) => (s.upfrontMip ? usd(s.upfrontMip) : '—') },
+    !investor && { label: 'Upfront MIP (1.75%, financed)', get: (s) => (s.upfrontMip ? usd(s.upfrontMip) : '—') },
     { label: 'Total loan amount', get: (s) => usd(s.totalLoan) },
     { section: 'Monthly payment' },
     { label: 'Principal & interest', get: (s) => usd(s.pi) },
@@ -160,18 +221,23 @@ export default function PaymentBreakdown({ property }) {
     { section: 'Cash to close' },
     { label: 'Down payment', get: (s) => usd(s.down) },
     { label: `Est. closing costs (${closingPct || 0}%)`, get: (s) => usd(s.closingCosts) },
-    { label: 'HUD pays closing costs (up to 3%)', get: (s) => (s.credit ? `−${usd(s.credit)}` : '—'), credit: true },
+    !investor && { label: `HUD pays closing costs (${Math.min(hudCreditPct, 3)}% requested)`, get: (s) => (s.credit ? `−${usd(s.credit)}` : '—'), credit: true },
     { label: 'Estimated cash to close', get: (s) => usd(s.cashToClose), strong: true },
-  ]
+  ].filter(Boolean)
+
+  if (!listPrice) return null
 
   return (
     <div className="bg-white border rounded-lg p-6 mb-8">
       <h2 className="text-2xl font-bold mb-1 flex items-center">
         <Calculator className="h-6 w-6 mr-2 text-blue-600" />
-        Owner-Occupant Payment Breakdown
+        {investor ? 'Investor Payment Breakdown' : 'Owner-Occupant Payment Breakdown'}
       </h2>
       <p className="text-gray-600 mb-6">
-        Compare HUD's $100 down FHA program against a standard FHA or conventional purchase at {usd(price)}.
+        {investor
+          ? `Investment-property loans at 10%, 20% and 25% down on a ${usd(price)} purchase. Investors pay their own closing costs.`
+          : `Compare HUD's $100 down FHA program against a standard FHA or conventional purchase at ${usd(price)}.`}
+        {termsOffer > 0 && price === termsOffer && <span className="block text-sm text-blue-700 mt-1">Following the offer you're preparing above.</span>}
       </p>
 
       {/* Offer price */}
@@ -233,11 +299,19 @@ export default function PaymentBreakdown({ property }) {
             ))}
           </div>
 
+          {investor ? (
+            <p className="mb-6 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
+              Each step from 10% to 25% down adds about <strong>{usd(scenarios[2].cashToClose - scenarios[0].cashToClose)}</strong> to
+              cash to close and lowers the payment by about <strong>{usd(scenarios[0].total - scenarios[2].total)}/mo</strong>. 10% down
+              investor loans are usually portfolio or non-QM loans priced above the rate shown; ask your lender for each tier.
+            </p>
+          ) : (
           <p className="mb-6 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800">
             With HUD's $100 down and up to 3% toward closing costs, an owner-occupant could bring about{' '}
             <strong>{usd(Math.max(0, standardFha.cashToClose - hud.cashToClose))} less</strong> to closing than a
             standard 3.5% down FHA purchase.
           </p>
+          )}
 
           {/* Inputs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -252,8 +326,14 @@ export default function PaymentBreakdown({ property }) {
             <NumberField label="Insurance / yr" prefix="$" value={annualInsurance} onChange={setAnnualInsurance} step={50} hint="Coastal homes run higher" />
             <NumberField label="HOA dues / mo" prefix="$" value={hoa} onChange={setHoa} step={5} hint="If applicable" />
             <NumberField label="Other fees / mo" prefix="$" value={otherFees} onChange={setOtherFees} step={5} hint="Flood ins., special assessments" />
-            <NumberField label="FHA rate" suffix="%" value={fhaRate} onChange={setFhaRate} step={0.125} />
-            <NumberField label="Conventional rate" suffix="%" value={convRate} onChange={setConvRate} step={0.125} />
+            {investor ? (
+              <NumberField label="Investor loan rate" suffix="%" value={investorRate} onChange={setInvestorRate} step={0.125} hint="Investment property" />
+            ) : (
+              <>
+                <NumberField label="FHA rate" suffix="%" value={fhaRate} onChange={setFhaRate} step={0.125} />
+                <NumberField label="Conventional rate" suffix="%" value={convRate} onChange={setConvRate} step={0.125} />
+              </>
+            )}
             <NumberField label="Closing costs" suffix="%" value={closingPct} onChange={setClosingPct} step={0.25} hint="Of purchase price" />
             <div className="col-span-2 lg:col-span-1 grid grid-cols-2 gap-2">
               <label className="block">
@@ -267,7 +347,7 @@ export default function PaymentBreakdown({ property }) {
                   <option value={15}>15 yr</option>
                 </select>
               </label>
-              <label className="block">
+              {!investor && <label className="block">
                 <span className="text-sm text-gray-600">Conv. down</span>
                 <select
                   value={convDownPct}
@@ -278,7 +358,7 @@ export default function PaymentBreakdown({ property }) {
                     <option key={p} value={p}>{p}%</option>
                   ))}
                 </select>
-              </label>
+              </label>}
             </div>
           </div>
 

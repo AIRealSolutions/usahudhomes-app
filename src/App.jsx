@@ -797,6 +797,9 @@ function PropertyDetailPage() {
   const [loading, setLoading] = useState(true)
   const [showAddressGate, setShowAddressGate] = useState(false)
   const [sidebarTab, setSidebarTab] = useState('agent') // 'agent' or 'property'
+  // The offer being prepared drives the payment breakdown; its financing estimate is saved with the offer
+  const [offerTerms, setOfferTerms] = useState(null)
+  const [financingEstimate, setFinancingEstimate] = useState(null)
 
   useEffect(() => {
     async function loadProperty() {
@@ -994,7 +997,7 @@ function PropertyDetailPage() {
           </div>
 
           <div id="prepare-offer" className="mb-8 scroll-mt-24">
-            {user ? <BuyerBidBuilder user={user} property={property} /> : (
+            {user ? <BuyerBidBuilder user={user} property={property} onTermsChange={setOfferTerms} financingEstimate={financingEstimate} /> : (
               <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
                 <h2 className="text-xl font-bold">Prepare an Offer for This Property</h2>
                 <p className="mt-2 text-sm">Sign in to prepare an offer. The form stays with this property's details, and saved offers appear in your dashboard.</p>
@@ -1056,7 +1059,7 @@ function PropertyDetailPage() {
 
           {/* Monthly payment and cash to close: HUD $100 down vs standard FHA vs conventional (members only) */}
           {user ? (
-            <PaymentBreakdown property={property} />
+            <PaymentBreakdown property={property} offerTerms={offerTerms} onEstimate={setFinancingEstimate} />
           ) : (
             <SignUpGate
               icon={Calculator}

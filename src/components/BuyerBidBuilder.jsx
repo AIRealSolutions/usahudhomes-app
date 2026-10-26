@@ -18,7 +18,7 @@ const fetchAllOffers = async () => {
   rows.push(...(data||[]));if(!data||data.length<1000)return rows
  }
 }
-export default function BuyerBidBuilder({ user, property }) {
+export default function BuyerBidBuilder({ user, property, onTermsChange, financingEstimate }) {
  const [searchParams,setSearchParams]=useSearchParams()
  const [historical,setHistorical]=useState([])
  const [statsError,setStatsError]=useState('')
@@ -134,6 +134,8 @@ export default function BuyerBidBuilder({ user, property }) {
  const meter=dealMeter({offers:historical,occupancy:form.occupancy,state,days:dom,reduced,netRatio,excludeCase:form.case_number})
  const outlook=!reduced?priceCutOutlook({offers:historical,occupancy:form.occupancy,state,days:dom,asking,deductionPercent,excludeCase:form.case_number}):null
  const assessment=ratios.length<5||netRatio===null?'Insufficient comparable data':percentile>=65?'Above historical median':percentile>=35?'Near historical median':'Below historical median'
+ useEffect(()=>{onTermsChange?.({offerPrice:Number(form.offer_price)||0,occupancy:form.occupancy,closingAssistPercent:percent(form.closing_cost_percent)})},[form.offer_price,form.occupancy,form.closing_cost_percent,onTermsChange])
+ const estimateForOffer=financingEstimate&&financingEstimate.price===Number(form.offer_price)&&financingEstimate.occupancy===form.occupancy?financingEstimate:null
  const save=async(status)=>{
   if(!user?.id)return setMessage('Please sign in to save an offer.')
   if(!['owner','investor'].includes(form.occupancy))return setMessage('Choose owner occupant or investor before continuing.')
@@ -146,7 +148,7 @@ export default function BuyerBidBuilder({ user, property }) {
   setBusy(true);setMessage('')
   const {id,created_at,updated_at,submitted_at,buyer_id,consultation_id,assigned_broker_id,status:oldStatus,...offerFields}=form
   const commissionSummary=`\n[HUD net estimate] Listing commission: ${percent(commission.listing)}%; buyer broker commission: ${percent(commission.buyer)}%; closing assistance: ${percent(form.closing_cost_percent)}%; estimated HUD net: ${money(hudNet)}. Broker to verify.`
-  const payload={...offerFields,notes:(form.notes||'').replace(/\n?\[HUD net estimate\][^\n]*/g,'')+commissionSummary,case_number:form.case_number,buyer_id:user.id,asking_price:form.asking_price===''?null:Number(form.asking_price),offer_price:Number(form.offer_price),closing_cost_percent:Number(form.closing_cost_percent),earnest_money:Number(form.earnest_money),est_net_to_hud:Math.round(hudNet*100)/100,net_to_list:netRatio!==null?Math.round(netRatio*10000)/10000:null,days_on_market:dom,deal_meter_score:meter?.score??null,deal_meter_sample:meter?.sample??null,deal_meter_basis:meter?.basis??null,status,submitted_at:status==='submitted'?new Date().toISOString():null,updated_at:new Date().toISOString()}
+  const payload={...offerFields,notes:(form.notes||'').replace(/\n?\[HUD net estimate\][^\n]*/g,'')+commissionSummary,case_number:form.case_number,buyer_id:user.id,asking_price:form.asking_price===''?null:Number(form.asking_price),offer_price:Number(form.offer_price),closing_cost_percent:Number(form.closing_cost_percent),earnest_money:Number(form.earnest_money),est_net_to_hud:Math.round(hudNet*100)/100,net_to_list:netRatio!==null?Math.round(netRatio*10000)/10000:null,days_on_market:dom,deal_meter_score:meter?.score??null,deal_meter_sample:meter?.sample??null,deal_meter_basis:meter?.basis??null,financing_estimate:estimateForOffer,status,submitted_at:status==='submitted'?new Date().toISOString():null,updated_at:new Date().toISOString()}
   const {error}=form.id?await supabase.from('buyer_bid_drafts').update(payload).eq('id',form.id).eq('buyer_id',user.id):await supabase.from('buyer_bid_drafts').insert(payload)
   setBusy(false)
   if(error)return setMessage(error.message)
@@ -190,6 +192,7 @@ export default function BuyerBidBuilder({ user, property }) {
    <label className="block text-sm font-medium text-gray-700">Listing / seller broker commission (%)<input className="mt-1 w-full border rounded-lg p-2" type="number" min="0" max="100" step="0.1" value={commission.listing} onChange={e=>setCommission(v=>({...v,listing:e.target.value}))} /></label>
    <label className="block text-sm font-medium text-gray-700">Buyer broker commission (%)<input className="mt-1 w-full border rounded-lg p-2" type="number" min="0" max="100" step="0.1" value={commission.buyer} onChange={e=>setCommission(v=>({...v,buyer:e.target.value}))} /></label>
   </div>
+  <p className="text-sm text-gray-600">The payment breakdown below follows this offer{form.occupancy==='investor'?' with investor loans at 10%, 20% and 25% down':''}. Its estimate is saved with your offer.</p>
   <label className="block text-sm font-medium">Notes for broker<textarea className="block w-full border rounded-lg p-2 mt-1" value={form.notes} onChange={e=>change('notes',e.target.value)} /></label>
   <div className="bg-blue-50 p-4 rounded-lg space-y-1"><p>Gross offer: <strong>{money(offerAmount)}</strong></p><p>Less requested closing assistance ({percent(form.closing_cost_percent)}%): −{money(assistance)}</p><p>Less listing commission ({percent(commission.listing)}%): −{money(listingCommission)}</p><p>Less buyer broker commission ({percent(commission.buyer)}%): −{money(buyerCommission)}</p><p className="border-t border-blue-200 pt-2 font-bold">Estimated net to HUD: {money(hudNet)}</p><p className="text-xs mt-2">Illustrative calculation only. All percentages are based on gross offer price. Commissions and assistance must be approved and may be subject to HUD limits; broker must verify actual bid amounts and other deductions.</p></div>
   <div className="border rounded-xl p-4 space-y-3">
