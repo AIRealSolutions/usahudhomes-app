@@ -23,7 +23,7 @@ import {
   ChevronLeft, ChevronRight, Menu, X, LogOut, Bell, RefreshCw,
   Phone, Mail, CheckCircle, Clock, AlertCircle,
   ArrowRight, Inbox, Share2, User, BarChart2, Shield,
-  ChevronDown, Search, Trash2, AlertTriangle, CheckSquare, Square, Briefcase, Gavel
+  ChevronDown, Search, Trash2, AlertTriangle, CheckSquare, Square, Briefcase, Gavel, UserPlus
 } from 'lucide-react'
 
 // ── Lazy-loaded leaf components ───────────────────────────────────────────────
@@ -38,6 +38,7 @@ const BrokerPropertySearch   = lazy(() => import('./broker/BrokerPropertySearch'
 const AddToClientsModal      = lazy(() => import('./broker/AddToClientsModal'))
 const ActivityFeed           = lazy(() => import('./dashboard/ActivityFeed'))
 const BidCalendar            = lazy(() => import('./dashboard/BidCalendar'))
+const InviteClientsPanel     = lazy(() => import('./invites/InviteClientsPanel'))
 
 // ── Navigation config ─────────────────────────────────────────────────────────
 const NAV_SECTIONS = [
@@ -53,6 +54,7 @@ const NAV_SECTIONS = [
       { id: 'active-leads',    label: 'Active Leads',      icon: Users,           color: 'text-green-500',  alertKey: 'activeLeads' },
       { id: 'referrals',       label: 'Referral Inbox',    icon: Inbox,           color: 'text-orange-500', alertKey: 'pendingReferrals' },
       { id: 'offer-marketplace', label: 'Offer-Ready Referrals', icon: Gavel, color: 'text-amber-600' },
+      { id: 'invite-clients',  label: 'Invite Clients',    icon: UserPlus,        color: 'text-green-600' },
     ]
   },
   {
@@ -1494,6 +1496,12 @@ export default function BrokerShell({ user, showAdminAccess }) {
         )
       case 'offer-marketplace':
         return <OfferReferralMarketplace />
+      case 'invite-clients':
+        return (
+          <Suspense fallback={<PanelFallback />}>
+            <InviteClientsPanel mode="broker" />
+          </Suspense>
+        )
       case 'ai-properties':
         return <FindPropertiesPanel agentId={agentId} />
       case 'share-analytics':

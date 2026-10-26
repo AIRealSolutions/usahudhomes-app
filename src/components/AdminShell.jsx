@@ -8,6 +8,7 @@
  *   hud-scraper       → HUDScrapeManager
  *   property-search   → PropertySearchTab
  *   leads             → LeadAdmin
+ *   invite-clients    → InviteClientsPanel (mode="admin")
  *   customers         → LeadAdmin (legacy id; Customers tab on Leads)
  *   referrals         → LeadAdmin (legacy id; merged into Leads)
  *   consultations     → LeadAdmin (legacy id; Assigned Leads tab on Leads)
@@ -36,7 +37,7 @@ import {
   Film, Zap, BookOpen, Layout,
   Facebook, Bot, HardDrive, Trash2,
   LogOut, ChevronLeft, ChevronRight, Menu, X,
-  ChevronDown, ChevronUp, Bell, Shield, Briefcase, Settings
+  ChevronDown, ChevronUp, Bell, Shield, Briefcase, Settings, UserPlus
 } from 'lucide-react'
 
 // Lazy-load all admin panels
@@ -45,6 +46,7 @@ const PropertyAdmin       = lazy(() => import('./admin/PropertyAdmin'))
 const HUDScrapeManager    = lazy(() => import('./admin/HUDScrapeManager'))
 const PropertySearchTab   = lazy(() => import('./admin/PropertySearchTab'))
 const LeadAdmin           = lazy(() => import('./admin/LeadsHub'))
+const InviteClientsPanel  = lazy(() => import('./invites/InviteClientsPanel'))
 const OfferReferralMarketplace = lazy(() => import('./broker/OfferReferralMarketplace'))
 const AgentAdmin          = lazy(() => import('./admin/AgentAdmin'))
 const AgentApplicationsAdmin = lazy(() => import('./admin/AgentApplicationsAdmin'))
@@ -85,6 +87,7 @@ const NAV = [
     items: [
       { id: 'leads',            label: 'Leads',             icon: MessageSquare, color: 'text-orange-500', alertKey: 'newLeads' },
       { id: 'offer-referrals', label: 'Unassigned Offers', icon: Gavel, color: 'text-amber-600' },
+      { id: 'invite-clients',   label: 'Invite Clients',    icon: UserPlus,      color: 'text-green-600', badge: 'NEW' },
     ]
   },
   {
@@ -125,6 +128,7 @@ const COMPONENT_MAP = {
   'customers':         LeadAdmin, // legacy tab id — Customers is a tab on Leads
   'referrals':         LeadAdmin, // legacy tab id — Referrals merged into Leads
   'offer-referrals':   () => <OfferReferralMarketplace admin />,
+  'invite-clients':    () => <InviteClientsPanel mode="admin" />,
   'consultations':     LeadAdmin, // legacy tab id — Assigned Leads is a tab on Leads
   'email-templates':   EmailTemplateEditor,
   'agents':            AgentAdmin,
