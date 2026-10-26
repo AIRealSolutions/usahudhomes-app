@@ -1,12 +1,23 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { Link, useSearchParams } from 'react-router-dom'
+import { dealMeter, daysOnMarket, meterLabel, offerForRatio } from '../lib/dealMeter'
+import { DealMeterGauge } from './DealMeter'
 
 const initial = { case_number:'', asking_price:'', offer_price:'', occupancy:'', financing:'fha', closing_cost_percent:0, earnest_money:1000, notes:'', referral_consent:false }
 const percent = n => Math.max(0, Math.min(100, Number(n) || 0))
 const money = n => Number(n || 0).toLocaleString('en-US',{style:'currency',currency:'USD'})
 const median = values => { const a=values.filter(Number.isFinite).sort((x,y)=>x-y);if(!a.length)return null;const m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2 }
 const pct = n => Number.isFinite(n)?(n*100).toFixed(1)+'%':'—'
+// Every accepted offer on record, a page at a time (a single select stops at 1,000 rows)
+const fetchAllOffers = async () => {
+ const rows=[]
+ for(let from=0;;from+=1000){
+  const {data,error}=await supabase.from('accepted_offers').select('case_number,city,county,state,net_to_hud,list_price_used,list_price_at_acceptance,original_list_price,purchaser_type,days_on_market').order('accepted_at',{ascending:false}).range(from,from+999)
+  if(error)throw error
+  rows.push(...(data||[]));if(!data||data.length<1000)return rows
+ }
+}
 export default function BuyerBidBuilder({ user, property }) {
  const [searchParams,setSearchParams]=useSearchParams()
  const [historical,setHistorical]=useState([])
@@ -86,9 +97,9 @@ export default function BuyerBidBuilder({ user, property }) {
   if(!property?.case_number)return
   let active=true;setStatsLoading(true);setStatsError('');setHistorical([]);setListing(null)
   Promise.all([
-   supabase.from('properties').select('case_number,city,county,state,price').eq('case_number',property.case_number).maybeSingle(),
-   supabase.from('accepted_offers').select('case_number,city,county,state,net_to_hud,list_price_used,list_price_at_acceptance,original_list_price,purchaser_type').limit(1000)
-  ]).then(([p,a])=>{if(!active)return;setStatsLoading(false);if(p.error||a.error){setStatsError(p.error?.message||a.error?.message);return}setListing(p.data);setHistorical(a.data||[])}).catch(e=>{if(active){setStatsLoading(false);setStatsError(e.message)}})
+   supabase.from('properties').select('case_number,city,county,state,price,listing_date').eq('case_number',property.case_number).maybeSingle(),
+   fetchAllOffers()
+  ]).then(([p,a])=>{if(!active)return;setStatsLoading(false);if(p.error){setStatsError(p.error.message);return}setListing(p.data);setHistorical(a)}).catch(e=>{if(active){setStatsLoading(false);setStatsError(e.message)}})
   return()=>{active=false}
  },[property?.case_number])
  const state=String(listing?.state||property?.state||'').toUpperCase()
@@ -116,6 +127,9 @@ export default function BuyerBidBuilder({ user, property }) {
  const hudNet=offerAmount-assistance-listingCommission-buyerCommission
  const netRatio=asking>0?hudNet/asking:null
  const percentile=netRatio!==null&&ratios.length?Math.round(100*ratios.filter(x=>x<=netRatio).length/ratios.length):null
+ const dom=daysOnMarket(listing?.listing_date||property?.listing_date)
+ const deductionPercent=percent(form.closing_cost_percent)+percent(commission.listing)+percent(commission.buyer)
+ const meter=dealMeter({offers:historical,occupancy:form.occupancy,state,days:dom,netRatio,excludeCase:form.case_number})
  const assessment=ratios.length<5||netRatio===null?'Insufficient comparable data':percentile>=65?'Above historical median':percentile>=35?'Near historical median':'Below historical median'
  const save=async(status)=>{
   if(!user?.id)return setMessage('Please sign in to save an offer.')
@@ -129,7 +143,7 @@ export default function BuyerBidBuilder({ user, property }) {
   setBusy(true);setMessage('')
   const {id,created_at,updated_at,submitted_at,buyer_id,consultation_id,assigned_broker_id,status:oldStatus,...offerFields}=form
   const commissionSummary=`\n[HUD net estimate] Listing commission: ${percent(commission.listing)}%; buyer broker commission: ${percent(commission.buyer)}%; closing assistance: ${percent(form.closing_cost_percent)}%; estimated HUD net: ${money(hudNet)}. Broker to verify.`
-  const payload={...offerFields,notes:(form.notes||'').replace(/\n?\[HUD net estimate\][^\n]*/g,'')+commissionSummary,case_number:form.case_number,buyer_id:user.id,asking_price:form.asking_price===''?null:Number(form.asking_price),offer_price:Number(form.offer_price),closing_cost_percent:Number(form.closing_cost_percent),earnest_money:Number(form.earnest_money),status,submitted_at:status==='submitted'?new Date().toISOString():null,updated_at:new Date().toISOString()}
+  const payload={...offerFields,notes:(form.notes||'').replace(/\n?\[HUD net estimate\][^\n]*/g,'')+commissionSummary,case_number:form.case_number,buyer_id:user.id,asking_price:form.asking_price===''?null:Number(form.asking_price),offer_price:Number(form.offer_price),closing_cost_percent:Number(form.closing_cost_percent),earnest_money:Number(form.earnest_money),est_net_to_hud:Math.round(hudNet*100)/100,net_to_list:netRatio!==null?Math.round(netRatio*10000)/10000:null,days_on_market:dom,deal_meter_score:meter?.score??null,deal_meter_sample:meter?.sample??null,deal_meter_basis:meter?.basis??null,status,submitted_at:status==='submitted'?new Date().toISOString():null,updated_at:new Date().toISOString()}
   const {error}=form.id?await supabase.from('buyer_bid_drafts').update(payload).eq('id',form.id).eq('buyer_id',user.id):await supabase.from('buyer_bid_drafts').insert(payload)
   setBusy(false)
   if(error)return setMessage(error.message)
@@ -177,6 +191,15 @@ export default function BuyerBidBuilder({ user, property }) {
   <div className="bg-blue-50 p-4 rounded-lg space-y-1"><p>Gross offer: <strong>{money(offerAmount)}</strong></p><p>Less requested closing assistance ({percent(form.closing_cost_percent)}%): −{money(assistance)}</p><p>Less listing commission ({percent(commission.listing)}%): −{money(listingCommission)}</p><p>Less buyer broker commission ({percent(commission.buyer)}%): −{money(buyerCommission)}</p><p className="border-t border-blue-200 pt-2 font-bold">Estimated net to HUD: {money(hudNet)}</p><p className="text-xs mt-2">Illustrative calculation only. All percentages are based on gross offer price. Commissions and assistance must be approved and may be subject to HUD limits; broker must verify actual bid amounts and other deductions.</p></div>
   <div className="border rounded-xl p-4 space-y-3">
    <h3 className="text-lg font-bold">Offer competitiveness &amp; statistics</h3>
+   {!statsLoading&&!statsError&&<div className="grid md:grid-cols-[auto,1fr] gap-4 items-center rounded-lg bg-gray-50 p-4">
+    {meter?<div className="text-center"><DealMeterGauge score={meter.score} /><p className="font-bold -mt-1">{meterLabel(meter.score)}</p></div>:<p className="text-sm">Deal meter needs accepted offers from {form.occupancy==='owner'?'owner-occupant':'investor'} buyers to compare against.</p>}
+    <div className="space-y-2 text-sm">
+     <p className="font-semibold text-base">Deal meter{dom!==null?<> · on the market {dom} day{dom===1?'':'s'}</>:null}</p>
+     {meter&&<p>Your net to HUD of <strong>{money(hudNet)}</strong> ({pct(netRatio)} of asking) is at or above <strong>{meter.score}%</strong> of {meter.sample} {meter.basis}.</p>}
+     {meter&&<div className="grid grid-cols-3 gap-2">{[['Typical low',meter.p25],['Median',meter.p50],['Typical high',meter.p75]].map(([label,r])=><div key={label} className="rounded border bg-white p-2"><p className="text-gray-500 text-xs">{label} net / list</p><strong>{pct(r)}</strong><p className="text-xs text-gray-600">Offer ≈ {money(offerForRatio(r,asking,deductionPercent))}</p></div>)}</div>}
+     <p className="text-xs text-gray-500">Net to HUD here subtracts {form.occupancy==='owner'?'the closing assistance you request plus ':''}both commissions, so owner-occupant and investor offers at the same price net HUD different amounts. Offer amounts above are what this offer would need to match each net level with your current closing and commission settings.</p>
+    </div>
+   </div>}
    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
     <div><p className="text-gray-500">Asking price</p><strong>{asking?money(asking):'Unavailable'}</strong></div>
     <div><p className="text-gray-500">Estimated net to HUD</p><strong>{money(hudNet)}</strong></div>
