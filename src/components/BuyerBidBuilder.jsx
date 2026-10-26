@@ -1,8 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { Link, useSearchParams } from 'react-router-dom'
-import { dealMeter, daysOnMarket, isPriceReduced, meterLabel, offerForRatio, priceCutOutlook, PRICE_CUT } from '../lib/dealMeter'
+import { acceptanceTimeline, dealMeter, daysOnMarket, isPriceReduced, meterLabel, offerForRatio, priceCutOutlook, PRICE_CUT } from '../lib/dealMeter'
 import { DealMeterGauge } from './DealMeter'
+import OfferWizard from './OfferWizard'
+
+const MODE_KEY='offer-builder-mode'
+const readMode=()=>{try{return localStorage.getItem(MODE_KEY)==='full'?'full':'guided'}catch{return 'guided'}}
 
 const initial = { case_number:'', asking_price:'', offer_price:'', occupancy:'', financing:'fha', closing_cost_percent:0, earnest_money:1000, notes:'', referral_consent:false }
 const percent = n => Math.max(0, Math.min(100, Number(n) || 0))
@@ -31,6 +35,9 @@ export default function BuyerBidBuilder({ user, property, onTermsChange, financi
  const [secureMessage,setSecureMessage]=useState('')
  const offerId=searchParams.get('offer')
  const editingRef=useRef(null)
+ const [mode,setModeState]=useState(readMode)
+ const setMode=m=>{setModeState(m);try{localStorage.setItem(MODE_KEY,m)}catch{/* private window */}}
+ const [loanRate,setLoanRate]=useState(6.25)
  const [commission,setCommission]=useState({listing:3,buyer:3}), [form,setForm]=useState(initial), [bids,setBids]=useState([]), [busy,setBusy]=useState(false), [message,setMessage]=useState('')
  useEffect(()=>{supabase.from('closing_agents').select('id,company_name,city,state').eq('active',true).order('company_name').limit(500).then(({data})=>setAgents(data||[]))},[])
  useEffect(()=>{
@@ -68,6 +75,7 @@ export default function BuyerBidBuilder({ user, property, onTermsChange, financi
  const change=(key,value)=>setForm(old=>({...old,[key]:value}))
  const chooseBuyerType=(type)=>{
   if(!['owner','investor'].includes(type))return
+  setLoanRate(type==='investor'?7.25:6.25)
   setForm(old=>({...old,occupancy:type,financing:type==='investor'&&['fha','203k'].includes(old.financing)?'cash':old.financing,closing_cost_percent:type==='investor'?0:old.closing_cost_percent}))
   setMessage('')
  }
@@ -133,8 +141,9 @@ export default function BuyerBidBuilder({ user, property, onTermsChange, financi
  const originalList=Number(listing?.original_list_price||property?.original_list_price)||0
  const meter=dealMeter({offers:historical,occupancy:form.occupancy,state,days:dom,reduced,netRatio,excludeCase:form.case_number})
  const outlook=!reduced?priceCutOutlook({offers:historical,occupancy:form.occupancy,state,days:dom,asking,deductionPercent,excludeCase:form.case_number}):null
+ const timeline=acceptanceTimeline({offers:historical,occupancy:form.occupancy,state,days:dom,asking,reduced,hudNet,deductionPercent,excludeCase:form.case_number})
  const assessment=ratios.length<5||netRatio===null?'Insufficient comparable data':percentile>=65?'Above historical median':percentile>=35?'Near historical median':'Below historical median'
- useEffect(()=>{onTermsChange?.({offerPrice:Number(form.offer_price)||0,occupancy:form.occupancy,closingAssistPercent:percent(form.closing_cost_percent)})},[form.offer_price,form.occupancy,form.closing_cost_percent,onTermsChange])
+ useEffect(()=>{onTermsChange?.({offerPrice:Number(form.offer_price)||0,occupancy:form.occupancy,closingAssistPercent:percent(form.closing_cost_percent),loanRate:Number(loanRate)||0})},[form.offer_price,form.occupancy,form.closing_cost_percent,loanRate,onTermsChange])
  const estimateForOffer=financingEstimate&&financingEstimate.price===Number(form.offer_price)&&financingEstimate.occupancy===form.occupancy?financingEstimate:null
  const save=async(status)=>{
   if(!user?.id)return setMessage('Please sign in to save an offer.')
@@ -148,7 +157,7 @@ export default function BuyerBidBuilder({ user, property, onTermsChange, financi
   setBusy(true);setMessage('')
   const {id,created_at,updated_at,submitted_at,buyer_id,consultation_id,assigned_broker_id,status:oldStatus,...offerFields}=form
   const commissionSummary=`\n[HUD net estimate] Listing commission: ${percent(commission.listing)}%; buyer broker commission: ${percent(commission.buyer)}%; closing assistance: ${percent(form.closing_cost_percent)}%; estimated HUD net: ${money(hudNet)}. Broker to verify.`
-  const payload={...offerFields,notes:(form.notes||'').replace(/\n?\[HUD net estimate\][^\n]*/g,'')+commissionSummary,case_number:form.case_number,buyer_id:user.id,asking_price:form.asking_price===''?null:Number(form.asking_price),offer_price:Number(form.offer_price),closing_cost_percent:Number(form.closing_cost_percent),earnest_money:Number(form.earnest_money),est_net_to_hud:Math.round(hudNet*100)/100,net_to_list:netRatio!==null?Math.round(netRatio*10000)/10000:null,days_on_market:dom,deal_meter_score:meter?.score??null,deal_meter_sample:meter?.sample??null,deal_meter_basis:meter?.basis??null,financing_estimate:estimateForOffer,status,submitted_at:status==='submitted'?new Date().toISOString():null,updated_at:new Date().toISOString()}
+  const payload={...offerFields,notes:(form.notes||'').replace(/\n?\[HUD net estimate\][^\n]*/g,'')+commissionSummary,case_number:form.case_number,buyer_id:user.id,asking_price:form.asking_price===''?null:Number(form.asking_price),offer_price:Number(form.offer_price),closing_cost_percent:Number(form.closing_cost_percent),earnest_money:Number(form.earnest_money),est_net_to_hud:Math.round(hudNet*100)/100,net_to_list:netRatio!==null?Math.round(netRatio*10000)/10000:null,days_on_market:dom,deal_meter_score:meter?.score??null,deal_meter_sample:meter?.sample??null,deal_meter_basis:meter?.basis??null,financing_estimate:estimateForOffer,accept_wait_low_days:timeline?.possible?.wait??null,accept_wait_days:timeline?.likely?.wait??null,status,submitted_at:status==='submitted'?new Date().toISOString():null,updated_at:new Date().toISOString()}
   const {error}=form.id?await supabase.from('buyer_bid_drafts').update(payload).eq('id',form.id).eq('buyer_id',user.id):await supabase.from('buyer_bid_drafts').insert(payload)
   setBusy(false)
   if(error)return setMessage(error.message)
@@ -173,6 +182,8 @@ export default function BuyerBidBuilder({ user, property, onTermsChange, financi
  return <section className="bg-white rounded-xl shadow p-6 mb-8 space-y-5">
   <div><h2 className="text-2xl font-bold">{form.id?'Edit Draft Offer':'My HUD Offers'}</h2><p className="text-gray-600">Prepare an offer for broker review. Only a HUD-authorized broker can submit an official HUD bid.</p></div>
   {form.id&&<button type="button" className="text-blue-700 underline text-sm" onClick={()=>{editingRef.current=null;setSearchParams(old=>{const next=new URLSearchParams(old);next.delete('offer');return next},{replace:true});setForm({...initial,case_number:property.case_number,asking_price:property.price??'',offer_price:property.price??''});setCommission({listing:3,buyer:3});setMessage('Edit cancelled.')}}>Cancel editing</button>}
+  {mode==='guided'?<OfferWizard form={form} change={change} chooseBuyerType={chooseBuyerType} commission={commission} setCommission={setCommission} property={property} asking={asking} dom={dom} reduced={reduced} originalList={originalList} hudNet={hudNet} netRatio={netRatio} assistance={assistance} listingCommission={listingCommission} buyerCommission={buyerCommission} meter={meter} timeline={timeline} estimate={estimateForOffer} statsLoading={statsLoading} statsError={statsError} message={message} busy={busy} save={save} loanRate={loanRate} setLoanRate={setLoanRate} onShowFullForm={()=>setMode('full')} />:<>
+  <button type="button" className="text-sm text-blue-700 underline" onClick={()=>setMode('guided')}>Use the step-by-step offer builder</button>
   <fieldset className="border rounded-xl p-4 space-y-3">
    <legend className="font-bold text-lg px-1">1. Are you buying this HUD home to live in or as an investment?</legend>
    <div className="grid sm:grid-cols-2 gap-3">
@@ -223,6 +234,7 @@ export default function BuyerBidBuilder({ user, property, onTermsChange, financi
   {message&&<p role="status" className="text-blue-800">{message}</p>}
   <label className="flex gap-2 items-start text-sm"><input type="checkbox" checked={!!form.referral_consent} onChange={e=>change("referral_consent",e.target.checked)} /> If no broker is assigned, I authorize USAHUDhomes to share a limited, non-identifying offer summary with eligible brokers for referral matching. Buyer contact information stays private until assignment.</label>
   <div className="flex flex-wrap gap-3"><button disabled={busy} onClick={()=>save('draft')} className="bg-gray-800 text-white rounded-lg px-4 py-2 disabled:opacity-50">{form.id?'Update draft':'Save draft'}</button><button disabled={busy} onClick={()=>save('submitted')} className="bg-blue-700 text-white rounded-lg px-4 py-2 disabled:opacity-50">Send proposal for review</button></div>
+  </>}
   </>}
   {['owner','investor'].includes(form.occupancy)&&<div className="border rounded-xl p-4 space-y-4">
    <h3 className="text-lg font-bold">Private buyer details &amp; supporting documents</h3>

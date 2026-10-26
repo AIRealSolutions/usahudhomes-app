@@ -110,3 +110,62 @@ export const meterTone = s => (s >= 75 ? 'green' : s >= 50 ? 'lime' : s >= 25 ? 
 /** Offer price whose net to HUD reaches a given net-to-list ratio, after % deductions */
 export const offerForRatio = (ratio, asking, deductionPercent) =>
   ratio && asking > 0 && deductionPercent < 100 ? (ratio * asking) / (1 - deductionPercent / 100) : null
+
+/**
+ * How long an offer may wait for acceptance if it stays where it is. HUD cuts the price about
+ * 10% every 30 days a home goes unsold, and the net it accepts falls with the price and with
+ * days on market. For each future day this projects the list price and the typical (median)
+ * and low-end (25th percentile) accepted net, then finds when this offer's net clears them.
+ */
+export function acceptanceTimeline({ offers, occupancy, state, days, asking, reduced = false, hudNet, deductionPercent, excludeCase, horizon = 180 }) {
+  if (!(asking > 0) || !(hudNet > 0) || !['owner', 'investor'].includes(occupancy)) return null
+  const st = String(state || '').toUpperCase()
+  const rows = comparableRows(offers, occupancy, excludeCase)
+  const cache = new Map()
+  const levels = (band, cut) => {
+    const key = `${band}|${cut}`
+    if (!cache.has(key)) {
+      const stage = rows.filter(o => !!o.reduced === cut)
+      cache.set(key, summarize([
+        st && { rows: stage.filter(o => o.state === st && o.band === band), basis: '' },
+        { rows: stage.filter(o => o.band === band), basis: '' },
+        { rows: rows.filter(o => o.band === band), basis: '' },
+        { rows: stage, basis: '' },
+      ]))
+    }
+    return cache.get(key)
+  }
+  const start = Number.isFinite(days) ? days : 0
+  const step = PRICE_CUT.day
+  const at = d => {
+    const cuts = Math.floor(d / step) - Math.floor(start / step)
+    const list = asking * Math.pow(1 - PRICE_CUT.percent / 100, cuts)
+    const stats = levels(ageBand(d), reduced || cuts > 0)
+    if (!stats) return null
+    return {
+      day: d, wait: d - start, cuts, list,
+      typicalNet: stats.p50 * list, lowNet: stats.p25 * list,
+      offerForTypical: offerForRatio(stats.p50, list, deductionPercent),
+    }
+  }
+  let possible = null, likely = null
+  for (let d = start; d <= start + horizon; d++) {
+    const p = at(d)
+    if (!p) return null
+    if (possible === null && hudNet >= p.lowNet) possible = p
+    if (likely === null && hudNet >= p.typicalNet) { likely = p; break }
+  }
+  // Today plus the next few price-cut days, for a simple schedule
+  const marks = [start]
+  for (let d = (Math.floor(start / step) + 1) * step; marks.length < 5; d += step) marks.push(d)
+  return { daysKnown: Number.isFinite(days), possible, likely, schedule: marks.map(at).filter(Boolean) }
+}
+
+/** Plain-language wait, e.g. "now", "in about 3 weeks", "in about 2 months" */
+export function waitLabel(waitDays) {
+  if (waitDays == null) return 'not within 6 months'
+  if (waitDays <= 0) return 'now'
+  if (waitDays < 14) return `in about ${waitDays} day${waitDays === 1 ? '' : 's'}`
+  if (waitDays < 60) return `in about ${Math.round(waitDays / 7)} weeks`
+  return `in about ${Math.round(waitDays / 30)} months`
+}

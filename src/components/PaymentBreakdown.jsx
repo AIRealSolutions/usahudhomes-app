@@ -1,11 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Calculator, Phone, Info } from 'lucide-react'
-
-// Annual FHA MIP (HUD Mortgagee Letter 2023-05), loans at or under the standard limit
-function fhaAnnualMipRate(ltv, termYears) {
-  if (termYears > 15) return ltv > 95 ? 0.0055 : 0.005
-  return ltv > 90 ? 0.004 : 0.0015
-}
+import { fhaAnnualMipRate, monthlyPI, FHA_UPFRONT_MIP } from '../lib/payments'
 
 // Rough conventional PMI by LTV; real quotes depend on credit score and the insurer
 function conventionalPmiRate(ltv) {
@@ -15,14 +10,6 @@ function conventionalPmiRate(ltv) {
   return 0
 }
 
-function monthlyPI(principal, annualRatePct, termYears) {
-  const n = termYears * 12
-  const r = annualRatePct / 100 / 12
-  if (r === 0) return principal / n
-  return (principal * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1)
-}
-
-const FHA_UPFRONT_MIP = 0.0175
 const HUD_CLOSING_CREDIT = 0.03
 
 /**
@@ -150,6 +137,9 @@ export default function PaymentBreakdown({ property, offerTerms, onEstimate }) {
   const termsOffer = Number(offerTerms?.offerPrice) || 0
   useEffect(() => { if (termsOffer > 0) setOffer(termsOffer) }, [termsOffer])
   const investor = offerTerms?.occupancy === 'investor'
+  // The rate the buyer set in the offer builder's budget step
+  const termsRate = Number(offerTerms?.loanRate) || 0
+  useEffect(() => { if (termsRate > 0) (investor ? setInvestorRate : setFhaRate)(termsRate) }, [termsRate, investor])
   // HUD pays the closing help the owner-occupant asks for in the offer (up to 3%)
   const hudCreditPct = offerTerms?.occupancy === 'owner' ? Number(offerTerms.closingAssistPercent) || 0 : HUD_CLOSING_CREDIT * 100
 
