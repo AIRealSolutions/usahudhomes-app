@@ -21,9 +21,13 @@ export default function UserDashboard({ user }) {
     contacted: 0
   })
 
+  const [isReferralAgent, setIsReferralAgent] = useState(false)
+
   useEffect(() => {
     if (user) {
       fetchInquiries()
+      supabase.from('referral_agents').select('id').eq('user_id', user.id).maybeSingle()
+        .then(({ data }) => setIsReferralAgent(!!data))
     }
   }, [user])
 
@@ -105,6 +109,11 @@ export default function UserDashboard({ user }) {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">My Dashboard</h1>
         <p className="mt-2 text-gray-600">Welcome back, {user.email}</p>
+        {isReferralAgent && (
+          <Link to="/agent-referrals" className="mt-3 inline-block bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+            Go to Agent Referrals
+          </Link>
+        )}
       </div>
 
       {/* Stats Cards */}

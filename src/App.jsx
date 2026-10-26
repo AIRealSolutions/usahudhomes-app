@@ -26,6 +26,8 @@ import VerifyEmail from './components/agent/VerifyEmail'
 import ApplicationSubmitted from './components/agent/ApplicationSubmitted'
 import ResendVerification from './components/agent/ResendVerification'
 import SuccessfulDeals from './components/SuccessfulDeals'
+import ReferABuyer from './pages/ReferABuyer'
+import AgentReferrals from './pages/AgentReferrals'
 import FullAdminDashboard from './components/AdminShell'
 import BrokerShell from './components/BrokerShell'
 import HudHomesLanding from './pages/HudHomesLanding'
@@ -222,6 +224,13 @@ function Header() {
                   >
                     Become a Partner
                   </Link>
+                  <Link
+                    to="/refer-a-buyer"
+                    className="text-gray-700 hover:text-blue-600 font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Agents: Refer a Buyer
+                  </Link>
                   <GetQualifiedButton className="py-3" onClick={() => setMobileMenuOpen(false)} />
                   <Link
                     to="/contact"
@@ -320,6 +329,12 @@ function Footer() {
               className="mt-2 block text-blue-300 hover:text-white"
             >
               HUD Homes by State
+            </Link>
+            <Link
+              to="/refer-a-buyer"
+              className="mt-2 block text-blue-300 hover:text-white"
+            >
+              Agents: Refer a Buyer to NC
             </Link>
           </div>
         </div>
@@ -1249,6 +1264,8 @@ export default function App() {
               <Route path="/admin-dashboard" element={<Navigate to="/admin" replace />} />
               <Route path="/unauthorized" element={<Unauthorized />} />
               <Route path="/deals" element={<SuccessfulDeals />} />
+              <Route path="/refer-a-buyer" element={<ReferABuyer />} />
+              <Route path="/agent-referrals" element={<ProtectedRoute><AgentReferrals /></ProtectedRoute>} />
             </Routes>
           </main>
           <Footer />
