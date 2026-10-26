@@ -1,8 +1,6 @@
 -- Next expected HUD price cut for every active home (about 10% after each 30 days at the
--- same price), for the bid calendar. price_cut_watch becomes the day-25+ slice of it.
+-- same price), for the bid calendar. price_cut_watch (day 25+ of a cycle) stays as is.
 -- Signed-in users only: cut timing is bidding strategy, not for anonymous visitors.
-drop view if exists public.price_cut_watch;
-
 create or replace view public.price_cut_schedule
 with (security_invoker = true) as
 with last_change as (
@@ -22,13 +20,8 @@ with last_change as (
 select a.*,
        current_date - a.price_since as days_at_price,
        a.price_since + (((current_date - a.price_since) / 30) + 1) * 30 as cut_due_on,
-       a.price_since + (((current_date - a.price_since) / 30) * 30 + 25) as alert_on,
        round(a.price * 0.9) as est_new_price
 from at_price a;
-
-create view public.price_cut_watch
-with (security_invoker = true) as
-select * from public.price_cut_schedule where days_at_price % 30 >= 25;
 
 revoke all on public.price_cut_schedule, public.price_cut_watch from anon, public;
 grant select on public.price_cut_schedule, public.price_cut_watch to authenticated;

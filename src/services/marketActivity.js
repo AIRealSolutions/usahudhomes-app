@@ -144,7 +144,7 @@ export async function fetchActivityCounts({ states, days = 7 } = {}) {
     new_listing: listed.count ?? 0,
     investor_eligible: investor.count ?? 0,
     price_drop: drops.count ?? 0,
-    price_cut_due: cutsDue.error ? 0 : cutsDue.count ?? 0,
+    price_cut_due: cutsDue.error ? null : cutsDue.count ?? 0, // signed-in only
     back_on_market: back.count ?? 0,
     offer_accepted: offers.error ? null : offers.count ?? 0,
   }
@@ -177,6 +177,30 @@ export async function fetchBidOpenings({ states, caseNumbers, from = new Date() 
     })
     .filter(r => r.date && r.date >= today)
     .sort((a, b) => a.date - b.date)
+}
+
+/**
+ * Next expected HUD price cut per active home (about 10% after 30 days at the same price),
+ * for the calendar. Signed-in users only; anonymous viewers get an empty list.
+ * @returns {Promise<Array>} [{ date: Date, case_number, address, city, state, price, est_new_price, days_at_price, ... }]
+ */
+export async function fetchPriceCuts({ states, caseNumbers, days = 45, from = new Date() } = {}) {
+  const start = dayKey(from)
+  const end = dayKey(new Date(from.getTime() + days * 86400000))
+  try {
+    const rows = await fetchAllRows(() => {
+      let q = supabase.from('price_cut_schedule')
+        .select('case_number, address, city, state, price, est_new_price, days_at_price, cut_due_on, beds, baths, listing_period')
+        .gte('cut_due_on', start).lte('cut_due_on', end)
+      if (states?.length) q = q.in('state', states)
+      if (caseNumbers) q = q.in('case_number', caseNumbers.length ? caseNumbers : ['__none__'])
+      return q.order('cut_due_on').order('case_number')
+    })
+    return rows.map(r => ({ ...r, date: new Date(`${r.cut_due_on}T12:00:00`) }))
+  } catch (e) {
+    if (e?.code === '42501') return [] // not signed in
+    throw e
+  }
 }
 
 /** Raw rows for the Control Panel's under-contract charts and meters */

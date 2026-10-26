@@ -1,6 +1,6 @@
 /**
  * BidCalendar — month view of upcoming HUD bid deadlines (Exclusive and Lottery
- * listings), plus optional workflow events (e.g. a broker's referral deadlines
+ * listings), expected HUD price cuts (signed-in users only), plus optional workflow events (e.g. a broker's referral deadlines
  * and appointments). Click a day for its agenda.
  */
 
@@ -10,8 +10,8 @@ import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
   isSameMonth, addMonths, format,
 } from 'date-fns'
-import { CalendarDays, ChevronLeft, ChevronRight, Gavel, RefreshCw, Clock } from 'lucide-react'
-import { fetchBidOpenings, dayKey, money } from '../../services/marketActivity'
+import { CalendarDays, ChevronLeft, ChevronRight, Gavel, RefreshCw, Clock, TrendingDown } from 'lucide-react'
+import { fetchBidOpenings, fetchPriceCuts, dayKey, money } from '../../services/marketActivity'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -24,6 +24,7 @@ export default function BidCalendar({
   extraEvents = [],
 }) {
   const [openings, setOpenings] = useState([])
+  const [cuts, setCuts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [month, setMonth] = useState(() => startOfMonth(new Date()))
@@ -36,11 +37,13 @@ export default function BidCalendar({
     let cancelled = false
     setLoading(true)
     setError(null)
-    fetchBidOpenings({
+    const scope = {
       states: statesKey ? statesKey.split(',') : undefined,
       caseNumbers: casesKey == null ? undefined : (casesKey ? casesKey.split(',') : []),
-    })
-      .then(rows => { if (!cancelled) setOpenings(rows) })
+    }
+    // Price cuts are extra: if they fail, bid dates still show
+    Promise.all([fetchBidOpenings(scope), fetchPriceCuts(scope).catch(e => { console.error('BidCalendar price cuts:', e); return [] })])
+      .then(([rows, cutRows]) => { if (!cancelled) { setOpenings(rows); setCuts(cutRows) } })
       .catch(e => { console.error('BidCalendar load:', e); if (!cancelled) setError('Bid dates could not be loaded.') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -51,11 +54,12 @@ export default function BidCalendar({
   // day key -> { bids: [], events: [] }
   const byDay = useMemo(() => {
     const map = new Map()
-    const slot = (k) => map.get(k) || (map.set(k, { bids: [], events: [] }), map.get(k))
+    const slot = (k) => map.get(k) || (map.set(k, { bids: [], cuts: [], events: [] }), map.get(k))
     for (const o of openings) slot(dayKey(o.date)).bids.push(o)
+    for (const c of cuts) slot(dayKey(c.date)).cuts.push(c)
     for (const e of extraEvents) if (e.date) slot(dayKey(e.date)).events.push(e)
     return map
-  }, [openings, extraEvents])
+  }, [openings, cuts, extraEvents])
 
   // Start on the first day that has something, if today is empty
   useEffect(() => {
@@ -71,7 +75,7 @@ export default function BidCalendar({
 
   const days = eachDayOfInterval({ start: startOfWeek(month), end: endOfWeek(endOfMonth(month)) })
   const todayKey = dayKey(new Date())
-  const agenda = byDay.get(selected) || { bids: [], events: [] }
+  const agenda = byDay.get(selected) || { bids: [], cuts: [], events: [] }
   const [sy, sm, sd] = selected.split('-').map(Number)
   const next7 = openings.filter(o => o.date - new Date() < 7 * 86400000).length
 
@@ -108,7 +112,9 @@ export default function BidCalendar({
             const entry = byDay.get(k)
             const bids = entry?.bids.length || 0
             const events = entry?.events.length || 0
+            const cutCount = entry?.cuts.length || 0
             const saved = entry?.bids.some(b => highlight.has(b.case_number))
+            const savedCut = entry?.cuts.some(c => highlight.has(c.case_number))
             const isSel = k === selected
             return (
               <button key={k} onClick={() => setSelected(k)}
@@ -124,6 +130,12 @@ export default function BidCalendar({
                     {bids}
                   </span>
                 )}
+                {cutCount > 0 && (
+                  <span title={`Price cut expected on ${cutCount} home${cutCount === 1 ? '' : 's'}`}
+                    className={`${bids ? 'mt-0.5' : 'mt-auto'} text-[11px] leading-4 font-semibold rounded px-1.5 tabular-nums ${savedCut ? 'bg-yellow-100 text-yellow-800' : 'bg-amber-100 text-amber-800'}`}>
+                    −{cutCount}
+                  </span>
+                )}
                 {events > 0 && <span className="absolute right-1.5 top-1.5 w-2 h-2 rounded-full bg-orange-500" title={`${events} task${events === 1 ? '' : 's'}`} />}
               </button>
             )
@@ -131,6 +143,7 @@ export default function BidCalendar({
         </div>
         <div className="flex flex-wrap gap-3 mt-2 px-1 text-[11px] text-gray-500">
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-blue-100" /> Homes with bids due that day</span>
+          {cuts.length > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-100" /> Price cut expected (−)</span>}
           {highlight.size > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-yellow-100" /> Includes a saved home</span>}
           {extraEvents.length > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500" /> Your tasks</span>}
           <span>Bids open overnight (about 1 AM Central) the next day. Extended listings take bids every business day.</span>
@@ -147,7 +160,7 @@ export default function BidCalendar({
             <div className="flex justify-center py-6"><RefreshCw className="w-5 h-5 text-blue-600 animate-spin" /></div>
           ) : error ? (
             <p className="px-5 py-6 text-sm text-red-600 text-center">{error}</p>
-          ) : !agenda.bids.length && !agenda.events.length ? (
+          ) : !agenda.bids.length && !agenda.cuts.length && !agenda.events.length ? (
             <p className="px-5 py-6 text-sm text-gray-400 text-center">Nothing scheduled this day.</p>
           ) : (
             <>
@@ -181,6 +194,26 @@ export default function BidCalendar({
                     </span>
                     <span className="block text-xs text-gray-500">
                       {money(b.price)} · {b.beds ?? '—'} bd / {b.baths ?? '—'} ba · {b.listing_period ? `${b.listing_period} · ` : ''}bids open {b.opensOn?.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </span>
+                  </span>
+                </Link>
+              ))}
+              {agenda.cuts.length > 0 && (
+                <p className="px-5 pt-2.5 pb-1 text-[11px] font-semibold text-amber-700 uppercase tracking-wider">
+                  Price cut expected · {agenda.cuts.length} home{agenda.cuts.length === 1 ? '' : 's'}
+                </p>
+              )}
+              {agenda.cuts.map(c => (
+                <Link key={`cut-${c.case_number}`} to={`/property/${c.case_number}`} className="flex items-start gap-3 px-5 py-2.5 hover:bg-gray-50">
+                  <TrendingDown className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 truncate">{c.address}, {c.city}</span>
+                      <span className="text-[11px] text-gray-400 flex-shrink-0">{c.state}</span>
+                      {highlight.has(c.case_number) && <span className="text-[11px] font-semibold text-yellow-700 flex-shrink-0">Saved</span>}
+                    </span>
+                    <span className="block text-xs text-gray-500">
+                      {money(c.price)} → about {money(c.est_new_price)} · {c.days_at_price} days at this price · HUD usually cuts about 10% at 30 days
                     </span>
                   </span>
                 </Link>
