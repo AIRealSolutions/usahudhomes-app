@@ -151,10 +151,11 @@ export async function fetchActivityCounts({ states, days = 7 } = {}) {
 }
 
 /**
- * Upcoming bid deadlines. Exclusive and Lottery listings open bids on a set
- * date (HUD's "bids open"), overnight around 1 AM Central, so bids are due the
- * day before; that day is `date`, and `opensOn` is the opening date. Extended
- * listings take bids every business day, so they aren't listed.
+ * Upcoming bid deadlines. HUD opens bids overnight around 1 AM Central on its
+ * "bids open" date, so bids are due the day before; that day is `date`, and
+ * `opensOn` is the opening date. Exclusive and Lottery listings open on a set
+ * date; Extended listings open every business day, and HUD's "bids open" is
+ * their next opening, so they appear on the next night bids are due.
  * @returns {Promise<Array>} [{ date: Date, opensOn: Date, case_number, address, city, state, price, listing_period, ... }]
  */
 export async function fetchBidOpenings({ states, caseNumbers, from = new Date() } = {}) {
@@ -163,7 +164,6 @@ export async function fetchBidOpenings({ states, caseNumbers, from = new Date() 
       .select('id, case_number, address, city, state, price, beds, baths, main_image, listing_period, bids_open, status')
       .neq('status', 'UNDER CONTRACT')
       .eq('is_active', true)
-      .in('listing_period', ['Exclusive', 'Lottery'])
     if (states?.length) q = q.in('state', states)
     if (caseNumbers) q = q.in('case_number', caseNumbers.length ? caseNumbers : ['__none__'])
     return q.order('case_number')

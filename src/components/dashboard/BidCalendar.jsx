@@ -1,6 +1,6 @@
 /**
  * BidCalendar — month view of upcoming HUD bid deadlines (Exclusive and Lottery
- * listings), expected HUD price cuts (signed-in users only), plus optional workflow events (e.g. a broker's referral deadlines
+ * listings on their set date, Extended listings on their next nightly deadline), expected HUD price cuts (signed-in users only), plus optional workflow events (e.g. a broker's referral deadlines
  * and appointments). Click a day for its agenda.
  */
 
@@ -146,7 +146,7 @@ export default function BidCalendar({
           {cuts.length > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-100" /> Price cut expected (−)</span>}
           {highlight.size > 0 && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-yellow-100" /> Includes a saved home</span>}
           {extraEvents.length > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500" /> Your tasks</span>}
-          <span>Bids open overnight (about 1 AM Central) the next day. Extended listings take bids every business day.</span>
+          <span>Bids open overnight (about 1 AM Central) the next day. Extended listings take bids every business day and show on their next deadline.</span>
         </div>
       </div>
 
