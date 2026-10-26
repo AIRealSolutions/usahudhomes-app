@@ -1,12 +1,13 @@
 /**
  * ActivityFeed — market news for dashboards: new listings, homes opened to investors, price drops,
+ * price cuts coming due (25+ days at the same price),
  * homes back on market and accepted offers, newest first, grouped by day.
  * Used on the admin Control Panel, broker Overview and buyer dashboard.
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Sparkles, TrendingDown, RotateCcw, Gavel, RefreshCw, Newspaper, Briefcase } from 'lucide-react'
+import { Sparkles, TrendingDown, RotateCcw, Gavel, RefreshCw, Newspaper, Briefcase, Timer } from 'lucide-react'
 import { fetchActivityFeed, fetchActivityCounts, FEED_TYPES, dayKey } from '../../services/marketActivity'
 import RemindersPanel from './RemindersPanel'
 
@@ -14,6 +15,7 @@ const TYPE_STYLE = {
   new_listing:    { icon: Sparkles,     chip: 'bg-blue-50 text-blue-700',     dot: 'bg-blue-600' },
   investor_eligible: { icon: Briefcase, chip: 'bg-violet-50 text-violet-700', dot: 'bg-violet-600' },
   price_drop:     { icon: TrendingDown, chip: 'bg-orange-50 text-orange-700', dot: 'bg-orange-500' },
+  price_cut_due:  { icon: Timer,        chip: 'bg-amber-50 text-amber-800',   dot: 'bg-amber-500' },
   back_on_market: { icon: RotateCcw,    chip: 'bg-teal-50 text-teal-700',     dot: 'bg-teal-600' },
   offer_accepted: { icon: Gavel,        chip: 'bg-gray-100 text-gray-700',    dot: 'bg-gray-500' },
 }

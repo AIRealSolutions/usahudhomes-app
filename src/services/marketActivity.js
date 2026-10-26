@@ -1,6 +1,6 @@
 /**
  * Market activity for dashboards: the news feed (new listings, homes opened to
- * investor bids, price drops, back on market, accepted offers), bid openings for the calendar, and the
+ * investor bids, price drops, price cuts coming due, back on market, accepted offers), bid openings for the calendar, and the
  * under-contract statistics on the admin Control Panel.
  *
  * property_activity and properties are public; accepted_offers is signed-in only,
@@ -42,6 +42,7 @@ export const FEED_TYPES = {
   new_listing:    { label: 'New listing' },
   investor_eligible: { label: 'Open to investors' },
   price_drop:     { label: 'Price reduced' },
+  price_cut_due:  { label: 'Price cut due' },
   back_on_market: { label: 'Back on market' },
   offer_accepted: { label: 'Offer accepted' },
 }
@@ -65,7 +66,7 @@ export async function fetchActivityFeed({ states, caseNumbers, days = 7, limit =
     return q
   }
 
-  const [activity, offers] = await Promise.all([
+  const [activity, offers, cutsDue] = await Promise.all([
     scope(supabase.from('property_activity')
       .select('id, case_number, state, event, list_price, previous_price, occurred_at, properties(address, city, main_image, bidder_types)')
       .in('event', ['listed', 'investor_eligible', 'price_change', 'back_on_market'])
@@ -76,6 +77,12 @@ export async function fetchActivityFeed({ states, caseNumbers, days = 7, limit =
       .select('id, case_number, state, address, city, net_to_hud, list_price_used, purchaser_type, accepted_at')
       .gte('accepted_at', since))
       .order('accepted_at', { ascending: false })
+      .limit(limit),
+    // Homes 25+ days into a 30-day cycle at the same price (price_cut_watch view)
+    scope(supabase.from('price_cut_watch')
+      .select('case_number, state, address, city, main_image, price, days_at_price, alert_on, cut_due_on, est_new_price')
+      .gte('alert_on', since.slice(0, 10)))
+      .order('cut_due_on')
       .limit(limit),
   ])
   if (activity.error) throw activity.error
@@ -101,6 +108,13 @@ export async function fetchActivityFeed({ states, caseNumbers, days = 7, limit =
         title: where || `Case ${a.case_number}`, detail: `Available again at ${money(a.list_price)}`, image: a.properties?.main_image })
     }
   }
+  for (const c of cutsDue.error ? [] : cutsDue.data || []) {
+    const due = new Date(`${c.cut_due_on}T12:00:00`)
+    const left = Math.max(0, Math.round((due - new Date()) / 86400000))
+    items.push({ id: `cut-${c.case_number}-${c.cut_due_on}`, type: 'price_cut_due', date: `${c.alert_on}T12:00:00`, caseNumber: c.case_number, state: c.state,
+      title: place(c) || `Case ${c.case_number}`, image: c.main_image,
+      detail: `${c.days_at_price} days at ${money(c.price)} · HUD usually cuts about 10% at 30 days, to about ${money(c.est_new_price)} ${left ? `in ${left} day${left === 1 ? '' : 's'} (${due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})` : 'any day now'}` })
+  }
   for (const o of offers.error ? [] : offers.data || []) {
     const pct = o.list_price_used ? Math.round((o.net_to_hud / o.list_price_used) * 100) : null
     items.push({ id: `offer-${o.id}`, type: 'offer_accepted', date: o.accepted_at, caseNumber: o.case_number, state: o.state,
@@ -118,10 +132,11 @@ export async function fetchActivityCounts({ states, days = 7 } = {}) {
     if (states?.length) q = q.in('state', states)
     return extra(q)
   }
-  const [listed, investor, drops, back, offers] = await Promise.all([
+  const [listed, investor, drops, cutsDue, back, offers] = await Promise.all([
     count('property_activity', 'occurred_at', q => q.eq('event', 'listed')),
     count('property_activity', 'occurred_at', q => q.eq('event', 'investor_eligible')),
     count('property_activity', 'occurred_at', q => q.eq('event', 'price_change')),
+    (() => { let q = supabase.from('price_cut_watch').select('case_number', { count: 'exact', head: true }).gte('alert_on', since.slice(0, 10)); if (states?.length) q = q.in('state', states); return q })(),
     count('property_activity', 'occurred_at', q => q.eq('event', 'back_on_market')),
     count('accepted_offers', 'accepted_at', q => q),
   ])
@@ -129,6 +144,7 @@ export async function fetchActivityCounts({ states, days = 7 } = {}) {
     new_listing: listed.count ?? 0,
     investor_eligible: investor.count ?? 0,
     price_drop: drops.count ?? 0,
+    price_cut_due: cutsDue.error ? 0 : cutsDue.count ?? 0,
     back_on_market: back.count ?? 0,
     offer_accepted: offers.error ? null : offers.count ?? 0,
   }
