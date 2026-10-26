@@ -37,7 +37,7 @@ import {
   Film, Zap, BookOpen, Layout,
   Facebook, Bot, HardDrive, Trash2,
   LogOut, ChevronLeft, ChevronRight, Menu, X,
-  ChevronDown, ChevronUp, Bell, Shield, Briefcase, Settings, UserPlus
+  ChevronDown, ChevronUp, Bell, Shield, Briefcase, Settings, UserPlus, Handshake
 } from 'lucide-react'
 
 // Lazy-load all admin panels
@@ -52,6 +52,7 @@ const AgentAdmin          = lazy(() => import('./admin/AgentAdmin'))
 const AgentApplicationsAdmin = lazy(() => import('./admin/AgentApplicationsAdmin'))
 const AcceptedOffersAdmin = lazy(() => import('./admin/AcceptedOffersAdmin'))
 const BrokerLeadsAdmin    = lazy(() => import('./admin/BrokerLeadsAdmin'))
+const BuyerReferralsAdmin = lazy(() => import('./admin/BuyerReferralsAdmin'))
 const VideoStudio         = lazy(() => import('./admin/VideoStudio'))
 const VideoBulkGenerator  = lazy(() => import('./admin/VideoBulkGenerator'))
 const VideoLibrary        = lazy(() => import('./admin/VideoLibrary'))
@@ -88,6 +89,7 @@ const NAV = [
       { id: 'leads',            label: 'Leads',             icon: MessageSquare, color: 'text-orange-500', alertKey: 'newLeads' },
       { id: 'offer-referrals', label: 'Unassigned Offers', icon: Gavel, color: 'text-amber-600' },
       { id: 'invite-clients',   label: 'Invite Clients',    icon: UserPlus,      color: 'text-green-600', badge: 'NEW' },
+      { id: 'agent-referrals',  label: 'Agent Referrals',   icon: Handshake,     color: 'text-teal-600',  badge: 'NEW' },
     ]
   },
   {
@@ -135,6 +137,7 @@ const COMPONENT_MAP = {
   'applications':      AgentApplicationsAdmin,
   'accepted-offers':   AcceptedOffersAdmin,
   'broker-leads':      BrokerLeadsAdmin,
+  'agent-referrals':   BuyerReferralsAdmin,
   'video-studio':      VideoStudio,
   'bulk-generator':    VideoBulkGenerator,
   'video-library':     VideoLibrary,

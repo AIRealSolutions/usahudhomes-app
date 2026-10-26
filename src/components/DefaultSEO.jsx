@@ -29,7 +29,7 @@ const ROUTE_META = {
 // Private or utility routes that should stay out of search results
 const NOINDEX_PREFIXES = [
   '/login', '/reset-password', '/forgot-password', '/dashboard', '/admin', '/broker-dashboard',
-  '/profile', '/lead', '/unauthorized', '/contact/thank-you', '/agent/'
+  '/profile', '/lead', '/unauthorized', '/contact/thank-you', '/agent/', '/agent-referrals'
 ]
 
 /**
