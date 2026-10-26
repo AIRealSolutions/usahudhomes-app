@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { Link, useSearchParams } from 'react-router-dom'
-import { dealMeter, daysOnMarket, meterLabel, offerForRatio } from '../lib/dealMeter'
+import { dealMeter, daysOnMarket, isPriceReduced, meterLabel, offerForRatio, priceCutOutlook, PRICE_CUT } from '../lib/dealMeter'
 import { DealMeterGauge } from './DealMeter'
 
 const initial = { case_number:'', asking_price:'', offer_price:'', occupancy:'', financing:'fha', closing_cost_percent:0, earnest_money:1000, notes:'', referral_consent:false }
@@ -13,7 +13,7 @@ const pct = n => Number.isFinite(n)?(n*100).toFixed(1)+'%':'—'
 const fetchAllOffers = async () => {
  const rows=[]
  for(let from=0;;from+=1000){
-  const {data,error}=await supabase.from('accepted_offers').select('case_number,city,county,state,net_to_hud,list_price_used,list_price_at_acceptance,original_list_price,purchaser_type,days_on_market').order('accepted_at',{ascending:false}).range(from,from+999)
+  const {data,error}=await supabase.from('accepted_offers').select('case_number,city,county,state,net_to_hud,list_price_used,list_price_at_acceptance,original_list_price,purchaser_type,days_on_market,price_reduced').order('accepted_at',{ascending:false}).range(from,from+999)
   if(error)throw error
   rows.push(...(data||[]));if(!data||data.length<1000)return rows
  }
@@ -97,7 +97,7 @@ export default function BuyerBidBuilder({ user, property }) {
   if(!property?.case_number)return
   let active=true;setStatsLoading(true);setStatsError('');setHistorical([]);setListing(null)
   Promise.all([
-   supabase.from('properties').select('case_number,city,county,state,price,listing_date').eq('case_number',property.case_number).maybeSingle(),
+   supabase.from('properties').select('case_number,city,county,state,price,original_list_price,status,listing_date').eq('case_number',property.case_number).maybeSingle(),
    fetchAllOffers()
   ]).then(([p,a])=>{if(!active)return;setStatsLoading(false);if(p.error){setStatsError(p.error.message);return}setListing(p.data);setHistorical(a)}).catch(e=>{if(active){setStatsLoading(false);setStatsError(e.message)}})
   return()=>{active=false}
@@ -129,7 +129,10 @@ export default function BuyerBidBuilder({ user, property }) {
  const percentile=netRatio!==null&&ratios.length?Math.round(100*ratios.filter(x=>x<=netRatio).length/ratios.length):null
  const dom=daysOnMarket(listing?.listing_date||property?.listing_date)
  const deductionPercent=percent(form.closing_cost_percent)+percent(commission.listing)+percent(commission.buyer)
- const meter=dealMeter({offers:historical,occupancy:form.occupancy,state,days:dom,netRatio,excludeCase:form.case_number})
+ const reduced=isPriceReduced(listing||property)
+ const originalList=Number(listing?.original_list_price||property?.original_list_price)||0
+ const meter=dealMeter({offers:historical,occupancy:form.occupancy,state,days:dom,reduced,netRatio,excludeCase:form.case_number})
+ const outlook=!reduced?priceCutOutlook({offers:historical,occupancy:form.occupancy,state,days:dom,asking,deductionPercent,excludeCase:form.case_number}):null
  const assessment=ratios.length<5||netRatio===null?'Insufficient comparable data':percentile>=65?'Above historical median':percentile>=35?'Near historical median':'Below historical median'
  const save=async(status)=>{
   if(!user?.id)return setMessage('Please sign in to save an offer.')
@@ -197,6 +200,8 @@ export default function BuyerBidBuilder({ user, property }) {
      <p className="font-semibold text-base">Deal meter{dom!==null?<> · on the market {dom} day{dom===1?'':'s'}</>:null}</p>
      {meter&&<p>Your net to HUD of <strong>{money(hudNet)}</strong> ({pct(netRatio)} of asking) is at or above <strong>{meter.score}%</strong> of {meter.sample} {meter.basis}.</p>}
      {meter&&<div className="grid grid-cols-3 gap-2">{[['Typical low',meter.p25],['Median',meter.p50],['Typical high',meter.p75]].map(([label,r])=><div key={label} className="rounded border bg-white p-2"><p className="text-gray-500 text-xs">{label} net / list</p><strong>{pct(r)}</strong><p className="text-xs text-gray-600">Offer ≈ {money(offerForRatio(r,asking,deductionPercent))}</p></div>)}</div>}
+     {reduced&&originalList>asking&&<p className="rounded border border-green-200 bg-green-50 p-2">HUD already cut this price from {money(originalList)} to {money(asking)} ({Math.round((1-asking/originalList)*100)}% off). Your net is {pct(hudNet/originalList)} of the original price.</p>}
+     {outlook&&<div className="rounded border border-amber-200 bg-amber-50 p-2 space-y-1"><p className="font-semibold">If HUD cuts the price</p><p>HUD usually cuts about {PRICE_CUT.percent}% around day {PRICE_CUT.day}{outlook.daysUntil>0?<>, about {outlook.daysUntil} day{outlook.daysUntil===1?'':'s'} from now</>:dom!==null?<>, and this home is past day {PRICE_CUT.day} without a cut</>:null}. That would put the price near <strong>{money(outlook.newList)}</strong>.</p>{outlook.median!==null&&<p>After a cut, the median accepted net is {pct(outlook.median)} of the new price ({outlook.sample} {outlook.basis}), about <strong>{money(outlook.expectedNet)}</strong> net to HUD, or an offer near <strong>{money(outlook.offerAfter)}</strong> with your settings{offerAmount>0&&outlook.offerAfter?<> ({money(Math.abs(offerAmount-outlook.offerAfter))} {offerAmount>outlook.offerAfter?'less':'more'} than this offer)</>:null}. Waiting risks another buyer winning first.</p>}</div>}
      <p className="text-xs text-gray-500">Net to HUD here subtracts {form.occupancy==='owner'?'the closing assistance you request plus ':''}both commissions, so owner-occupant and investor offers at the same price net HUD different amounts. Offer amounts above are what this offer would need to match each net level with your current closing and commission settings.</p>
     </div>
    </div>}
