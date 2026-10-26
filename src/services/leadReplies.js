@@ -10,6 +10,8 @@ export const INQUIRY_LABELS = {
   property_inquiry: 'Asked about a home',
   agent_callback_request: 'Requested an agent callback',
   account_signup: 'Created a buyer account',
+  invite: 'Joined from an invitation',
+  broker_invite: 'Joined from your invitation',
   registered_buyer: 'Registered buyer',
   hud_home_alerts: 'Signed up for HUD home alerts',
   website: 'Contact form',

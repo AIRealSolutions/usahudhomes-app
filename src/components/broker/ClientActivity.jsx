@@ -16,6 +16,7 @@ const date = (v) => (v ? new Date(v).toLocaleDateString(undefined, { month: 'sho
 const INQUIRY_LABELS = {
   property_inquiry: 'Asked about a home',
   account_signup: 'Created an account',
+  broker_invite: 'Joined from your invitation',
   hud_home_alerts: 'Signed up for HUD home alerts',
   website: 'Contact form',
   agent_callback_request: 'Requested an agent callback',

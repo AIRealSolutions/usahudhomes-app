@@ -7,6 +7,7 @@ import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCi
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
+import JoinInvite from './pages/JoinInvite'
 import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
 import DashboardLayout from './components/DashboardLayout'
@@ -1225,6 +1226,7 @@ export default function App() {
               <Route path="/alerts" element={<BuyerAlerts />} />
               <Route path="/login" element={<Login />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/join/:token" element={<JoinInvite />} />
               <Route path="/forgot-password" element={<Navigate to="/login?reset=1" replace />} />
               {/* Role-based dashboard routing */}
               <Route path="/dashboard" element={<DashboardRouter />} />

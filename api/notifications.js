@@ -18,6 +18,10 @@
  *   POST ?action=lead-submitted — public forms: announce a new lead to admins (looked up by id, once)
  *   GET/POST ?action=send-alerts — daily cron (CRON_SECRET) or an admin: email HUD home alert matches
  *   GET  ?action=unsubscribe&token= — one-click unsubscribe link in alert emails
+ *   POST ?action=client-invite — admin/broker emails buyers an invitation to join (single, bulk or resend)
+ *   POST ?action=invite-lookup — public: the /join/:token page reads its invitation
+ *   POST ?action=invite-accept — public: creates the invited buyer's account and files them as a lead
+ *   GET  ?action=invite-unsubscribe&token= — "don't send me invitations" link in invitation emails
  *
  * agent-email and sms also require a broker/admin Bearer token.
  *
@@ -30,6 +34,8 @@
  *   SUPABASE_URL    — Supabase project URL
  *   SUPABASE_SERVICE_KEY — Supabase service-role key
  *   CRON_SECRET     — sent by the daily Vercel cron (vercel.json) to ?action=send-alerts
+ *   BUSINESS_MAILING_ADDRESS — postal address printed in invitation emails (required for bulk email)
+ *   RESEND_API_KEY / INVITE_FROM_EMAIL — optional; send invitations through Resend instead of Gmail
  */
 
 import nodemailer from 'nodemailer'
@@ -59,11 +65,12 @@ const CARRIER_GATEWAYS = {
 }
 
 // ─── Gmail transporter ────────────────────────────────────────────────────────
-function getTransporter() {
+function getTransporter(options = {}) {
   if (!GMAIL_USER || !GMAIL_APP_PASS) {
     throw new Error('Gmail not configured — set GMAIL_USER and GMAIL_APP_PASS in Vercel environment variables')
   }
   return nodemailer.createTransport({
+    ...options,
     service: 'gmail',
     auth: {
       user: GMAIL_USER,
@@ -681,72 +688,81 @@ async function routeLeadToBroker(lead) {
       const active = await supabaseFetch(`agents?id=eq.${agentId}&is_active=eq.true&status=eq.approved&select=id&limit=1`)
       if (!active?.length) return null
     }
-    const already = await supabaseFetch(`lead_events?lead_id=eq.${lead.id}&event_type=eq.assigned_to_agent&select=id&limit=1`)
-    if (already?.length) return null
-
-    // Find or create the customer (customers.email is unique)
-    let customerId = lead.customer_id
-    if (!customerId && lead.email) {
-      const existing = (await supabaseFetch(
-        `customers?select=id,is_deleted&email=ilike.${encodeURIComponent(escapeLike(lead.email.trim()))}&limit=1`
-      ))?.[0]
-      if (existing) {
-        customerId = existing.id
-        if (existing.is_deleted) await supabaseWrite('rpc/restore_customer', 'POST', { customer_id: customerId })
-      }
-    }
-    if (!customerId) {
-      customerId = (await supabaseFetch('customers', {
-        method: 'POST',
-        headers: { Prefer: 'return=representation' },
-        body: JSON.stringify({
-          first_name: lead.first_name || '', last_name: lead.last_name || '', email: lead.email, phone: lead.phone || null,
-          state, lead_source: lead.source || 'website', status: 'active', is_active: true,
-        }),
-      }))?.[0]?.id
-    }
-    if (!customerId) throw new Error('could not find or create the customer')
-
-    const name = `${lead.first_name || ''} ${lead.last_name || ''}`.trim()
-    const now = new Date().toISOString()
-    const consultation = (await supabaseFetch('consultations', {
-      method: 'POST',
-      headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({
-        customer_id: customerId,
-        agent_id: agentId,
-        assigned_broker_id: agentId,
-        assigned_at: now,
-        property_id: lead.property_id || null,
-        case_number: lead.property_case_number || null,
-        consultation_type: lead.lead_type || lead.source || 'property_inquiry',
-        first_name: lead.first_name, last_name: lead.last_name, email: lead.email, phone: lead.phone,
-        customer_name: name || null, customer_email: lead.email, customer_phone: lead.phone,
-        state, message: lead.message,
-        source: lead.source, source_details: { lead_id: lead.id, auto_routed: true },
-        budget_min: lead.budget_min ?? null, budget_max: lead.budget_max ?? null,
-        timeline: lead.timeline || null, financing_type: lead.financing_type || null,
-        down_payment: lead.down_payment || null, credit_score_range: lead.credit_score_range || null,
-        pre_approved: lead.pre_approved ?? false, buyer_type: lead.buyer_type || null,
-        experience_level: lead.experience_level || null,
-        price_range_min: lead.price_range_min ?? null, price_range_max: lead.price_range_max ?? null,
-        property_preferences: lead.property_preferences || null, hear_about_us: lead.hear_about_us || null,
-        status: 'new', is_deleted: false,
-      }),
-    }))?.[0]
-    if (!consultation) throw new Error('could not create the consultation')
-
-    await supabaseWrite(`leads?id=eq.${lead.id}`, 'PATCH', { customer_id: customerId, status: 'under_review', updated_at: now })
-    await supabaseWrite('lead_events', 'POST', {
-      lead_id: lead.id,
-      event_type: 'assigned_to_agent',
-      event_data: { agent_id: agentId, consultation_id: consultation.id, auto_routed: true, rule: `state ${state}` },
-    })
-    return consultation
+    return await assignLeadToAgent(lead, agentId, { auto_routed: true, rule: `state ${state}` })
   } catch (e) {
     console.error('[lead-routing] failed:', e.message)
     return null
   }
+}
+
+// Files a lead under one broker: finds or creates the customer, opens a consultation
+// for the broker, and records the assignment. Returns the consultation, or null if the
+// lead was already assigned. `routing` is saved with the event; `status` is the
+// consultation's starting status ('new' waits for the broker, 'accepted' is theirs already).
+async function assignLeadToAgent(lead, agentId, routing = {}, { status = 'new' } = {}) {
+  const state = String(lead?.state || '').trim().toUpperCase().slice(0, 2) || null
+  const already = await supabaseFetch(`lead_events?lead_id=eq.${lead.id}&event_type=eq.assigned_to_agent&select=id&limit=1`)
+  if (already?.length) return null
+
+  // Find or create the customer (customers.email is unique)
+  let customerId = lead.customer_id
+  if (!customerId && lead.email) {
+    const existing = (await supabaseFetch(
+      `customers?select=id,is_deleted&email=ilike.${encodeURIComponent(escapeLike(lead.email.trim()))}&limit=1`
+    ))?.[0]
+    if (existing) {
+      customerId = existing.id
+      if (existing.is_deleted) await supabaseWrite('rpc/restore_customer', 'POST', { customer_id: customerId })
+    }
+  }
+  if (!customerId) {
+    customerId = (await supabaseFetch('customers', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        first_name: lead.first_name || '', last_name: lead.last_name || '', email: lead.email, phone: lead.phone || null,
+        state, lead_source: lead.source || 'website', status: 'active', is_active: true,
+      }),
+    }))?.[0]?.id
+  }
+  if (!customerId) throw new Error('could not find or create the customer')
+
+  const name = `${lead.first_name || ''} ${lead.last_name || ''}`.trim()
+  const now = new Date().toISOString()
+  const consultation = (await supabaseFetch('consultations', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      customer_id: customerId,
+      agent_id: agentId,
+      assigned_broker_id: agentId,
+      assigned_at: now,
+      property_id: lead.property_id || null,
+      case_number: lead.property_case_number || null,
+      consultation_type: lead.lead_type || lead.source || 'property_inquiry',
+      first_name: lead.first_name, last_name: lead.last_name, email: lead.email, phone: lead.phone,
+      customer_name: name || null, customer_email: lead.email, customer_phone: lead.phone,
+      state, message: lead.message,
+      source: lead.source, source_details: { lead_id: lead.id, ...routing },
+      budget_min: lead.budget_min ?? null, budget_max: lead.budget_max ?? null,
+      timeline: lead.timeline || null, financing_type: lead.financing_type || null,
+      down_payment: lead.down_payment || null, credit_score_range: lead.credit_score_range || null,
+      pre_approved: lead.pre_approved ?? false, buyer_type: lead.buyer_type || null,
+      experience_level: lead.experience_level || null,
+      price_range_min: lead.price_range_min ?? null, price_range_max: lead.price_range_max ?? null,
+      property_preferences: lead.property_preferences || null, hear_about_us: lead.hear_about_us || null,
+      status, is_deleted: false,
+    }),
+  }))?.[0]
+  if (!consultation) throw new Error('could not create the consultation')
+
+  await supabaseWrite(`leads?id=eq.${lead.id}`, 'PATCH', { customer_id: customerId, status: 'under_review', updated_at: now })
+  await supabaseWrite('lead_events', 'POST', {
+    lead_id: lead.id,
+    event_type: 'assigned_to_agent',
+    event_data: { agent_id: agentId, consultation_id: consultation.id, ...routing },
+  })
+  return consultation
 }
 
 // ─── Action: lead submitted (public forms) ────────────────────────────────────
@@ -756,6 +772,8 @@ const SOURCE_LABELS = {
   hud_home_alerts: 'HUD home alert sign-up',
   property_inquiry: 'property inquiry',
   account_signup: 'buyer account',
+  invite: 'invited client',
+  broker_invite: 'broker-invited client',
   website: 'contact form',
 }
 
@@ -795,6 +813,415 @@ async function handleLeadSubmitted(req, res) {
   }
   await routeLeadToBroker(lead)
   return res.status(200).json({ success: true })
+}
+
+// ─── Client invitations (admins and brokers) ──────────────────────────────────
+// Staff email buyers a personal /join/:token link. The token proves the invitee
+// received the email, so accepting creates an already-confirmed account and the
+// new member is signed straight in. A broker's invite (agent_id set) files the
+// member under that broker; an admin's invite files them as a lead for the admins
+// and the usual lead routing.
+const INVITE_MAX_PER_REQUEST = 20   // the browser sends bulk lists in chunks of this size
+const INVITE_TTL_DAYS = 90
+const INVITE_RESEND_HOURS = 24
+const BUSINESS_ADDRESS = process.env.BUSINESS_MAILING_ADDRESS || ''
+const EMAIL_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const DEFAULT_INVITER = { name: 'Marc Spencer', company: 'Lightkeeper Realty', phone: '(910) 363-6147', email: '' }
+// With RESEND_API_KEY set, invitations go through Resend from INVITE_FROM_EMAIL (a verified
+// Resend domain). Without it they go through Gmail, capped well under Gmail's ~500/day limit.
+const RESEND_API_KEY = process.env.RESEND_API_KEY
+const INVITE_FROM_EMAIL = process.env.INVITE_FROM_EMAIL || 'invites@usahudhomes.com'
+const GMAIL_DAILY_INVITE_CAP = 400
+
+const clip = (v, n = 80) => (v ? String(v).trim().slice(0, n) : '')
+const emailFilter = (email) => `email=ilike.${encodeURIComponent(escapeLike(email))}`
+
+// The name, company and phone shown in the email and on the join page
+async function inviterProfile(inv) {
+  let agent = null
+  let user = null
+  const agentCols = 'first_name,last_name,company,phone,email,is_admin'
+  if (inv.agent_id) {
+    agent = (await supabaseFetch(`agents?id=eq.${inv.agent_id}&select=${agentCols}&limit=1`))?.[0]
+  } else if (inv.invited_by_user_id) {
+    user = (await supabaseFetch(`users?id=eq.${inv.invited_by_user_id}&select=name,email&limit=1`))?.[0]
+    if (user?.email) agent = (await supabaseFetch(`agents?${emailFilter(user.email)}&select=${agentCols}&limit=1`))?.[0]
+  }
+  if (agent) {
+    return {
+      name: `${agent.first_name || ''} ${agent.last_name || ''}`.trim() || DEFAULT_INVITER.name,
+      company: agent.company || (agent.is_admin ? DEFAULT_INVITER.company : ''),
+      phone: agent.phone || '',
+      email: agent.email || '',
+    }
+  }
+  if (user?.name) return { ...DEFAULT_INVITER, name: user.name, email: user.email || '' }
+  return DEFAULT_INVITER
+}
+
+function buildInviteEmail(inv, inviter) {
+  const first = inv.first_name || 'there'
+  const joinUrl = `${SITE_URL}/join/${inv.token}`
+  const unsubscribeUrl = `${SITE_URL}/api/notifications?action=invite-unsubscribe&token=${inv.token}`
+  const pitch = inv.invited_by_role === 'broker'
+    ? 'I use USAHUDhomes.com with my buyers. It is a tool built to give HUD home buyers an advantage when making offers, and I would like you to have it too.'
+    : 'USAHUDhomes.com is a tool I am building to give HUD home buyers an advantage when making offers, and I would like you to be one of the first to use it.'
+  const benefits = [
+    'See what HUD actually accepted on homes like the one you want, before you bid',
+    'A deal meter and step-by-step offer builder, so your offer is priced to win',
+    'A calendar of HUD bid deadlines and expected price cuts',
+    'Full property addresses, saved homes, and alerts for new listings in your area',
+  ]
+  const signature = [inviter.name, [inviter.company, inviter.phone].filter(Boolean).join(' · ')].filter(Boolean)
+  const subject = `${inviter.name} invited you to USAHUDhomes.com`
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#111827">
+      <h2 style="color:#1e40af;margin:0 0 12px">You're invited to USAHUDhomes.com</h2>
+      <p>Hi ${escapeHtml(first)},</p>
+      <p>${escapeHtml(pitch)}</p>
+      ${inv.note ? `<blockquote style="margin:16px 0;padding:12px 16px;background:#f3f4f6;border-left:4px solid #1e40af;white-space:pre-wrap">${escapeHtml(inv.note)}</blockquote>` : ''}
+      <p style="margin-bottom:6px"><strong>Your free account includes:</strong></p>
+      <ul style="margin-top:0;padding-left:20px;line-height:1.6">${benefits.map(b => `<li>${escapeHtml(b)}</li>`).join('')}</ul>
+      <p style="margin:28px 0">
+        <a href="${joinUrl}" style="background:#1e40af;color:#fff;padding:14px 26px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:16px">Create my free account</a>
+      </p>
+      <p style="color:#374151">It takes about a minute: pick a password and you're in. No credit card, no obligation.</p>
+      <p style="margin-top:24px">${signature.map(escapeHtml).join('<br>')}</p>
+      <p style="color:#6b7280;font-size:12px;margin-top:28px">You received this invitation because ${escapeHtml(inviter.name)} entered your email at USAHUDhomes.com.
+        ${BUSINESS_ADDRESS ? `${escapeHtml(BUSINESS_ADDRESS)}.` : ''}
+        <a href="${unsubscribeUrl}" style="color:#6b7280">Don't send me invitations</a></p>
+    </div>`
+
+  const text = [
+    `Hi ${first},`, '', pitch, '',
+    ...(inv.note ? [inv.note, ''] : []),
+    'Your free account includes:', ...benefits.map(b => `- ${b}`), '',
+    `Create your free account: ${joinUrl}`, '',
+    ...signature, '',
+    `You received this invitation because ${inviter.name} entered your email at USAHUDhomes.com.${BUSINESS_ADDRESS ? ` ${BUSINESS_ADDRESS}.` : ''}`,
+    `Don't send me invitations: ${unsubscribeUrl}`,
+  ].join('\n')
+
+  return { subject, html, text, unsubscribeUrl }
+}
+
+function inviteMailer() {
+  if (RESEND_API_KEY) {
+    return {
+      provider: 'resend',
+      async send({ fromName, ...message }) {
+        const r = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: `${fromName} <${INVITE_FROM_EMAIL}>`,
+            to: [message.to],
+            reply_to: message.replyTo,
+            subject: message.subject,
+            html: message.html,
+            text: message.text,
+            headers: message.headers,
+          }),
+        })
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}))
+          throw new Error(`Resend ${r.status}: ${e.message || e.name || 'send failed'}`)
+        }
+      },
+      close() {},
+    }
+  }
+  const transporter = getTransporter({ pool: true })
+  return {
+    provider: 'gmail',
+    send: ({ fromName, ...message }) => transporter.sendMail({ ...message, from: `"${fromName}" <${GMAIL_USER}>` }),
+    close: () => transporter.close(),
+  }
+}
+
+async function deliverInvite(inv, inviter, mailer) {
+  const { subject, html, text, unsubscribeUrl } = buildInviteEmail(inv, inviter)
+  const now = new Date().toISOString()
+  const sendCount = inv.send_count || 0
+  try {
+    await mailer.send({
+      fromName: `${inviter.name.replace(/["\\\r\n<>]/g, '')} via USAHUDhomes`,
+      replyTo: inviter.email || GMAIL_USER,
+      to: inv.email,
+      subject,
+      text,
+      html,
+      headers: { 'List-Unsubscribe': `<${unsubscribeUrl}>` },
+    })
+    await supabaseWrite(`client_invitations?id=eq.${inv.id}`, 'PATCH', {
+      status: inv.status === 'opened' ? 'opened' : 'sent',
+      send_count: sendCount + 1, sent_at: now, last_error: null, updated_at: now,
+    })
+    return { id: inv.id, email: inv.email, status: sendCount ? 'resent' : 'sent' }
+  } catch (e) {
+    console.error('[client-invite] send failed:', inv.email, e.message)
+    await supabaseWrite(`client_invitations?id=eq.${inv.id}`, 'PATCH', { status: 'failed', last_error: e.message.slice(0, 500), updated_at: now })
+    return { id: inv.id, email: inv.email, status: 'failed', error: e.message }
+  }
+}
+
+// POST ?action=client-invite  { invites: [{ email, firstName, lastName, phone, state }], note, batchId }
+//                          or { resendIds: [invitationId] }
+async function handleClientInvite(req, res) {
+  const caller = await requireStaff(req)
+  if (!caller) return res.status(401).json({ success: false, error: 'Sign in as a broker or admin to send invitations.' })
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ success: false, error: 'Server is not configured.' })
+
+  const isAdmin = caller.role === 'admin'
+  let agentId = null
+  if (!isAdmin) {
+    const agent = caller.email && (await supabaseFetch(`agents?${emailFilter(caller.email)}&select=id&limit=1`))?.[0]
+    if (!agent) return res.status(403).json({ success: false, error: 'Your broker profile was not found, so invitations cannot be assigned to you.' })
+    agentId = agent.id
+  }
+
+  const invites = Array.isArray(req.body?.invites) ? req.body.invites : []
+  const resendIds = (Array.isArray(req.body?.resendIds) ? req.body.resendIds : []).filter(id => UUID_RE.test(String(id)))
+  if (!invites.length && !resendIds.length) return res.status(400).json({ success: false, error: 'Add at least one email address.' })
+  if (invites.length + resendIds.length > INVITE_MAX_PER_REQUEST) {
+    return res.status(400).json({ success: false, error: `Send at most ${INVITE_MAX_PER_REQUEST} invitations per request.` })
+  }
+  const note = clip(req.body?.note, 600) || null
+  const batchId = UUID_RE.test(String(req.body?.batchId || '')) ? req.body.batchId : randomUUID()
+
+  const inviters = new Map()
+  const inviterOf = async (inv) => {
+    const key = inv.agent_id || inv.invited_by_user_id || 'default'
+    if (!inviters.has(key)) inviters.set(key, await inviterProfile(inv))
+    return inviters.get(key)
+  }
+
+  const mailer = inviteMailer()
+  // Gmail blocks accounts that go past ~500 messages a day, so stop short of it
+  let gmailRoom = Infinity
+  if (mailer.provider === 'gmail') {
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+    const recent = (await supabaseFetch(`client_invitations?select=id&sent_at=gte.${since}&limit=1000`)) || []
+    gmailRoom = Math.max(0, GMAIL_DAILY_INVITE_CAP - recent.length)
+  }
+  const deliver = async (inv, inviter) => {
+    if (gmailRoom <= 0) {
+      await supabaseWrite(`client_invitations?id=eq.${inv.id}`, 'PATCH', {
+        status: inv.status === 'opened' ? 'opened' : 'failed',
+        last_error: 'Daily email limit reached; resend tomorrow.', updated_at: new Date().toISOString(),
+      })
+      return { id: inv.id, email: inv.email, status: 'daily_limit' }
+    }
+    const result = await deliverInvite(inv, inviter, mailer)
+    if (result.status !== 'failed') gmailRoom--
+    return result
+  }
+  const results = []
+  try {
+    for (const id of resendIds) {
+      const inv = (await supabaseFetch(`client_invitations?id=eq.${id}&select=*&limit=1`))?.[0]
+      if (!inv || (!isAdmin && inv.agent_id !== agentId)) { results.push({ id, status: 'not_found' }); continue }
+      if (inv.status === 'registered') { results.push({ id, email: inv.email, status: 'already_member' }); continue }
+      if (inv.status === 'unsubscribed') { results.push({ id, email: inv.email, status: 'unsubscribed' }); continue }
+      results.push(await deliver(inv, await inviterOf(inv)))
+    }
+
+    const seen = new Set()
+    for (const row of invites) {
+      const email = String(row?.email || '').trim().toLowerCase()
+      if (!EMAIL_RE.test(email) || email.length > 200) { results.push({ email, status: 'invalid' }); continue }
+      if (seen.has(email)) { results.push({ email, status: 'duplicate' }); continue }
+      seen.add(email)
+
+      const member = await supabaseFetch(`users?${emailFilter(email)}&select=id&limit=1`)
+      if (member?.length) { results.push({ email, status: 'already_member' }); continue }
+      const prior = (await supabaseFetch(`client_invitations?${emailFilter(email)}&select=*&order=created_at.desc`)) || []
+      if (prior.some(p => p.status === 'unsubscribed')) { results.push({ email, status: 'unsubscribed' }); continue }
+      if (prior.some(p => p.status === 'registered')) { results.push({ email, status: 'already_member' }); continue }
+
+      // Re-inviting someone this sender (or the admin pool) already invited reuses that invitation
+      let inv = prior.find(p => (p.agent_id || null) === agentId)
+      if (inv?.sent_at && Date.now() - new Date(inv.sent_at).getTime() < INVITE_RESEND_HOURS * 3600 * 1000) {
+        results.push({ id: inv.id, email, status: 'recently_invited' }); continue
+      }
+      if (!inv) {
+        const state = clip(row.state, 2).toUpperCase()
+        inv = (await supabaseFetch('client_invitations', {
+          method: 'POST',
+          headers: { Prefer: 'return=representation' },
+          body: JSON.stringify({
+            email,
+            first_name: clip(row.firstName) || null,
+            last_name: clip(row.lastName) || null,
+            phone: clip(row.phone, 40) || null,
+            state: /^[A-Z]{2}$/.test(state) ? state : null,
+            note,
+            invited_by_user_id: caller.id,
+            invited_by_role: isAdmin ? 'admin' : 'broker',
+            agent_id: agentId,
+            batch_id: batchId,
+          }),
+        }))?.[0]
+        if (!inv) { results.push({ email, status: 'failed', error: 'Could not save the invitation.' }); continue }
+      } else if (note) {
+        inv.note = note
+        await supabaseWrite(`client_invitations?id=eq.${inv.id}`, 'PATCH', { note })
+      }
+      results.push(await deliver(inv, await inviterOf(inv)))
+    }
+  } finally {
+    mailer.close()
+  }
+
+  const sent = results.filter(r => r.status === 'sent' || r.status === 'resent').length
+  return res.status(200).json({ success: true, batchId, sent, results })
+}
+
+async function loadInvite(token) {
+  if (!UUID_RE.test(String(token || ''))) return null
+  return (await supabaseFetch(`client_invitations?token=eq.${token}&select=*&limit=1`))?.[0] || null
+}
+
+const inviteExpired = (inv) =>
+  inv.status !== 'registered' && inv.sent_at && Date.now() - new Date(inv.sent_at).getTime() > INVITE_TTL_DAYS * 86400 * 1000
+
+// POST ?action=invite-lookup { token } — the /join/:token page
+async function handleInviteLookup(req, res) {
+  const inv = await loadInvite(req.body?.token)
+  if (!inv) return res.status(404).json({ success: false, error: 'This invitation link is not valid.' })
+  if (inv.status === 'sent') {
+    const now = new Date().toISOString()
+    await supabaseWrite(`client_invitations?id=eq.${inv.id}&status=eq.sent`, 'PATCH', { status: 'opened', opened_at: now, updated_at: now })
+  }
+  const inviter = await inviterProfile(inv)
+  return res.status(200).json({
+    success: true,
+    invite: {
+      email: inv.email,
+      firstName: inv.first_name || '',
+      lastName: inv.last_name || '',
+      phone: inv.phone || '',
+      state: inv.state || '',
+      byBroker: !!inv.agent_id,
+      registered: inv.status === 'registered',
+      expired: !!inviteExpired(inv),
+      inviter: { name: inviter.name, company: inviter.company, phone: inviter.phone },
+    },
+  })
+}
+
+// POST ?action=invite-accept { token, password, firstName, lastName, phone, state }
+async function handleInviteAccept(req, res) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ success: false, error: 'Server is not configured.' })
+  const inv = await loadInvite(req.body?.token)
+  if (!inv) return res.status(404).json({ success: false, error: 'This invitation link is not valid.' })
+  if (inv.status === 'registered') return res.status(200).json({ success: false, existingAccount: true, email: inv.email })
+  if (inviteExpired(inv)) return res.status(410).json({ success: false, error: 'This invitation has expired. Ask for a new one, or create an account on the sign-up page.' })
+
+  const password = String(req.body?.password || '')
+  if (password.length < 8 || password.length > 72) return res.status(400).json({ success: false, error: 'Use a password of at least 8 characters.' })
+  const firstName = clip(req.body?.firstName) || inv.first_name || ''
+  const lastName = clip(req.body?.lastName) || inv.last_name || ''
+  const phone = clip(req.body?.phone, 40) || inv.phone || ''
+  const stateIn = clip(req.body?.state, 2).toUpperCase()
+  const state = /^[A-Z]{2}$/.test(stateIn) ? stateIn : (inv.state || '')
+
+  // The invite email proves the address, so the account starts confirmed
+  const created = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: inv.email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        first_name: firstName, last_name: lastName, full_name: `${firstName} ${lastName}`.trim(),
+        phone: phone || undefined, state: state || undefined, role: 'end_user', invitation_id: inv.id,
+      },
+    }),
+  })
+  if (!created.ok) {
+    const err = await created.json().catch(() => ({}))
+    const msg = err.msg || err.message || err.error_description || ''
+    if (created.status === 422 || /already/i.test(msg)) return res.status(200).json({ success: false, existingAccount: true, email: inv.email })
+    console.error('[invite-accept] create user failed:', created.status, msg)
+    return res.status(502).json({ success: false, error: msg || 'Could not create your account.' })
+  }
+  const authUser = await created.json()
+  const now = new Date().toISOString()
+  await supabaseWrite(`client_invitations?id=eq.${inv.id}`, 'PATCH', {
+    status: 'registered', registered_at: now, registered_user_id: authUser.id, updated_at: now,
+  })
+
+  // Everything below files the new member for follow-up; it must never undo the sign-up
+  try {
+    const agent = inv.agent_id
+      ? (await supabaseFetch(`agents?id=eq.${inv.agent_id}&is_active=eq.true&status=eq.approved&select=id,first_name,last_name,email,notification_phone,sms_carrier,sms_notifications_enabled&limit=1`))?.[0]
+      : null
+    const lead = (await supabaseFetch('leads', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        first_name: firstName, last_name: lastName, email: inv.email, phone: phone || null, state: state || null,
+        source: agent ? 'broker_invite' : 'invite', lead_type: 'registered_buyer', status: 'new_lead',
+        source_details: { invitation_id: inv.id, invited_by_role: inv.invited_by_role },
+      }),
+    }))?.[0]
+    if (!lead) throw new Error('could not create the lead')
+    await supabaseWrite(`client_invitations?id=eq.${inv.id}`, 'PATCH', { lead_id: lead.id })
+    const name = `${firstName} ${lastName}`.trim() || inv.email
+
+    if (agent) {
+      // The broker brought this client in, so the client is theirs from the start
+      const consultation = await assignLeadToAgent(lead, agent.id, { invitation_id: inv.id, broker_invite: true }, { status: 'accepted' })
+      if (consultation) await supabaseWrite(`client_invitations?id=eq.${inv.id}`, 'PATCH', { consultation_id: consultation.id })
+      if (agent.email) {
+        await sendEmail({
+          to: agent.email,
+          subject: `${name} accepted your invitation`,
+          html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+            <h2 style="color:#1e40af">${escapeHtml(name)} joined USAHUDhomes.com</h2>
+            <p>Your invitation was accepted. ${escapeHtml(name)} (${escapeHtml(inv.email)}${phone ? `, ${escapeHtml(phone)}` : ''}) is now in your Active Leads.</p>
+            <p><a href="${SITE_URL}/broker-dashboard" style="background:#1e40af;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold">Open my dashboard</a></p>
+          </div>`,
+        }).catch(e => console.error('[invite-accept] broker email failed:', e.message))
+      }
+      await sendSmsToAgent(agent, `USAHUDHomes: ${name} accepted your invite and joined.\nLogin: usahudhomes.com/broker-dashboard`)
+    } else {
+      // Admin invites go to the admins first, then the usual routing rules
+      await supabaseWrite('lead_events', 'POST', { lead_id: lead.id, event_type: 'admin_notified', event_data: { invitation_id: inv.id } })
+      await notifyAdminsOfLead({
+        consultation: { state },
+        customer: { name, email: inv.email, phone },
+        details: { Source: 'invited client', Note: inv.agent_id ? 'Invited by a broker who is no longer active' : null },
+      }).catch(e => console.error('[invite-accept] admin notice failed:', e.message))
+      const routed = await routeLeadToBroker(lead)
+      if (routed) await supabaseWrite(`client_invitations?id=eq.${inv.id}`, 'PATCH', { consultation_id: routed.id })
+    }
+  } catch (e) {
+    console.error('[invite-accept] filing the new member failed:', e.message)
+  }
+
+  return res.status(200).json({ success: true, email: inv.email })
+}
+
+// GET ?action=invite-unsubscribe&token= — link in every invitation email
+async function handleInviteUnsubscribe(req, res) {
+  const inv = await loadInvite(req.query?.token)
+  const ok = !!inv && inv.status !== 'registered'
+  if (ok) {
+    const now = new Date().toISOString()
+    await supabaseWrite(`client_invitations?${emailFilter(inv.email)}&status=neq.registered`, 'PATCH', { status: 'unsubscribed', updated_at: now })
+  }
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  return res.status(ok ? 200 : 400).send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>USAHUDhomes.com invitations</title></head>
+    <body style="font-family:Arial,sans-serif;max-width:520px;margin:60px auto;padding:0 16px;color:#111827;text-align:center">
+      <h1 style="color:#1e40af">${ok ? 'No more invitations' : 'Link not recognized'}</h1>
+      <p>${ok ? 'We won\'t send you invitations to USAHUDhomes.com again.' : 'This link is invalid, or you already have an account.'}</p>
+      <p><a href="${SITE_URL}">USAHUDhomes.com</a></p>
+    </body></html>`)
 }
 
 // ─── Action: send HUD home alerts (daily cron, or an admin) ───────────────────
@@ -951,6 +1378,7 @@ export default async function handler(req, res) {
     try {
       if (action === 'send-alerts') return await handleSendAlerts(req, res)
       if (action === 'unsubscribe') return await handleUnsubscribe(req, res)
+      if (action === 'invite-unsubscribe') return await handleInviteUnsubscribe(req, res)
     } catch (err) {
       console.error(`[notifications/${action}] Error:`, err.message)
       return res.status(500).json({ success: false, error: err.message })
@@ -971,11 +1399,14 @@ export default async function handler(req, res) {
     if (action === 'agent-invite') return await handleAgentInvite(req, res)
     if (action === 'lead-submitted') return await handleLeadSubmitted(req, res)
     if (action === 'send-alerts') return await handleSendAlerts(req, res)
+    if (action === 'client-invite') return await handleClientInvite(req, res)
+    if (action === 'invite-lookup') return await handleInviteLookup(req, res)
+    if (action === 'invite-accept') return await handleInviteAccept(req, res)
 
     return res.status(400).json({
       success: false,
       error: 'Missing or unknown ?action= parameter',
-      valid_actions: ['lead', 'sms', 'agent-email', 'agent-verify', 'agent-resend-verification', 'agent-application-submitted', 'lead-email', 'lead-sms', 'consultation-request', 'agent-invite', 'lead-submitted', 'send-alerts', 'unsubscribe'],
+      valid_actions: ['lead', 'sms', 'agent-email', 'agent-verify', 'agent-resend-verification', 'agent-application-submitted', 'lead-email', 'lead-sms', 'consultation-request', 'agent-invite', 'lead-submitted', 'send-alerts', 'unsubscribe', 'client-invite', 'invite-lookup', 'invite-accept', 'invite-unsubscribe'],
     })
   } catch (err) {
     console.error(`[notifications/${action}] Error:`, err.message)
