@@ -32,6 +32,7 @@ export default function OfferWizard({
   form, change, chooseBuyerType, commission, setCommission, property, asking, dom, reduced, originalList,
   hudNet, netRatio, assistance, listingCommission, buyerCommission, meter, timeline, estimate,
   statsLoading, statsError, message, busy, save, loanRate, setLoanRate, onShowFullForm,
+  brokerFor, // client's first name when a broker is building this offer for them
 }) {
   const [step, setStep] = useState(form.occupancy ? 2 : 0)
   const [target, setTarget] = useState(1500)
@@ -222,17 +223,21 @@ export default function OfferWizard({
               ['Payment', estimate?.scenarios?.length ? estimate.scenarios.map(s => `${s.label}: ${money(s.monthly_total)}/mo`).join('; ') : 'See payment breakdown']]
               .map(([k, v]) => <div key={k} className="flex justify-between gap-3 border-b py-1"><dt className="text-gray-600">{k}</dt><dd className="text-right font-medium">{v}</dd></div>)}
           </dl>
-          <label className="block text-sm font-medium">Notes for broker
-            <textarea className="mt-1 block w-full rounded-lg border p-2" value={form.notes} onChange={e => change('notes', e.target.value)} />
+          <label className="block text-sm font-medium">{brokerFor ? `Message to ${brokerFor}` : 'Notes for broker'}
+            <textarea className="mt-1 block w-full rounded-lg border p-2" value={form.notes} onChange={e => change('notes', e.target.value)} placeholder={brokerFor ? 'Why this price? Comps, repairs to plan for, bid strategy…' : undefined} />
           </label>
+          {brokerFor ? (
+            <p className="text-sm text-gray-600">{brokerFor} gets a link to review this offer, then can accept it (authorizing you to submit the bid), ask for changes, decline, or save it to their favorites. The net to HUD, deal meter, wait and payment estimates go with it.</p>
+          ) : <>
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" checked={!!form.referral_consent} onChange={e => change('referral_consent', e.target.checked)} />
             If no broker is assigned, I authorize USAHUDhomes to share a limited, non-identifying offer summary with eligible brokers for referral matching. Buyer contact information stays private until assignment.
           </label>
           <p className="text-sm text-gray-600">Your net to HUD, deal meter, wait estimate and payment estimate are saved with the offer for your broker. After saving, open the offer from "Your saved proposals" to add deed details and upload your prequalification letter.</p>
+          </>}
           <div className="flex flex-wrap gap-3">
             <button type="button" disabled={busy} onClick={() => save('draft')} className="rounded-lg bg-gray-800 px-4 py-2 text-white disabled:opacity-50">{form.id ? 'Update draft' : 'Save draft'}</button>
-            <button type="button" disabled={busy} onClick={() => save('submitted')} className="rounded-lg bg-blue-700 px-4 py-2 text-white disabled:opacity-50">Send proposal for review</button>
+            <button type="button" disabled={busy} onClick={() => save('submitted')} className="rounded-lg bg-blue-700 px-4 py-2 text-white disabled:opacity-50">{brokerFor ? `Send offer to ${brokerFor}` : 'Send proposal for review'}</button>
           </div>
         </div>
       )}

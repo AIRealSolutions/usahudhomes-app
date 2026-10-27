@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Mail, Phone, MapPin, DollarSign, Calendar, Home as HomeIcon, CheckCircle, Search, Bell, Heart, BookOpen } from 'lucide-react'
 import SavedHomesSection from '../components/SavedHomesSection'
+import BrokerOffersSection from '../components/BrokerOffersSection'
 import BuyerOfferSummary from '../components/BuyerOfferSummary'
 import { useAuth } from '../contexts/AuthContext'
 import { PROFILE_KEYS, OPTIONS, stateName } from '../services/buyerProfile'
@@ -164,6 +165,9 @@ export default function UserDashboard({ user }) {
 
       {/* When bids are due, and what's happening in the buyer's market */}
       <SectionBoundary name="Bids & Market News"><MarketSection /></SectionBoundary>
+
+      {/* Offers the buyer's broker built for them to accept or save */}
+      <SectionBoundary name="Offers from your broker"><BrokerOffersSection /></SectionBoundary>
 
       {/* Homes the buyer saved, with price and contract activity */}
       <SavedHomesSection />

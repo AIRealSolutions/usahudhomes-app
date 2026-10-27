@@ -13,11 +13,14 @@
  *   GET  ?action=referrals            — get all referrals for an agent
  *   GET  ?action=client-activity      — a lead's saved homes, property requests and inquiries
  *   GET/POST/PATCH/DELETE ?action=property-picks — homes a broker picked for clients (Find Properties)
+ *   GET/POST/PATCH/DELETE ?action=offer-proposals — offers a broker builds for a client
+ *   GET/POST ?action=offer-respond    — the buyer's answer to a broker's offer (share token, no login needed)
  *   POST ?action=process-expired      — expire overdue referrals
  *   POST ?action=purge-under-contract — hard-delete stale UNDER CONTRACT properties
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { randomBytes } from 'crypto'
 
 function getSupabase() {
   // NOTE: VITE_ prefixed env vars are build-time only — use SUPABASE_URL in serverless functions
@@ -418,6 +421,335 @@ async function handlePropertyPicks(req, res) {
   return res.status(405).json({ success: false, error: 'Method not allowed' })
 }
 
+// ─── Action: offer-proposals ─────────────────────────────────────────────────
+// Offers a broker builds for a client (broker_offer_proposals). The buyer answers
+// them through ?action=offer-respond using the offer's share token.
+// GET    ?consultationId=   → that lead's offers;  no param → all of the caller's offers
+// POST   { consultationId, id?, status: 'draft'|'sent', ...terms }
+//        → create, or revise (a revision goes back to the buyer for a new answer)
+// PATCH  { id, status: 'sent'|'submitted'|'withdrawn' }
+// DELETE ?id=               → drafts only
+const PROPOSAL_FIELDS = 'id, consultation_id, user_id, agent_id, property_id, case_number, share_token, status, asking_price, offer_price, occupancy, financing, closing_cost_percent, earnest_money, listing_commission_percent, buyer_commission_percent, broker_message, est_net_to_hud, net_to_list, days_on_market, deal_meter_score, deal_meter_sample, deal_meter_basis, financing_estimate, accept_wait_low_days, accept_wait_days, is_favorite, buyer_note, viewed_at, responded_at, accepted_signature, accepted_terms, sent_at, submitted_at, created_at, updated_at'
+const BROKER_EDITABLE = ['draft', 'sent', 'changes_requested', 'declined']
+const BUYER_ACTIONABLE = ['sent', 'changes_requested']
+const TOKEN_RE = /^[A-Za-z0-9_-]{32}$/
+const numOrNull = (v) => (v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Number(v))
+const intOrNull = (v) => (numOrNull(v) === null ? null : Math.round(Number(v)))
+
+/** Validates the builder's terms the same way the buyer offer builder does. Returns { values } or { error }. */
+function proposalTerms(body) {
+  const caseNumber = String(body.case_number || '').trim()
+  const offer = Number(body.offer_price)
+  const closing = Number(body.closing_cost_percent || 0)
+  const listingPct = Number(body.listing_commission_percent ?? 3)
+  const buyerPct = Number(body.buyer_commission_percent ?? 3)
+  const earnest = Number(body.earnest_money || 0)
+  if (!/^\d{3}-\d{6}$/.test(caseNumber)) return { error: 'Enter a valid HUD case number (000-000000).' }
+  if (!['owner', 'investor'].includes(body.occupancy)) return { error: 'Choose owner occupant or investor.' }
+  if (!['fha', 'conventional', 'cash', '203k'].includes(body.financing)) return { error: 'Choose a financing type.' }
+  if (!(offer > 0)) return { error: 'Enter an offer greater than zero.' }
+  if (!(closing >= 0 && closing <= 3)) return { error: 'Closing assistance must be between 0 and 3%.' }
+  if (body.occupancy === 'investor' && closing !== 0) return { error: 'Investor offers cannot request HUD-paid closing cost assistance.' }
+  if (body.occupancy === 'investor' && ['fha', '203k'].includes(body.financing)) return { error: 'Investor offers cannot use owner-occupant FHA financing.' }
+  if ([listingPct, buyerPct].some(v => !(v >= 0 && v <= 100))) return { error: 'Commission rates must be between 0 and 100%.' }
+  if (!(earnest >= 0)) return { error: 'Earnest money cannot be negative.' }
+  const score = intOrNull(body.deal_meter_score)
+  return {
+    values: {
+      case_number: caseNumber,
+      asking_price: numOrNull(body.asking_price),
+      offer_price: offer,
+      occupancy: body.occupancy,
+      financing: body.financing,
+      closing_cost_percent: closing,
+      earnest_money: earnest,
+      listing_commission_percent: listingPct,
+      buyer_commission_percent: buyerPct,
+      broker_message: body.broker_message ? String(body.broker_message).slice(0, 4000) : null,
+      est_net_to_hud: numOrNull(body.est_net_to_hud),
+      net_to_list: numOrNull(body.net_to_list),
+      days_on_market: intOrNull(body.days_on_market),
+      deal_meter_score: score !== null && score >= 0 && score <= 100 ? score : null,
+      deal_meter_sample: intOrNull(body.deal_meter_sample),
+      deal_meter_basis: body.deal_meter_basis ? String(body.deal_meter_basis).slice(0, 200) : null,
+      financing_estimate: body.financing_estimate && typeof body.financing_estimate === 'object' ? body.financing_estimate : null,
+      accept_wait_low_days: intOrNull(body.accept_wait_low_days),
+      accept_wait_days: intOrNull(body.accept_wait_days),
+    },
+  }
+}
+
+/** The terms a buyer agrees to; frozen into accepted_terms when they accept. */
+const termsOf = (p) => ({
+  case_number: p.case_number,
+  offer_price: Number(p.offer_price),
+  occupancy: p.occupancy,
+  financing: p.financing,
+  closing_cost_percent: Number(p.closing_cost_percent),
+  earnest_money: Number(p.earnest_money),
+  listing_commission_percent: Number(p.listing_commission_percent),
+  buyer_commission_percent: Number(p.buyer_commission_percent),
+})
+
+async function logProposalEvent(supabase, proposalId, actor, event, note = null) {
+  const { error } = await supabase.from('broker_offer_proposal_events').insert([{ proposal_id: proposalId, actor, event, note }])
+  if (error) console.warn(`[offer-proposals] event ${event} not logged:`, error.message)
+}
+
+// Adds the buyer's name/contact (from the lead) and the home's listing details
+async function withProposalExtras(supabase, rows) {
+  const leadIds = [...new Set(rows.map(r => r.consultation_id))]
+  const cases = [...new Set(rows.map(r => r.case_number))]
+  const [leads, props] = await Promise.all([
+    leadIds.length ? supabase.from('consultations').select('id, first_name, last_name, customer_name, email, customer_email, phone, customer_phone').in('id', leadIds) : { data: [] },
+    cases.length ? supabase.from('properties').select(PROPERTY_FIELDS).in('case_number', cases) : { data: [] },
+  ])
+  return rows.map(r => {
+    const l = (leads.data || []).find(x => x.id === r.consultation_id) || {}
+    return {
+      ...r,
+      buyer: {
+        name: `${l.first_name || ''} ${l.last_name || ''}`.trim() || l.customer_name || l.email || l.customer_email || 'Client',
+        email: l.email || l.customer_email || null,
+        phone: l.phone || l.customer_phone || null,
+      },
+      property: (props.data || []).find(p => p.case_number === r.case_number) || null,
+    }
+  })
+}
+
+async function proposalForCaller(supabase, caller, id) {
+  if (!UUID_RE.test(String(id || ''))) return null
+  const { data } = await supabase.from('broker_offer_proposals').select(PROPOSAL_FIELDS).eq('id', id).maybeSingle()
+  if (!data || !(await leadForCaller(supabase, caller, data.consultation_id))) return null
+  return data
+}
+
+async function handleOfferProposals(req, res) {
+  const supabase = getSupabase()
+  const caller = await requireRole(req, res, supabase, ['admin', 'broker'])
+  if (!caller) return
+
+  if (req.method === 'GET') {
+    let q = supabase.from('broker_offer_proposals').select(PROPOSAL_FIELDS).order('updated_at', { ascending: false }).limit(300)
+    if (req.query?.consultationId) {
+      const lead = await leadForCaller(supabase, caller, req.query.consultationId)
+      if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' })
+      q = q.eq('consultation_id', lead.id)
+    } else if (caller.role !== 'admin') {
+      const { data: agents } = await supabase.from('agents').select('id').ilike('email', likeExact(caller.email || ''))
+      q = q.in('agent_id', [caller.id, ...(agents || []).map(a => a.id)])
+    }
+    const { data, error } = await q
+    if (error) throw error
+    return res.status(200).json({ success: true, data: await withProposalExtras(supabase, data || []) })
+  }
+
+  if (req.method === 'POST') {
+    const body = req.body || {}
+    const lead = await leadForCaller(supabase, caller, body.consultationId)
+    if (!lead) return res.status(404).json({ success: false, error: 'Lead not found' })
+    const parsed = proposalTerms(body)
+    if (parsed.error) return res.status(400).json({ success: false, error: parsed.error })
+    if (!['draft', 'sent'].includes(body.status)) return res.status(400).json({ success: false, error: 'Save as a draft or send it.' })
+
+    const [{ data: property }, account] = await Promise.all([
+      supabase.from('properties').select('id').eq('case_number', parsed.values.case_number).maybeSingle(),
+      buyerAccount(supabase, lead.buyerEmail),
+    ])
+    const now = new Date().toISOString()
+    const base = { ...parsed.values, property_id: property?.id || null, user_id: account?.id || null, updated_at: now }
+
+    if (body.id) {
+      const current = await proposalForCaller(supabase, caller, body.id)
+      if (!current || current.consultation_id !== lead.id) return res.status(404).json({ success: false, error: 'Offer not found' })
+      if (!BROKER_EDITABLE.includes(current.status)) {
+        return res.status(409).json({ success: false, error: 'This offer was already accepted, so it can no longer be changed. Withdraw it and build a new one.' })
+      }
+      // Once the buyer has it, any change goes back to them for a fresh answer
+      const status = current.status === 'draft' ? body.status : 'sent'
+      const { data, error } = await supabase.from('broker_offer_proposals')
+        .update({ ...base, status, buyer_note: null, responded_at: null, ...(status === 'sent' && !current.sent_at ? { sent_at: now } : {}) })
+        .eq('id', current.id).eq('status', current.status).select(PROPOSAL_FIELDS)
+      if (error) throw error
+      if (!data?.length) return res.status(409).json({ success: false, error: 'The buyer just responded. Reload and try again.' })
+      await logProposalEvent(supabase, current.id, 'broker', current.status === 'draft' ? (status === 'sent' ? 'sent' : 'edited') : 'revised')
+      return res.status(200).json({ success: true, data: (await withProposalExtras(supabase, data))[0] })
+    }
+
+    const { data, error } = await supabase.from('broker_offer_proposals').insert([{
+      ...base,
+      consultation_id: lead.id,
+      customer_id: lead.customer_id || null,
+      agent_id: lead.ownerId || null,
+      share_token: randomBytes(24).toString('base64url'),
+      status: body.status,
+      sent_at: body.status === 'sent' ? now : null,
+    }]).select(PROPOSAL_FIELDS)
+    if (error) throw error
+    await logProposalEvent(supabase, data[0].id, 'broker', body.status === 'sent' ? 'sent' : 'created')
+    return res.status(200).json({ success: true, data: (await withProposalExtras(supabase, data))[0] })
+  }
+
+  if (req.method === 'PATCH') {
+    const { id, status } = req.body || {}
+    const from = { sent: ['draft'], submitted: ['accepted'], withdrawn: ['sent', 'changes_requested', 'accepted', 'declined'] }[status]
+    if (!from) return res.status(400).json({ success: false, error: 'Unknown status change' })
+    const current = await proposalForCaller(supabase, caller, id)
+    if (!current) return res.status(404).json({ success: false, error: 'Offer not found' })
+    const now = new Date().toISOString()
+    const { data, error } = await supabase.from('broker_offer_proposals')
+      .update({ status, updated_at: now, ...(status === 'submitted' ? { submitted_at: now } : {}), ...(status === 'sent' ? { sent_at: now } : {}) })
+      .eq('id', current.id).in('status', from).select(PROPOSAL_FIELDS)
+    if (error) throw error
+    if (!data?.length) return res.status(409).json({ success: false, error: 'This offer changed. Reload and try again.' })
+    await logProposalEvent(supabase, current.id, 'broker', status)
+    return res.status(200).json({ success: true, data: (await withProposalExtras(supabase, data))[0] })
+  }
+
+  if (req.method === 'DELETE') {
+    const current = await proposalForCaller(supabase, caller, req.query?.id)
+    if (!current) return res.status(404).json({ success: false, error: 'Offer not found' })
+    const { data, error } = await supabase.from('broker_offer_proposals').delete().eq('id', current.id).eq('status', 'draft').select('id')
+    if (error) throw error
+    if (!data?.length) return res.status(409).json({ success: false, error: 'Only drafts can be deleted. Withdraw a sent offer instead.' })
+    return res.status(200).json({ success: true })
+  }
+
+  return res.status(405).json({ success: false, error: 'Method not allowed' })
+}
+
+// ─── Action: offer-respond ───────────────────────────────────────────────────
+// The buyer's side of a broker's offer, authorized by its share token so it works
+// from an emailed link without an account. Signed-in buyers use the same token.
+// GET  ?token=   → the offer, its home and the broker (street address only when signed in)
+// POST { token, action: 'favorite'|'unfavorite'|'accept'|'changes'|'decline', terms?, signature?, authorize?, note? }
+async function proposalByToken(supabase, token) {
+  if (!TOKEN_RE.test(String(token || ''))) return null
+  const { data } = await supabase.from('broker_offer_proposals').select(PROPOSAL_FIELDS)
+    .eq('share_token', token).neq('status', 'draft').maybeSingle()
+  return data || null
+}
+
+// Best-effort email to the broker when the buyer answers; skipped if Gmail isn't configured
+async function emailAgent(supabase, agentId, subject, text) {
+  if (!agentId || !process.env.GMAIL_USER || !process.env.GMAIL_APP_PASS) return
+  try {
+    const { data: agent } = await supabase.from('agents').select('email').eq('id', agentId).maybeSingle()
+    if (!agent?.email) return
+    const { default: nodemailer } = await import('nodemailer')
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASS.replace(/\s/g, '') },
+    })
+    await transporter.sendMail({ from: `USAHUDHomes <${process.env.GMAIL_USER}>`, to: agent.email, subject, text })
+  } catch (e) {
+    console.warn('[offer-respond] broker email failed:', e.message)
+  }
+}
+
+async function handleOfferRespond(req, res) {
+  const supabase = getSupabase()
+
+  if (req.method === 'GET') {
+    const offer = await proposalByToken(supabase, req.query?.token)
+    if (!offer) return res.status(404).json({ success: false, error: 'This offer link is not valid.' })
+    if (!offer.viewed_at) {
+      const { data } = await supabase.from('broker_offer_proposals').update({ viewed_at: new Date().toISOString() }).eq('id', offer.id).is('viewed_at', null).select('id')
+      if (data?.length) await logProposalEvent(supabase, offer.id, 'buyer', 'viewed')
+    }
+    const [caller, { data: property }, { data: agent }, { data: lead }] = await Promise.all([
+      getCaller(req, supabase),
+      supabase.from('properties').select('id, case_number, address, city, state, zip_code, price, beds, baths, sq_ft, status, main_image, bid_deadline').eq('case_number', offer.case_number).maybeSingle(),
+      offer.agent_id ? supabase.from('agents').select('first_name, last_name, email, phone, company').eq('id', offer.agent_id).maybeSingle() : { data: null },
+      supabase.from('consultations').select('first_name, last_name, customer_name').eq('id', offer.consultation_id).maybeSingle(),
+    ])
+    // Internal ids stay on the server; street addresses stay behind the login, as on property pages
+    const { consultation_id, user_id, agent_id, property_id, viewed_at, ...safe } = offer // eslint-disable-line no-unused-vars
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...safe,
+        terms: termsOf(offer),
+        property: property && !caller ? { ...property, address: null } : property,
+        agent,
+        buyerName: `${lead?.first_name || ''} ${lead?.last_name || ''}`.trim() || lead?.customer_name || '',
+        signedIn: !!caller,
+      },
+    })
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' })
+  const body = req.body || {}
+  const offer = await proposalByToken(supabase, body.token)
+  if (!offer) return res.status(404).json({ success: false, error: 'This offer link is not valid.' })
+  const now = new Date().toISOString()
+
+  if (body.action === 'favorite' || body.action === 'unfavorite') {
+    if (offer.status === 'withdrawn') return res.status(409).json({ success: false, error: 'This offer was withdrawn.' })
+    const favorite = body.action === 'favorite'
+    // Mirror into the buyer's Saved Homes when they have an account (it may be newer than the offer)
+    let userId = offer.user_id
+    if (!userId) {
+      const lead = await leadForCaller(supabase, { role: 'admin' }, offer.consultation_id)
+      userId = (await buyerAccount(supabase, lead?.buyerEmail))?.id || null
+    }
+    const { error } = await supabase.from('broker_offer_proposals').update({ is_favorite: favorite, user_id: userId, updated_at: now }).eq('id', offer.id)
+    if (error) throw error
+    if (userId && offer.property_id) {
+      const saved = favorite
+        ? await supabase.from('saved_properties').upsert([{ user_id: userId, property_id: offer.property_id, case_number: offer.case_number, price_at_save: offer.asking_price, recommended_by_agent_id: offer.agent_id }], { onConflict: 'user_id,property_id', ignoreDuplicates: true })
+        : await supabase.from('saved_properties').delete().eq('user_id', userId).eq('property_id', offer.property_id)
+      if (saved.error) console.warn('[offer-respond] saved homes not updated:', saved.error.message)
+    }
+    await logProposalEvent(supabase, offer.id, 'buyer', favorite ? 'favorited' : 'unfavorited')
+    return res.status(200).json({ success: true, data: { is_favorite: favorite, savedToAccount: !!(userId && offer.property_id) } })
+  }
+
+  if (!BUYER_ACTIONABLE.includes(offer.status)) {
+    return res.status(409).json({ success: false, error: 'This offer can no longer be changed. Contact your broker.' })
+  }
+
+  if (body.action === 'accept') {
+    const signature = String(body.signature || '').trim().slice(0, 200)
+    if (body.authorize !== true) return res.status(400).json({ success: false, error: 'Check the box to authorize your broker to submit this offer.' })
+    if (signature.length < 2) return res.status(400).json({ success: false, error: 'Type your full name to sign.' })
+    // Only accept the exact terms the buyer was looking at
+    const terms = termsOf(offer)
+    const seen = body.terms || {}
+    if (!Object.keys(terms).every(k => seen[k] === terms[k])) {
+      return res.status(409).json({ success: false, error: 'Your broker just updated this offer. Reload to review the new terms.' })
+    }
+    const { data, error } = await supabase.from('broker_offer_proposals')
+      .update({ status: 'accepted', accepted_signature: signature, accepted_terms: terms, responded_at: now, updated_at: now })
+      .eq('id', offer.id).eq('updated_at', offer.updated_at).in('status', BUYER_ACTIONABLE).select('id')
+    if (error) throw error
+    if (!data?.length) return res.status(409).json({ success: false, error: 'This offer changed while you were reviewing it. Reload and try again.' })
+    await logProposalEvent(supabase, offer.id, 'buyer', 'accepted', `Signed: ${signature}`)
+    await emailAgent(supabase, offer.agent_id, `Offer accepted: HUD ${offer.case_number}`,
+      `${signature} accepted your $${terms.offer_price.toLocaleString()} offer on HUD case ${offer.case_number} and authorized you to submit it.\n\nOpen your broker dashboard: https://www.usahudhomes.com/broker-dashboard`)
+    return res.status(200).json({ success: true, data: { status: 'accepted' } })
+  }
+
+  if (body.action === 'changes' || body.action === 'decline') {
+    const note = String(body.note || '').trim().slice(0, 2000)
+    if (body.action === 'changes' && !note) return res.status(400).json({ success: false, error: 'Tell your broker what you would like changed.' })
+    const status = body.action === 'changes' ? 'changes_requested' : 'declined'
+    const { data, error } = await supabase.from('broker_offer_proposals')
+      .update({ status, buyer_note: note || null, responded_at: now, updated_at: now })
+      .eq('id', offer.id).eq('updated_at', offer.updated_at).in('status', BUYER_ACTIONABLE).select('id')
+    if (error) throw error
+    if (!data?.length) return res.status(409).json({ success: false, error: 'This offer changed while you were reviewing it. Reload and try again.' })
+    await logProposalEvent(supabase, offer.id, 'buyer', status, note || null)
+    await emailAgent(supabase, offer.agent_id,
+      status === 'changes_requested' ? `Changes requested: HUD ${offer.case_number}` : `Offer declined: HUD ${offer.case_number}`,
+      `Your client ${status === 'changes_requested' ? 'asked for changes to' : 'declined'} your offer on HUD case ${offer.case_number}.${note ? `\n\n"${note}"` : ''}\n\nOpen your broker dashboard: https://www.usahudhomes.com/broker-dashboard`)
+    return res.status(200).json({ success: true, data: { status } })
+  }
+
+  return res.status(400).json({ success: false, error: 'Unknown response' })
+}
+
 // ─── Action: purge-under-contract ───────────────────────────────────────────
 /**
  * Removes (hard-deletes) properties that have been UNDER CONTRACT for more
@@ -581,6 +913,8 @@ export default async function handler(req, res) {
     if (action === 'referrals')        return await handleGetReferrals(req, res)
     if (action === 'client-activity')  return await handleClientActivity(req, res)
     if (action === 'property-picks')   return await handlePropertyPicks(req, res)
+    if (action === 'offer-proposals')  return await handleOfferProposals(req, res)
+    if (action === 'offer-respond')    return await handleOfferRespond(req, res)
     if (action === 'process-expired')       return await handleProcessExpired(req, res)
     if (action === 'purge-under-contract')  return await handlePurgeUnderContract(req, res)
 
