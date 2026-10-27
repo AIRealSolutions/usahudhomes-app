@@ -9,6 +9,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useActiveClient } from '../contexts/ActiveClientContext'
 import BrokerOfferInbox from './broker/BrokerOfferInbox'
+import ClientOffersPanel from './broker/ClientOffersPanel'
 import SectionBoundary from './dashboard/SectionBoundary'
 import { useReminders, remindersAsEvents } from '../services/reminders'
 import { useInvestorWatches, watchesAsEvents } from '../services/investorWatches'
@@ -23,7 +24,7 @@ import {
   ChevronLeft, ChevronRight, Menu, X, LogOut, Bell, RefreshCw,
   Phone, Mail, CheckCircle, Clock, AlertCircle,
   ArrowRight, Inbox, Share2, User, BarChart2, Shield,
-  ChevronDown, Search, Trash2, AlertTriangle, CheckSquare, Square, Briefcase, Gavel, UserPlus
+  ChevronDown, Search, Trash2, AlertTriangle, CheckSquare, Square, Briefcase, Gavel, UserPlus, FileSignature
 } from 'lucide-react'
 
 // ── Lazy-loaded leaf components ───────────────────────────────────────────────
@@ -53,6 +54,7 @@ const NAV_SECTIONS = [
     items: [
       { id: 'active-leads',    label: 'Active Leads',      icon: Users,           color: 'text-green-500',  alertKey: 'activeLeads' },
       { id: 'referrals',       label: 'Referral Inbox',    icon: Inbox,           color: 'text-orange-500', alertKey: 'pendingReferrals' },
+      { id: 'client-offers',   label: 'Offers to Clients', icon: FileSignature,   color: 'text-emerald-600' },
       { id: 'offer-marketplace', label: 'Offer-Ready Referrals', icon: Gavel, color: 'text-amber-600' },
       { id: 'invite-clients',  label: 'Invite Clients',    icon: UserPlus,        color: 'text-green-600' },
     ]
@@ -1430,7 +1432,11 @@ function BrokerControlPanel({ agentId, agentName, onNavigate }) {
 export default function BrokerShell({ user, showAdminAccess }) {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
-  const [activePanel, setActivePanel]   = useState('overview')
+  // ?panel= opens a panel directly (e.g. from the offer builder's "Manage & share" link)
+  const [activePanel, setActivePanel]   = useState(() => {
+    const panel = new URLSearchParams(window.location.search).get('panel')
+    return NAV_SECTIONS.some(s => s.items.some(i => i.id === panel)) ? panel : 'overview'
+  })
   const [sidebarOpen, setSidebarOpen]   = useState(true)
   const [collapsed, setCollapsed]       = useState(false)
   const [roleMenuOpen, setRoleMenuOpen] = useState(false)
@@ -1485,7 +1491,9 @@ export default function BrokerShell({ user, showAdminAccess }) {
     if (loadingAgent) return <PanelFallback />
     switch (activePanel) {
       case 'overview':
-        return <><BrokerControlPanel agentId={agentId} agentName={agentName} onNavigate={setActivePanel} />{agentId&&<BrokerOfferInbox agentId={agentId} />}</>
+        return <><BrokerControlPanel agentId={agentId} agentName={agentName} onNavigate={setActivePanel} />{agentId&&<BrokerOfferInbox agentId={agentId} />}<ClientOffersPanel attentionOnly onShowAll={() => setActivePanel('client-offers')} /></>
+      case 'client-offers':
+        return <ClientOffersPanel />
       case 'active-leads':
         return <ActiveLeadsPanel agentId={agentId} />
       case 'referrals':
