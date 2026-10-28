@@ -13,6 +13,8 @@ import { PRICE_CUT } from '../lib/dealMeter'
 import { EVENT_STYLE } from './BidHistory'
 
 const DAY = 86400000
+// Lowest offer worth suggesting once the cut lands: 94% of the projected new price
+const MIN_OFFER_RATIO = 0.94
 // Date-only values are read at noon so they don't slip a day across time zones
 const toDate = d => (d ? new Date(String(d).length <= 10 ? `${d}T12:00:00` : d) : null)
 const dayStart = d => { const x = new Date(d); x.setHours(12, 0, 0, 0); return x }
@@ -64,6 +66,7 @@ export default function ListingTimeline({ property, signedIn }) {
   const cutDue = new Date(dayStart(priceSince).getTime() + (Math.floor(daysAtPrice / PRICE_CUT.day) + 1) * PRICE_CUT.day * DAY)
   const daysToCut = daysBetween(today, cutDue)
   const estNewPrice = Number(property.price) > 0 ? Math.round(Number(property.price) * (1 - PRICE_CUT.percent / 100)) : null
+  const minOffer = estNewPrice ? Math.round(estNewPrice * MIN_OFFER_RATIO) : null
   const showCut = !underContract && Number(property.price) > 0
 
   // The meter runs from the first record to the projected cut (or to today while under contract)
@@ -164,12 +167,22 @@ export default function ListingTimeline({ property, signedIn }) {
             : <>If it doesn't sell, HUD typically cuts about {PRICE_CUT.percent}% around <strong>{formatDate(cutDue.toISOString())}</strong></>}
           {estNewPrice && <> — to roughly <strong className="text-green-700">{formatMoney(estNewPrice)}</strong></>}.
         </p>
-      ) : (
+      ) : null)}
+      {showCut && signedIn && minOffer && (
+        <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-green-800">Minimum suggested offer at the price cut</p>
+            <p className="text-xs text-green-900">{formatMoney(property.price)} − {PRICE_CUT.percent}% = {formatMoney(estNewPrice)} × {Math.round(MIN_OFFER_RATIO * 100)}%</p>
+          </div>
+          <p className="text-2xl font-bold text-green-800">{formatMoney(minOffer)}</p>
+        </div>
+      )}
+      {showCut && !signedIn && (
         <Link to={`/login?signup=1&next=${encodeURIComponent(`/property/${property.case_number}`)}`}
           className="inline-flex items-center gap-1.5 text-sm text-blue-700 bg-blue-50 rounded px-3 py-2 hover:bg-blue-100">
-          <Lock className="h-4 w-4" /> Free account: see when HUD's next price cut is expected and the projected price
+          <Lock className="h-4 w-4" /> Free account: see when HUD's next price cut is expected, the projected price and the minimum suggested offer
         </Link>
-      ))}
+      )}
 
       {events.length > 0 && (
         <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-600">
