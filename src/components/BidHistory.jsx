@@ -41,7 +41,7 @@ export function BidHistorySummary({ property, offers, signedIn }) {
   )
 }
 
-const EVENT_STYLE = {
+export const EVENT_STYLE = {
   listed:          { dot: 'bg-blue-500',    title: 'Listed by HUD' },
   price_change:    { dot: 'bg-green-500',   title: 'Price change' },
   status_change:   { dot: 'bg-gray-400',    title: 'Status update' },

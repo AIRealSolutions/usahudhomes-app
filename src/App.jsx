@@ -46,6 +46,7 @@ import PropertyRequestForm from './components/PropertyRequestForm'
 import AgentRequestForm from './components/AgentRequestForm'
 import SearchFilters from './components/SearchFilters'
 import { BidHistorySummary, PropertyHistoryPanel } from './components/BidHistory'
+import ListingTimeline from './components/ListingTimeline'
 import SaveHomeButton from './components/SaveHomeButton'
 import PaymentBreakdown from './components/PaymentBreakdown'
 import SignUpGate from './components/SignUpGate'
@@ -1012,6 +1013,9 @@ function PropertyDetailPage() {
               <SaveHomeButton property={property} variant="button" />
             </div>
           </div>
+
+          {/* Days on market, recorded events and the next expected price cut */}
+          <ListingTimeline property={property} signedIn={!!user} />
 
           <div id="prepare-offer" className="mb-8 scroll-mt-24">
             {user ? <BuyerBidBuilder user={user} property={property} onTermsChange={setOfferTerms} financingEstimate={financingEstimate} /> : (
