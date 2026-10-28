@@ -15,6 +15,8 @@ import { EVENT_STYLE } from './BidHistory'
 const DAY = 86400000
 // Lowest offer worth suggesting once the cut lands, as a share of the projected new price.
 // Owner-occupant bids often ask HUD for 3% closing costs, so their floor sits 3 points higher.
+// The projected post-cut price and suggested offers stay hidden until the home has been listed this long
+const SHOW_CUT_PRICE_AFTER_DAYS = 21
 const MIN_OFFERS = [
   { label: 'Investor', ratio: 0.94 },
   { label: 'Owner-occupant', ratio: 0.97, note: 'allows for 3% closing costs' },
@@ -69,7 +71,8 @@ export default function ListingTimeline({ property, signedIn }) {
   const daysAtPrice = Math.max(0, daysBetween(priceSince, today))
   const cutDue = new Date(dayStart(priceSince).getTime() + (Math.floor(daysAtPrice / PRICE_CUT.day) + 1) * PRICE_CUT.day * DAY)
   const daysToCut = daysBetween(today, cutDue)
-  const estNewPrice = Number(property.price) > 0 ? Math.round(Number(property.price) * (1 - PRICE_CUT.percent / 100)) : null
+  const cutPriceVisible = dom !== null && dom > SHOW_CUT_PRICE_AFTER_DAYS
+  const estNewPrice = cutPriceVisible && Number(property.price) > 0 ? Math.round(Number(property.price) * (1 - PRICE_CUT.percent / 100)) : null
   const minOffers = estNewPrice ? MIN_OFFERS.map(o => ({ ...o, amount: Math.round(estNewPrice * o.ratio) })) : null
   const showCut = !underContract && Number(property.price) > 0
 
@@ -170,6 +173,12 @@ export default function ListingTimeline({ property, signedIn }) {
             ? <>HUD's usual {PRICE_CUT.percent}% cut is due now</>
             : <>If it doesn't sell, HUD typically cuts about {PRICE_CUT.percent}% around <strong>{formatDate(cutDue.toISOString())}</strong></>}
           {estNewPrice && <> — to roughly <strong className="text-green-700">{formatMoney(estNewPrice)}</strong></>}.
+          {!cutPriceVisible && dom !== null && (
+            <span className="block mt-1 text-gray-500">
+              The projected price and minimum suggested offers appear after {SHOW_CUT_PRICE_AFTER_DAYS} days on the market
+              {' '}(in {SHOW_CUT_PRICE_AFTER_DAYS + 1 - dom} day{SHOW_CUT_PRICE_AFTER_DAYS + 1 - dom === 1 ? '' : 's'}).
+            </span>
+          )}
         </p>
       ) : null)}
       {showCut && signedIn && minOffers && (
