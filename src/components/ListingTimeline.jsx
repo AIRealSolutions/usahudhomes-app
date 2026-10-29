@@ -13,10 +13,13 @@ import { PRICE_CUT } from '../lib/dealMeter'
 import { EVENT_STYLE } from './BidHistory'
 
 const DAY = 86400000
-// Lowest offer worth suggesting once the cut lands, as a share of the projected new price.
-// Owner-occupant bids often ask HUD for 3% closing costs, so their floor sits 3 points higher.
 // The projected post-cut price and suggested offers stay hidden until the home has been listed this long
 const SHOW_CUT_PRICE_AFTER_DAYS = 21
+// How many future cuts the schedule lists, and how far ahead the target-price estimate looks (one year)
+const SCHEDULE_CUTS = 3
+const MAX_CUTS = 12
+// Lowest offer worth suggesting once the cut lands, as a share of the projected new price.
+// Owner-occupant bids often ask HUD for 3% closing costs, so their floor sits 3 points higher.
 const MIN_OFFERS = [
   { label: 'Investor', ratio: 0.94 },
   { label: 'Owner-occupant', ratio: 0.97, note: 'allows for 3% closing costs' },
@@ -26,6 +29,62 @@ const toDate = d => (d ? new Date(String(d).length <= 10 ? `${d}T12:00:00` : d) 
 const dayStart = d => { const x = new Date(d); x.setHours(12, 0, 0, 0); return x }
 const daysBetween = (a, b) => Math.floor((dayStart(b) - dayStart(a)) / DAY)
 const isCut = e => e.kind === 'price_change' && Number(e.list_price) < Number(e.previous_price)
+
+const CUT_FACTOR = 1 - PRICE_CUT.percent / 100
+const waitText = days => (days <= 0 ? 'now' : `in ~${days} day${days === 1 ? '' : 's'}`)
+
+/**
+ * HUD keeps cutting about 10% every 30 days a home goes unsold: the next few projected cuts, and how long
+ * it would generally take for the list price to reach a price the buyer has in mind.
+ */
+function CutSchedule({ price, cutDue, dom, daysToCut }) {
+  const [target, setTarget] = useState('')
+  const cuts = Array.from({ length: SCHEDULE_CUTS }, (_, i) => ({
+    n: i + 1,
+    on: new Date(cutDue.getTime() + i * PRICE_CUT.day * DAY),
+    wait: daysToCut + i * PRICE_CUT.day,
+    price: Math.round(price * Math.pow(CUT_FACTOR, i + 1)),
+  }))
+
+  const want = Number(String(target).replace(/[^0-9.]/g, ''))
+  let answer = null
+  if (want > 0) {
+    if (want >= price) answer = <>It's already listed at {formatMoney(price)}, at or below your price.</>
+    else {
+      const n = Math.ceil(Math.log(want / price) / Math.log(CUT_FACTOR))
+      const wait = daysToCut + (n - 1) * PRICE_CUT.day
+      answer = n > MAX_CUTS
+        ? <>That would take more than {MAX_CUTS} cuts (over a year). HUD rarely lets a home sit that long.</>
+        : <>
+            About <strong>{n} cut{n === 1 ? '' : 's'}</strong>, down to roughly <strong className="text-green-700">{formatMoney(price * Math.pow(CUT_FACTOR, n))}</strong>
+            {' '}around <strong>{formatDate(new Date(cutDue.getTime() + (n - 1) * PRICE_CUT.day * DAY).toISOString())}</strong>
+            {' '}({waitText(wait)}{dom !== null ? `, at ${dom + Math.max(0, wait)} days on market` : ''}), if it hasn't sold by then.
+          </>
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Projected price cuts if it doesn't sell</p>
+      <p className="text-xs text-gray-500">About {PRICE_CUT.percent}% every {PRICE_CUT.day} days, so {SCHEDULE_CUTS * PRICE_CUT.day} more days usually means {SCHEDULE_CUTS} cuts.</p>
+      <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {cuts.map(c => (
+          <div key={c.n} className="rounded-md bg-gray-50 px-3 py-2">
+            <p className="text-xs text-gray-500">Cut {c.n} · {formatDate(c.on.toISOString())}</p>
+            <p className="text-lg font-bold text-gray-900">{formatMoney(c.price)}</p>
+            <p className="text-xs text-gray-500">{waitText(c.wait)}{dom !== null ? ` · day ${dom + Math.max(0, c.wait)}` : ''}</p>
+          </div>
+        ))}
+      </div>
+      <label className="mt-3 block text-sm font-medium text-gray-800" htmlFor="target-price">How long until it reaches your price?</label>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <input id="target-price" inputMode="numeric" value={target} onChange={e => setTarget(e.target.value)} placeholder="e.g. 120,000"
+          className="w-40 rounded-md border px-3 py-1.5 text-sm" />
+        {answer && <p className="text-sm text-gray-700 flex-1 min-w-[200px]">{answer}</p>}
+      </div>
+    </div>
+  )
+}
 
 function eventLabel(e) {
   if (e.kind === 'price_change') {
@@ -197,6 +256,9 @@ export default function ListingTimeline({ property, signedIn }) {
             ))}
           </div>
         </div>
+      )}
+      {showCut && signedIn && estNewPrice && (
+        <CutSchedule price={Number(property.price)} cutDue={cutDue} dom={dom} daysToCut={daysToCut} />
       )}
       {showCut && !signedIn && (
         <Link to={`/login?signup=1&next=${encodeURIComponent(`/property/${property.case_number}`)}`}
