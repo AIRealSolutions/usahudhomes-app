@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FileSignature, Heart } from 'lucide-react'
 import { supabase } from '../config/supabase'
+import DealStatusBadge from './DealStatusBadge'
 
 const money = n => Number(n || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 const STATUS = {
@@ -25,7 +26,7 @@ export default function BrokerOffersSection() {
     let active = true
     // RLS returns only offers sent to this buyer's account
     supabase.from('broker_offer_proposals')
-      .select('id, share_token, case_number, status, offer_price, asking_price, is_favorite, updated_at')
+      .select('id, share_token, case_number, status, offer_price, asking_price, is_favorite, updated_at, deal_status, deal_status_date')
       .neq('status', 'withdrawn')
       .order('updated_at', { ascending: false })
       .then(({ data }) => { if (active) setOffers(data || []) })
@@ -50,7 +51,7 @@ export default function BrokerOffersSection() {
             </div>
             <div className="flex items-center gap-2">
               {o.is_favorite && <Heart className="h-4 w-4 fill-rose-600 text-rose-600" aria-label="In your favorites" />}
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS[o.status]?.[1]}`}>{STATUS[o.status]?.[0]}</span>
+              {o.deal_status ? <DealStatusBadge offer={o} /> : <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS[o.status]?.[1]}`}>{STATUS[o.status]?.[0]}</span>}
             </div>
           </Link>
         ))}

@@ -89,4 +89,24 @@ export async function deleteDocument(doc) {
   await supabase.storage.from(BUCKET).remove([doc.storage_path])
 }
 
+/** Where an offer stands with HUD after the bid; null means still waiting on HUD. */
+export const DEAL_STATUS = {
+  hud_accepted: { label: 'Accepted by HUD', tone: 'bg-emerald-100 text-emerald-800', dateLabel: 'Accepted on' },
+  under_contract: { label: 'Under contract', tone: 'bg-amber-100 text-amber-900', dateLabel: 'Contract date' },
+  closed: { label: 'Closed', tone: 'bg-indigo-100 text-indigo-800', dateLabel: 'Closed on' },
+  not_accepted: { label: 'Not accepted by HUD', tone: 'bg-gray-200 text-gray-700', dateLabel: 'Date' },
+  fell_through: { label: 'Fell through', tone: 'bg-rose-100 text-rose-800', dateLabel: 'Date' },
+}
+export const DEAL_STATUS_ORDER = ['hud_accepted', 'under_contract', 'closed', 'not_accepted', 'fell_through']
+
+/** Brokers on the offer and admins only. status null clears it. Returns the saved deal fields. */
+export async function setDealStatus(kind, id, { status, date = null, closingDate = null, note = '' }) {
+  const { data, error } = await supabase.rpc('set_offer_deal_status', {
+    p_kind: kind, p_offer_id: id, p_status: status || null,
+    p_date: date || null, p_closing_date: closingDate || null, p_note: note || null,
+  })
+  if (error) throw error
+  return data
+}
+
 export const offerPagePath = (kind, id) => `/offers/${kind}/${id}`

@@ -429,7 +429,7 @@ async function handlePropertyPicks(req, res) {
 //        → create, or revise (a revision goes back to the buyer for a new answer)
 // PATCH  { id, status: 'sent'|'submitted'|'withdrawn' }
 // DELETE ?id=               → drafts only
-const PROPOSAL_FIELDS = 'id, consultation_id, user_id, agent_id, property_id, case_number, share_token, status, asking_price, offer_price, occupancy, financing, closing_cost_percent, earnest_money, listing_commission_percent, buyer_commission_percent, broker_message, est_net_to_hud, net_to_list, days_on_market, deal_meter_score, deal_meter_sample, deal_meter_basis, financing_estimate, accept_wait_low_days, accept_wait_days, is_favorite, buyer_note, viewed_at, responded_at, accepted_signature, accepted_terms, sent_at, submitted_at, created_at, updated_at'
+const PROPOSAL_FIELDS = 'id, consultation_id, user_id, agent_id, property_id, case_number, share_token, status, asking_price, offer_price, occupancy, financing, closing_cost_percent, earnest_money, listing_commission_percent, buyer_commission_percent, broker_message, est_net_to_hud, net_to_list, days_on_market, deal_meter_score, deal_meter_sample, deal_meter_basis, financing_estimate, accept_wait_low_days, accept_wait_days, is_favorite, buyer_note, viewed_at, responded_at, accepted_signature, accepted_terms, sent_at, submitted_at, deal_status, deal_status_date, closing_date, deal_note, created_at, updated_at'
 const BROKER_EDITABLE = ['draft', 'sent', 'changes_requested', 'declined']
 const BUYER_ACTIONABLE = ['sent', 'changes_requested']
 const TOKEN_RE = /^[A-Za-z0-9_-]{32}$/

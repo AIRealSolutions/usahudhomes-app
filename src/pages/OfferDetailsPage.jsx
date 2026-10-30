@@ -12,14 +12,17 @@ import { FileText, Upload } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { EVENT_STYLE } from '../components/BidHistory'
 import OfferDocumentViewer from '../components/OfferDocumentViewer'
+import DealStatusBadge from '../components/DealStatusBadge'
 import { fetchPropertyHistory, formatMoney } from '../services/acceptedOffers'
 import { PROPOSAL_EVENT_LABELS, PROPOSAL_STATUS } from '../services/offerProposals'
 import {
-  ACCEPT, DOC_TYPES, deleteDocument, docTypeLabel, downloadDocument, getOfferDetails, getOfferTimeline,
-  listDocuments, MAX_FILE_BYTES, uploadDocument,
+  ACCEPT, DEAL_STATUS, DEAL_STATUS_ORDER, DOC_TYPES, deleteDocument, docTypeLabel, downloadDocument, getOfferDetails,
+  getOfferTimeline, listDocuments, MAX_FILE_BYTES, setDealStatus, uploadDocument,
 } from '../services/offerDocuments'
 
 const when = d => (d ? new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '')
+const day = d => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { dateStyle: 'medium' }) : '')
+const today = () => new Date().toLocaleDateString('en-CA')
 const fileSize = n => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`)
 const FINANCING = { fha: 'FHA', '203k': 'FHA 203(k)', conventional: 'Conventional', cash: 'Cash' }
 const OCCUPANCY = { owner: 'Owner occupant', investor: 'Investor', other: 'Other' }
@@ -44,8 +47,12 @@ const FIELDS = {
   notes: ['Buyer notes', v => `“${v}”`],
   broker_message: ['Broker message', v => `“${v}”`],
   closing_agent_id: ['Closing agent', () => 'updated'],
+  deal_status: ['Deal status', v => DEAL_STATUS[v]?.label || v],
+  deal_status_date: ['Status date', day],
+  closing_date: ['Closing date', day],
+  deal_note: ['Deal note', v => `“${v}”`],
 }
-const showValue = (field, v) => (v == null || v === '' ? 'none' : (FIELDS[field]?.[1] || String)(v))
+const showValue = (field, v) => (v == null || v === '' ? (field === 'deal_status' ? 'Waiting on HUD' : 'none') : (FIELDS[field]?.[1] || String)(v))
 
 export default function OfferDetailsPage() {
   const { kind, id } = useParams()
@@ -94,7 +101,11 @@ export default function OfferDetailsPage() {
     )
   }
 
-  const { offer: o, property: p = {}, client, broker } = details
+  const { offer: o, property: p = {}, client, broker, can_manage: canManage } = details
+  const onDealSaved = async (deal) => {
+    setDetails(d => ({ ...d, offer: { ...d.offer, ...deal } }))
+    await loadOfferSide()
+  }
   const status = (kind === 'bid' ? BID_STATUS : PROPOSAL_STATUS)[o.status] || { label: o.status, tone: 'bg-gray-100' }
   const clientName = client?.name || client?.fallback_name
   const where = [p?.address, p?.city, p?.state].filter(Boolean).join(', ')
@@ -109,8 +120,13 @@ export default function OfferDetailsPage() {
           <h1 className="text-2xl sm:text-3xl font-bold">{formatMoney(o.offer_price)} offer · HUD {o.case_number}</h1>
           <p className="text-gray-600">{where || 'Address shown on the property page'} · <Link className="text-blue-700 underline" to={`/property/${encodeURIComponent(o.case_number)}`}>View the home</Link></p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-sm font-semibold ${status.tone}`}>{status.label}</span>
+        <div className="flex flex-wrap gap-2">
+          <span className={`rounded-full px-3 py-1 text-sm font-semibold ${status.tone}`}>{status.label}</span>
+          <DealStatusBadge offer={o} className="px-3 py-1 text-sm" />
+        </div>
       </header>
+
+      <DealStatusSection kind={kind} id={id} offer={o} canManage={canManage} onSaved={onDealSaved} />
 
       <section className="bg-white rounded-xl border p-5">
         <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
@@ -132,6 +148,92 @@ export default function OfferDetailsPage() {
       <DocumentsSection kind={kind} id={id} docs={docs} userId={user?.id} onChange={loadOfferSide} />
       <TimelineSection offerItems={timeline} propertyItems={history} />
     </div>
+  )
+}
+
+function DealStatusSection({ kind, id, offer: o, canManage, onSaved }) {
+  const [status, setStatus] = useState(o.deal_status || '')
+  const [date, setDate] = useState(o.deal_status_date || today())
+  const [closingDate, setClosingDate] = useState(o.closing_date || '')
+  const [note, setNote] = useState(o.deal_note || '')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const current = DEAL_STATUS[o.deal_status]
+
+  const pick = (s) => {
+    setStatus(s); setMessage('')
+    // A new status starts on today's date; reopening the current one keeps its date
+    setDate(s === o.deal_status ? o.deal_status_date || today() : today())
+  }
+
+  const save = async (e) => {
+    e.preventDefault()
+    setBusy(true); setMessage('')
+    try {
+      await onSaved(await setDealStatus(kind, id, { status: status || null, date, closingDate, note }))
+      setMessage('Saved.')
+    } catch (err) {
+      setMessage(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Buyers see where things stand; only the broker and admins change it
+  if (!canManage) {
+    if (!current) return null
+    return (
+      <section className="rounded-xl border bg-white p-5">
+        <h2 className="text-xl font-bold">Deal status</h2>
+        <p className="mt-2"><DealStatusBadge offer={o} withDate className="px-3 py-1 text-sm" /></p>
+        {o.closing_date && <p className="mt-2 text-sm">{o.deal_status === 'closed' ? 'Closed' : 'Expected closing'}: <strong>{day(o.closing_date)}</strong></p>}
+        {o.deal_note && <p className="mt-1 text-sm text-gray-700">{o.deal_note}</p>}
+      </section>
+    )
+  }
+
+  const unchanged = (status || null) === (o.deal_status || null) && (!status || (date === (o.deal_status_date || today())
+    && (closingDate || null) === (o.closing_date || null) && (note.trim() || null) === (o.deal_note || null)))
+
+  return (
+    <section className="rounded-xl border bg-white p-5 space-y-4">
+      <div>
+        <h2 className="text-xl font-bold">Deal status</h2>
+        <p className="text-sm text-gray-600">Where this offer stands with HUD. The buyer sees it on their offer, and every change goes in the timeline.</p>
+      </div>
+      <form onSubmit={save} className="space-y-4">
+        <div role="radiogroup" aria-label="Deal status" className="flex flex-wrap gap-2">
+          {[['', 'Waiting on HUD', 'bg-gray-100 text-gray-700'], ...DEAL_STATUS_ORDER.map(k => [k, DEAL_STATUS[k].label, DEAL_STATUS[k].tone])].map(([key, label, tone]) => (
+            <button key={key || 'none'} type="button" role="radio" aria-checked={status === key} onClick={() => pick(key)}
+              className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${status === key ? `${tone} border-transparent ring-2 ring-blue-600` : 'bg-white text-gray-700 hover:bg-gray-50'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {status && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-sm">
+              <span className="mb-1 block font-medium">{DEAL_STATUS[status].dateLabel}</span>
+              <input type="date" required value={date} onChange={e => setDate(e.target.value)} className="w-full rounded-lg border px-3 py-2" />
+            </label>
+            {['hud_accepted', 'under_contract', 'closed'].includes(status) && (
+              <label className="text-sm">
+                <span className="mb-1 block font-medium">{status === 'closed' ? 'Closing date' : 'Expected closing date (optional)'}</span>
+                <input type="date" value={closingDate} onChange={e => setClosingDate(e.target.value)} className="w-full rounded-lg border px-3 py-2" />
+              </label>
+            )}
+            <label className="text-sm sm:col-span-2">
+              <span className="mb-1 block font-medium">Note (optional)</span>
+              <input value={note} onChange={e => setNote(e.target.value)} maxLength={300} placeholder={status === 'fell_through' ? 'e.g. Financing denied' : 'e.g. HUD-9548 signed, EMD sent to closing agent'} className="w-full rounded-lg border px-3 py-2" />
+            </label>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="submit" disabled={busy || unchanged} className="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : 'Save deal status'}</button>
+          {message && <p role="status" className={`text-sm ${message === 'Saved.' ? 'text-emerald-700' : 'text-red-700'}`}>{message}</p>}
+        </div>
+      </form>
+    </section>
   )
 }
 
@@ -292,7 +394,9 @@ function TimelineItem({ item }) {
       if (fields.length) body = fields.map(([f, v]) => `${FIELDS[f]?.[0] || f}: ${showValue(f, v.to)}`).join(' · ')
     } else if (item.event === 'updated') {
       const fields = Object.entries(item.changes || {})
-      title = fields.length === 1 && fields[0][0] === 'status' ? 'Status changed' : 'Offer changed'
+      title = fields.some(([f]) => f === 'deal_status') ? `Deal status: ${showValue('deal_status', item.changes.deal_status.to)}`
+        : fields.every(([f]) => f.startsWith('deal_') || f === 'closing_date') ? 'Deal details updated'
+          : fields.length === 1 && fields[0][0] === 'status' ? 'Status changed' : 'Offer changed'
       body = (
         <ul className="mt-1 space-y-0.5">
           {fields.map(([f, v]) => (

@@ -11,16 +11,21 @@ import { useActiveClient } from '../../contexts/ActiveClientContext'
 import {
   deleteProposal, listProposals, offerLink, offerMessage, PROPOSAL_EVENT_LABELS, PROPOSAL_STATUS, setProposalStatus,
 } from '../../services/offerProposals'
-import { offerPagePath } from '../../services/offerDocuments'
+import { DEAL_STATUS, DEAL_STATUS_ORDER, offerPagePath, setDealStatus } from '../../services/offerDocuments'
+import DealStatusBadge from '../DealStatusBadge'
 
 const money = n => Number(n || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 const when = d => (d ? new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '')
 const FINANCING = { fha: 'FHA', '203k': 'FHA 203(k)', conventional: 'Conventional', cash: 'Cash' }
+// Once HUD answers, the deal status decides the group; until then the offer's own status does
+const stage = (statuses, deals = []) => o => (o.deal_status ? deals.includes(o.deal_status) : statuses.includes(o.status))
 const GROUPS = [
-  { title: 'Needs you', statuses: ['accepted', 'changes_requested'] },
-  { title: 'With buyers', statuses: ['sent'] },
-  { title: 'Drafts', statuses: ['draft'] },
-  { title: 'Closed', statuses: ['submitted', 'declined', 'withdrawn'] },
+  { title: 'Needs you', match: stage(['accepted', 'changes_requested']) },
+  { title: 'Accepted by HUD / under contract', match: stage([], ['hud_accepted', 'under_contract']) },
+  { title: 'Submitted, waiting on HUD', match: stage(['submitted']) },
+  { title: 'With buyers', match: stage(['sent']) },
+  { title: 'Drafts', match: stage(['draft']) },
+  { title: 'Finished', match: stage(['declined', 'withdrawn'], ['closed', 'not_accepted', 'fell_through']) },
 ]
 
 export default function ClientOffersPanel({ attentionOnly = false, onShowAll }) {
@@ -43,7 +48,7 @@ export default function ClientOffersPanel({ attentionOnly = false, onShowAll }) 
   const replace = (updated) => setOffers(list => list.map(o => (o.id === updated.id ? updated : o)))
 
   if (attentionOnly) {
-    const waiting = offers.filter(o => ['accepted', 'changes_requested'].includes(o.status))
+    const waiting = offers.filter(GROUPS[0].match)
     if (!waiting.length) return null
     return (
       <section className="bg-white rounded-xl border border-emerald-200 p-5 mb-6">
@@ -63,7 +68,7 @@ export default function ClientOffersPanel({ attentionOnly = false, onShowAll }) 
       </div>
       {error && <p role="alert" className="text-red-700">{error}</p>}
       {loading ? <p className="text-gray-500">Loading offers…</p> : GROUPS.map(g => {
-        const rows = offers.filter(o => g.statuses.includes(o.status))
+        const rows = offers.filter(g.match)
         return (
           <section key={g.title}>
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">{g.title} ({rows.length})</h2>
@@ -132,6 +137,7 @@ function OfferCard({ offer: o, onChange, onRemoved }) {
         <div className="min-w-0">
           <p className="font-semibold">{o.buyer?.name} · {money(o.offer_price)}
             <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${status.tone}`}>{status.label}</span>
+            <DealStatusBadge offer={o} withDate className="ml-2" />
           </p>
           <p className="text-sm text-gray-600">HUD {o.case_number}{where ? ` · ${where}` : ''}{o.asking_price ? ` · asking ${money(o.asking_price)}` : ''}</p>
           <p className="text-xs text-gray-500 mt-1">
@@ -172,6 +178,17 @@ function OfferCard({ offer: o, onChange, onRemoved }) {
         {['draft', 'sent', 'changes_requested', 'declined'].includes(o.status) && <button type="button" onClick={revise} className="rounded-lg border px-3 py-1.5">{o.status === 'draft' ? 'Edit' : 'Revise terms'}</button>}
         {['sent', 'changes_requested', 'accepted', 'declined'].includes(o.status) && <button type="button" disabled={busy} onClick={() => act(() => setProposalStatus(o.id, 'withdrawn'), `Withdraw this offer? ${firstName} will no longer be able to accept it.`)} className="rounded-lg border border-red-200 px-3 py-1.5 text-red-700 disabled:opacity-50">Withdraw</button>}
         {o.status === 'draft' && <button type="button" disabled={busy} onClick={() => act(async () => { await deleteProposal(o.id); return null }, 'Delete this draft?')} className="rounded-lg border border-red-200 px-3 py-1.5 text-red-700 disabled:opacity-50">Delete</button>}
+        {(o.status === 'submitted' || o.deal_status) && (
+          <label className="inline-flex items-center gap-2 rounded-lg border px-2 py-1">
+            <span className="text-gray-600">HUD:</span>
+            <select value={o.deal_status || ''} disabled={busy} aria-label="Deal status"
+              onChange={e => act(async () => ({ ...o, ...await setDealStatus('proposal', o.id, { status: e.target.value || null, closingDate: o.closing_date, note: o.deal_note }) }))}
+              className="bg-transparent py-0.5 font-medium">
+              <option value="">Waiting on HUD</option>
+              {DEAL_STATUS_ORDER.map(k => <option key={k} value={k}>{DEAL_STATUS[k].label}</option>)}
+            </select>
+          </label>
+        )}
         <Link to={offerPagePath('proposal', o.id)} className="rounded-lg border px-3 py-1.5">Documents &amp; timeline</Link>
         <button type="button" onClick={toggleHistory} className="px-2 py-1.5 text-blue-700 underline">{history ? 'Hide history' : 'History'}</button>
       </div>

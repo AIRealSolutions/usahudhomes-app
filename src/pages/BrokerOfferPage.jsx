@@ -14,7 +14,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { DealMeterChip } from '../components/DealMeter'
 import { waitLabel } from '../lib/dealMeter'
 import { getOfferByToken, respondToOffer } from '../services/offerProposals'
-import { offerPagePath } from '../services/offerDocuments'
+import { DEAL_STATUS, offerPagePath } from '../services/offerDocuments'
 
 const money = n => (n == null ? '—' : Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }))
 const when = d => (d ? new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '')
@@ -72,7 +72,14 @@ export default function BrokerOfferPage() {
   const p = offer.property || {}
   const agentName = offer.agent ? `${offer.agent.first_name || ''} ${offer.agent.last_name || ''}`.trim() : 'your broker'
   const actionable = ['sent', 'changes_requested'].includes(offer.status)
-  const outcome = OUTCOMES[offer.status]
+  // HUD's answer outranks where the offer stood between buyer and broker
+  const deal = DEAL_STATUS[offer.deal_status]
+  const outcome = deal
+    ? [['not_accepted', 'fell_through'].includes(offer.deal_status) ? 'border-gray-300 bg-gray-50 text-gray-800' : 'border-emerald-300 bg-emerald-50 text-emerald-950', deal.label,
+      [offer.deal_status_date && `${deal.dateLabel} ${new Date(`${offer.deal_status_date}T12:00:00`).toLocaleDateString('en-US', { dateStyle: 'medium' })}.`,
+        offer.closing_date && `${offer.deal_status === 'closed' ? 'Closed' : 'Expected closing'} ${new Date(`${offer.closing_date}T12:00:00`).toLocaleDateString('en-US', { dateStyle: 'medium' })}.`,
+        offer.deal_note].filter(Boolean).join(' ') || 'Your broker will keep you posted on next steps.']
+    : OUTCOMES[offer.status]
   const ratio = offer.asking_price ? Number(offer.offer_price) / Number(offer.asking_price) : null
   const closing = Number(offer.offer_price) * Number(offer.closing_cost_percent) / 100
 
