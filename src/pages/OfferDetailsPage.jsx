@@ -11,10 +11,11 @@ import { Helmet } from 'react-helmet-async'
 import { FileText, Upload } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { EVENT_STYLE } from '../components/BidHistory'
+import OfferDocumentViewer from '../components/OfferDocumentViewer'
 import { fetchPropertyHistory, formatMoney } from '../services/acceptedOffers'
 import { PROPOSAL_EVENT_LABELS, PROPOSAL_STATUS } from '../services/offerProposals'
 import {
-  ACCEPT, DOC_TYPES, deleteDocument, docTypeLabel, documentUrl, getOfferDetails, getOfferTimeline,
+  ACCEPT, DOC_TYPES, deleteDocument, docTypeLabel, downloadDocument, getOfferDetails, getOfferTimeline,
   listDocuments, MAX_FILE_BYTES, uploadDocument,
 } from '../services/offerDocuments'
 
@@ -141,6 +142,7 @@ function DocumentsSection({ kind, id, docs, userId, onChange }) {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [inputKey, setInputKey] = useState(0)
+  const [viewing, setViewing] = useState(null)
 
   const upload = async (e) => {
     e.preventDefault()
@@ -158,8 +160,8 @@ function DocumentsSection({ kind, id, docs, userId, onChange }) {
     }
   }
 
-  const open = async (doc, download) => {
-    try { window.open(await documentUrl(doc, { download }), '_blank', 'noopener') } catch (err) { setMessage(err.message) }
+  const download = async (doc) => {
+    try { await downloadDocument(doc) } catch (err) { setMessage(err.message) }
   }
 
   const remove = async (doc) => {
@@ -168,6 +170,9 @@ function DocumentsSection({ kind, id, docs, userId, onChange }) {
   }
 
   const groups = DOC_TYPES.map(t => ({ ...t, rows: docs.filter(d => d.doc_type === t.id) })).filter(g => g.rows.length)
+  // The viewer steps through documents in the order they're listed
+  const ordered = groups.flatMap(g => g.rows)
+  const view = (doc) => setViewing(ordered.findIndex(d => d.id === doc.id))
 
   return (
     <section className="bg-white rounded-xl border p-5 space-y-4">
@@ -206,21 +211,24 @@ function DocumentsSection({ kind, id, docs, userId, onChange }) {
                 <div className="flex min-w-0 items-start gap-2">
                   <FileText className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
                   <div className="min-w-0">
-                    <p className="font-medium break-all">{d.file_name}</p>
+                    <button type="button" onClick={() => view(d)} className="text-left font-medium text-blue-700 underline break-all">{d.file_name}</button>
                     <p className="text-xs text-gray-500">{when(d.created_at)}{d.size_bytes ? ` · ${fileSize(d.size_bytes)}` : ''}</p>
                     {d.notes && <p className="text-sm text-gray-600">{d.notes}</p>}
                   </div>
                 </div>
-                <div className="flex gap-3 text-sm">
-                  <button type="button" onClick={() => open(d, false)} className="text-blue-700 underline">Open</button>
-                  <button type="button" onClick={() => open(d, true)} className="text-blue-700 underline">Download</button>
-                  {d.uploaded_by === userId && <button type="button" onClick={() => remove(d)} className="text-red-700 underline">Remove</button>}
+                <div className="flex items-center gap-2 text-sm">
+                  <button type="button" onClick={() => view(d)} className="rounded-lg border px-3 py-1">View</button>
+                  <button type="button" onClick={() => download(d)} className="rounded-lg border px-3 py-1">Download</button>
+                  {d.uploaded_by === userId && <button type="button" onClick={() => remove(d)} className="px-1 text-red-700 underline">Remove</button>}
                 </div>
               </li>
             ))}
           </ul>
         </div>
       ))}
+      {viewing != null && ordered[viewing] && (
+        <OfferDocumentViewer docs={ordered} index={viewing} onIndex={setViewing} onClose={() => setViewing(null)} />
+      )}
     </section>
   )
 }

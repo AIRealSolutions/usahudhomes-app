@@ -71,6 +71,17 @@ export async function documentUrl(doc, { download = false } = {}) {
   return data.signedUrl
 }
 
+/** Saves the file. A signed link with a download name, so it stays on this page (and works on iPhone). */
+export async function downloadDocument(doc) {
+  const url = await documentUrl(doc, { download: true })
+  const a = document.createElement('a')
+  a.href = url
+  a.download = doc.file_name
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
 export async function deleteDocument(doc) {
   const { data, error } = await supabase.from('offer_documents').delete().eq('id', doc.id).select('id')
   if (error) throw error
