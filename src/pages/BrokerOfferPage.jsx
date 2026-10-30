@@ -14,6 +14,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { DealMeterChip } from '../components/DealMeter'
 import { waitLabel } from '../lib/dealMeter'
 import { getOfferByToken, respondToOffer } from '../services/offerProposals'
+import { offerPagePath } from '../services/offerDocuments'
 
 const money = n => (n == null ? '—' : Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }))
 const when = d => (d ? new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '')
@@ -117,7 +118,7 @@ export default function BrokerOfferPage() {
             <p className="text-sm text-gray-500">HUD case {offer.case_number}{[p.beds && `${p.beds} bd`, p.baths && `${p.baths} ba`, p.sq_ft && `${Number(p.sq_ft).toLocaleString()} sq ft`].filter(Boolean).map(x => ` · ${x}`).join('')}</p>
             <h2 className="text-xl font-bold">{p.address ? `${p.address}, ` : ''}{[p.city, p.state].filter(Boolean).join(', ')} {p.zip_code || ''}</h2>
             {!p.address && !offer.signedIn && <p className="text-sm"><Link className="text-blue-700 underline" to={`/login?next=${encodeURIComponent(`/offer/${token}`)}`}>Sign in</Link> to see the street address.</p>}
-            <p className="text-sm text-gray-600">HUD asking price {money(offer.asking_price ?? p.price)} · <Link className="text-blue-700 underline" to={`/property/${encodeURIComponent(offer.case_number)}`}>View the home</Link></p>
+            <p className="text-sm text-gray-600">HUD asking price {money(offer.asking_price ?? p.price)} · <Link className="text-blue-700 underline" to={`/property/${encodeURIComponent(offer.case_number)}`}>View the home</Link>{offer.signedIn && offer.status !== 'draft' && <> · <Link className="text-blue-700 underline" to={offerPagePath('proposal', offer.id)}>Documents &amp; timeline</Link></>}</p>
           </div>
 
           <div className="grid gap-4 rounded-lg bg-blue-50 p-4 sm:grid-cols-3">

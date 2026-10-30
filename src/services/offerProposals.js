@@ -41,6 +41,14 @@ export const respondToOffer = (token, action, extra = {}) => call('offer-respond
 
 export const offerLink = (token) => `${SITE_URL}/offer/${token}`
 
+/** broker_offer_proposal_events.event, as shown in history and timelines */
+export const PROPOSAL_EVENT_LABELS = {
+  created: 'Draft created', edited: 'Draft edited', sent: 'Sent to buyer', revised: 'Revised and re-sent',
+  viewed: 'Buyer opened it', favorited: 'Buyer saved it to favorites', unfavorited: 'Buyer removed it from favorites',
+  changes_requested: 'Buyer asked for changes', declined: 'Buyer declined', accepted: 'Buyer accepted and authorized submission',
+  submitted: 'Marked submitted to HUD', withdrawn: 'Withdrawn',
+}
+
 export const PROPOSAL_STATUS = {
   draft: { label: 'Draft', tone: 'bg-gray-100 text-gray-700' },
   sent: { label: 'Waiting on buyer', tone: 'bg-sky-100 text-sky-800' },
