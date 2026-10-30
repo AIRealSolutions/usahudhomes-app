@@ -9,6 +9,7 @@ import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
 import JoinInvite from './pages/JoinInvite'
 import BrokerOfferPage from './pages/BrokerOfferPage'
+import OfferDetailsPage from './pages/OfferDetailsPage'
 import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
 import DashboardLayout from './components/DashboardLayout'
@@ -1248,6 +1249,7 @@ export default function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/join/:token" element={<JoinInvite />} />
               <Route path="/offer/:token" element={<BrokerOfferPage />} />
+              <Route path="/offers/:kind/:id" element={<ProtectedRoute><OfferDetailsPage /></ProtectedRoute>} />
               <Route path="/forgot-password" element={<Navigate to="/login?reset=1" replace />} />
               {/* Role-based dashboard routing */}
               <Route path="/dashboard" element={<DashboardRouter />} />

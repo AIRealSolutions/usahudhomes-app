@@ -5,22 +5,17 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../config/supabase'
 import { useActiveClient } from '../../contexts/ActiveClientContext'
 import {
-  deleteProposal, listProposals, offerLink, offerMessage, PROPOSAL_STATUS, setProposalStatus,
+  deleteProposal, listProposals, offerLink, offerMessage, PROPOSAL_EVENT_LABELS, PROPOSAL_STATUS, setProposalStatus,
 } from '../../services/offerProposals'
+import { offerPagePath } from '../../services/offerDocuments'
 
 const money = n => Number(n || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 const when = d => (d ? new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '')
 const FINANCING = { fha: 'FHA', '203k': 'FHA 203(k)', conventional: 'Conventional', cash: 'Cash' }
-const EVENT_LABELS = {
-  created: 'Draft created', edited: 'Draft edited', sent: 'Sent to buyer', revised: 'Revised and re-sent',
-  viewed: 'Buyer opened it', favorited: 'Buyer saved it to favorites', unfavorited: 'Buyer removed it from favorites',
-  changes_requested: 'Buyer asked for changes', declined: 'Buyer declined', accepted: 'Buyer accepted and authorized submission',
-  submitted: 'Marked submitted to HUD', withdrawn: 'Withdrawn',
-}
 const GROUPS = [
   { title: 'Needs you', statuses: ['accepted', 'changes_requested'] },
   { title: 'With buyers', statuses: ['sent'] },
@@ -177,12 +172,13 @@ function OfferCard({ offer: o, onChange, onRemoved }) {
         {['draft', 'sent', 'changes_requested', 'declined'].includes(o.status) && <button type="button" onClick={revise} className="rounded-lg border px-3 py-1.5">{o.status === 'draft' ? 'Edit' : 'Revise terms'}</button>}
         {['sent', 'changes_requested', 'accepted', 'declined'].includes(o.status) && <button type="button" disabled={busy} onClick={() => act(() => setProposalStatus(o.id, 'withdrawn'), `Withdraw this offer? ${firstName} will no longer be able to accept it.`)} className="rounded-lg border border-red-200 px-3 py-1.5 text-red-700 disabled:opacity-50">Withdraw</button>}
         {o.status === 'draft' && <button type="button" disabled={busy} onClick={() => act(async () => { await deleteProposal(o.id); return null }, 'Delete this draft?')} className="rounded-lg border border-red-200 px-3 py-1.5 text-red-700 disabled:opacity-50">Delete</button>}
+        <Link to={offerPagePath('proposal', o.id)} className="rounded-lg border px-3 py-1.5">Documents &amp; timeline</Link>
         <button type="button" onClick={toggleHistory} className="px-2 py-1.5 text-blue-700 underline">{history ? 'Hide history' : 'History'}</button>
       </div>
       {message && <p role="alert" className="mt-2 text-sm text-red-700 break-all">{message}</p>}
       {history && (
         <ol className="mt-3 space-y-1 border-l-2 border-gray-200 pl-3 text-sm">
-          {history.map(e => <li key={e.id}><span className="font-medium">{EVENT_LABELS[e.event] || e.event}</span>{e.note && <span className="text-gray-600"> · “{e.note}”</span>} <span className="text-xs text-gray-400">{when(e.created_at)}</span></li>)}
+          {history.map(e => <li key={e.id}><span className="font-medium">{PROPOSAL_EVENT_LABELS[e.event] || e.event}</span>{e.note && <span className="text-gray-600"> · “{e.note}”</span>} <span className="text-xs text-gray-400">{when(e.created_at)}</span></li>)}
         </ol>
       )}
     </div>
