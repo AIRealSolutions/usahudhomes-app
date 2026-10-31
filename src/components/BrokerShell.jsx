@@ -29,7 +29,7 @@ import {
 
 // ── Lazy-loaded leaf components ───────────────────────────────────────────────
 const BrokerReferralInbox    = lazy(() => import('./broker/BrokerReferralInbox'))
-const ConsultationCard       = lazy(() => import('./broker/ConsultationCard'))
+const LeadRow                = lazy(() => import('./broker/LeadRow'))
 const AIAgentAssistant       = lazy(() => import('./broker/AIAgentAssistant'))
 const AIPropertiesTab        = lazy(() => import('./broker/AIPropertiesTab'))
 const PropertyShareAnalytics = lazy(() => import('./broker/PropertyShareAnalytics'))
@@ -708,41 +708,18 @@ function ActiveLeadsPanel({ agentId }) {
         </div>
       ) : (
         <Suspense fallback={<PanelFallback />}>
-          <div className="space-y-4">
-            {filtered.map(c => {
-              const isSelected = selected.has(c.id)
-              return (
-                <div key={c.id} className={`relative group rounded-xl transition-all ${
-                  isSelected ? 'ring-2 ring-red-400' : ''
-                }`}>
-                  {/* Select checkbox overlay */}
-                  {selectMode && (
-                    <button
-                      onClick={() => toggleSelect(c.id)}
-                      className="absolute top-3 left-3 z-10 w-6 h-6 flex items-center justify-center"
-                    >
-                      {isSelected
-                        ? <CheckSquare className="w-5 h-5 text-red-500" />
-                        : <Square className="w-5 h-5 text-gray-400" />}
-                    </button>
-                  )}
-                  {/* Delete button (always visible so it works on touch screens) */}
-                  {!selectMode && (
-                    <button
-                      onClick={() => { setDeletingId(c.id); setConfirmDelete('single') }}
-                      className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-300 transition-all"
-                      title="Remove this lead"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                  <ConsultationCard
-                    consultation={c}
-                    onUpdate={() => setRefreshKey(k => k + 1)}
-                  />
-                </div>
-              )
-            })}
+          <div className="space-y-2">
+            {filtered.map(c => (
+              <LeadRow
+                key={c.id}
+                consultation={c}
+                onUpdate={() => setRefreshKey(k => k + 1)}
+                onDelete={() => { setDeletingId(c.id); setConfirmDelete('single') }}
+                selectMode={selectMode}
+                selected={selected.has(c.id)}
+                onToggleSelect={() => toggleSelect(c.id)}
+              />
+            ))}
           </div>
         </Suspense>
       )}
