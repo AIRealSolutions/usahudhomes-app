@@ -171,7 +171,7 @@ function OfferCard({ offer: o, onChange, onRemoved }) {
         </>}
         {['draft', 'sent', 'changes_requested', 'declined'].includes(o.status) && <button type="button" onClick={revise} className="rounded-lg border px-3 py-1.5">{o.status === 'draft' ? 'Edit' : 'Revise terms'}</button>}
         {['sent', 'changes_requested', 'accepted', 'declined'].includes(o.status) && <button type="button" disabled={busy} onClick={() => act(() => setProposalStatus(o.id, 'withdrawn'), `Withdraw this offer? ${firstName} will no longer be able to accept it.`)} className="rounded-lg border border-red-200 px-3 py-1.5 text-red-700 disabled:opacity-50">Withdraw</button>}
-        {o.status === 'draft' && <button type="button" disabled={busy} onClick={() => act(async () => { await deleteProposal(o.id); return null }, 'Delete this draft?')} className="rounded-lg border border-red-200 px-3 py-1.5 text-red-700 disabled:opacity-50">Delete</button>}
+        {['draft', 'withdrawn'].includes(o.status) && <button type="button" disabled={busy} onClick={() => act(async () => { await deleteProposal(o.id); return null }, o.status === 'draft' ? 'Delete this draft?' : 'Delete this withdrawn offer? Its documents and history will be removed for good.')} className="rounded-lg border border-red-200 px-3 py-1.5 text-red-700 disabled:opacity-50">Delete</button>}
         <Link to={offerPagePath('proposal', o.id)} className="rounded-lg border px-3 py-1.5">Documents &amp; timeline</Link>
         <button type="button" onClick={toggleHistory} className="px-2 py-1.5 text-blue-700 underline">{history ? 'Hide history' : 'History'}</button>
       </div>
