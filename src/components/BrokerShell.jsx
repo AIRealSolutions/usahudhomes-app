@@ -564,11 +564,12 @@ function ActiveLeadsPanel({ agentId }) {
   const handleDeleteSingle = async (id) => {
     setDeleting(true)
     try {
-      await consultationService.deleteConsultation(id)
+      const result = await consultationService.deleteConsultation(id)
+      if (!result.success) throw new Error(result.error)
       setConsultations(prev => prev.filter(c => c.id !== id))
     } catch (e) {
       console.error('Delete failed:', e)
-      alert('Failed to remove lead. Please try again.')
+      alert('Failed to remove lead: ' + (e.message || 'Please try again.'))
     } finally {
       setDeleting(false)
       setConfirmDelete(null)
@@ -580,9 +581,11 @@ function ActiveLeadsPanel({ agentId }) {
     setDeleting(true)
     try {
       const ids = Array.from(selected)
-      await Promise.all(ids.map(id => consultationService.deleteConsultation(id)))
-      setConsultations(prev => prev.filter(c => !selected.has(c.id)))
-      setSelected(new Set())
+      const results = await Promise.all(ids.map(id => consultationService.deleteConsultation(id)))
+      const removed = new Set(ids.filter((_, i) => results[i].success))
+      setConsultations(prev => prev.filter(c => !removed.has(c.id)))
+      setSelected(new Set(ids.filter(id => !removed.has(id))))
+      if (removed.size < ids.length) throw new Error(results.find(r => !r.success).error)
       setSelectMode(false)
     } catch (e) {
       console.error('Bulk delete failed:', e)
@@ -596,11 +599,10 @@ function ActiveLeadsPanel({ agentId }) {
   const handleCleanupEmpty = async () => {
     setDeleting(true)
     try {
-      await Promise.all(emptyLeads.map(c => consultationService.deleteConsultation(c.id)))
-      setConsultations(prev => prev.filter(c => {
-        const name = `${c.first_name || ''} ${c.last_name || ''}`.trim()
-        return c.customer_id || name
-      }))
+      const results = await Promise.all(emptyLeads.map(c => consultationService.deleteConsultation(c.id)))
+      const removed = new Set(emptyLeads.filter((_, i) => results[i].success).map(c => c.id))
+      setConsultations(prev => prev.filter(c => !removed.has(c.id)))
+      if (removed.size < emptyLeads.length) throw new Error(results.find(r => !r.success).error)
     } catch (e) {
       console.error('Cleanup failed:', e)
       alert('Cleanup failed. Please try again.')
@@ -724,11 +726,11 @@ function ActiveLeadsPanel({ agentId }) {
                         : <Square className="w-5 h-5 text-gray-400" />}
                     </button>
                   )}
-                  {/* Delete button (shown on hover when not in select mode) */}
+                  {/* Delete button (always visible so it works on touch screens) */}
                   {!selectMode && (
                     <button
                       onClick={() => { setDeletingId(c.id); setConfirmDelete('single') }}
-                      className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-300 transition-all opacity-0 group-hover:opacity-100"
+                      className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-300 transition-all"
                       title="Remove this lead"
                     >
                       <Trash2 className="w-4 h-4" />

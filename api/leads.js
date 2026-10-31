@@ -5,7 +5,7 @@
  *   consultation-delete.js, referral.js
  *
  * Routes via ?action= query param:
- *   POST ?action=delete          — soft-delete one or more consultations
+ *   POST ?action=delete          — soft-delete one or more consultations (admin, or the broker they belong to)
  *   POST ?action=assign          — assign a consultation to a broker
  *   POST ?action=accept          — broker accepts a referral
  *   POST ?action=decline         — broker declines a referral
@@ -87,11 +87,20 @@ async function logActivity(supabase, consultation, agentId, activityType, descri
 // ─── Action: delete ───────────────────────────────────────────────────────────
 async function handleDelete(req, res) {
   const supabase = getSupabase()
-  if (!(await requireRole(req, res, supabase, ['admin']))) return
+  const caller = await requireRole(req, res, supabase, ['admin', 'broker'])
+  if (!caller) return
   const { ids, id } = req.body || {}
   const toDelete = ids || (id ? [id] : [])
   if (!toDelete.length) {
     return res.status(400).json({ success: false, error: 'Provide id or ids array' })
+  }
+  // Brokers may only remove leads assigned to them
+  if (caller.role !== 'admin') {
+    for (const leadId of toDelete) {
+      if (!(await leadForCaller(supabase, caller, leadId))) {
+        return res.status(403).json({ success: false, error: 'You can only remove your own leads.' })
+      }
+    }
   }
   const { error } = await supabase
     .from('consultations')
@@ -428,9 +437,11 @@ async function handlePropertyPicks(req, res) {
 // POST   { consultationId, id?, status: 'draft'|'sent', ...terms }
 //        → create, or revise (a revision goes back to the buyer for a new answer)
 // PATCH  { id, status: 'sent'|'submitted'|'withdrawn' }
-// DELETE ?id=               → drafts only
+// DELETE ?id=               → drafts and withdrawn offers only
 const PROPOSAL_FIELDS = 'id, consultation_id, user_id, agent_id, property_id, case_number, share_token, status, asking_price, offer_price, occupancy, financing, closing_cost_percent, earnest_money, listing_commission_percent, buyer_commission_percent, broker_message, est_net_to_hud, net_to_list, days_on_market, deal_meter_score, deal_meter_sample, deal_meter_basis, financing_estimate, accept_wait_low_days, accept_wait_days, is_favorite, buyer_note, viewed_at, responded_at, accepted_signature, accepted_terms, sent_at, submitted_at, created_at, updated_at'
 const BROKER_EDITABLE = ['draft', 'sent', 'changes_requested', 'declined']
+// Never shared, or pulled back from the buyer, so nothing depends on them any more
+const DELETABLE = ['draft', 'withdrawn']
 const BUYER_ACTIONABLE = ['sent', 'changes_requested']
 const TOKEN_RE = /^[A-Za-z0-9_-]{32}$/
 const numOrNull = (v) => (v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Number(v))
@@ -610,9 +621,16 @@ async function handleOfferProposals(req, res) {
   if (req.method === 'DELETE') {
     const current = await proposalForCaller(supabase, caller, req.query?.id)
     if (!current) return res.status(404).json({ success: false, error: 'Offer not found' })
-    const { data, error } = await supabase.from('broker_offer_proposals').delete().eq('id', current.id).eq('status', 'draft').select('id')
+    if (!DELETABLE.includes(current.status)) return res.status(409).json({ success: false, error: 'Only drafts and withdrawn offers can be deleted. Withdraw it first.' })
+    // Uploaded files outlive the offer_documents rows the delete cascades to
+    const { data: docs } = await supabase.from('offer_documents').select('storage_path').eq('proposal_id', current.id)
+    const { data, error } = await supabase.from('broker_offer_proposals').delete().eq('id', current.id).in('status', DELETABLE).select('id')
     if (error) throw error
-    if (!data?.length) return res.status(409).json({ success: false, error: 'Only drafts can be deleted. Withdraw a sent offer instead.' })
+    if (!data?.length) return res.status(409).json({ success: false, error: 'This offer changed. Reload and try again.' })
+    if (docs?.length) {
+      const { error: storageError } = await supabase.storage.from('offer-documents').remove(docs.map(d => d.storage_path))
+      if (storageError) console.warn('[leads] offer document cleanup failed:', storageError.message)
+    }
     return res.status(200).json({ success: true })
   }
 
