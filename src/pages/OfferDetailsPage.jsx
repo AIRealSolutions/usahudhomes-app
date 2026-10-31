@@ -8,15 +8,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { FileText, Upload } from 'lucide-react'
+import { FileText, MessageSquare, Upload } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { EVENT_STYLE } from '../components/BidHistory'
 import OfferDocumentViewer from '../components/OfferDocumentViewer'
 import { fetchPropertyHistory, formatMoney } from '../services/acceptedOffers'
 import { PROPOSAL_EVENT_LABELS, PROPOSAL_STATUS } from '../services/offerProposals'
 import {
-  ACCEPT, DOC_TYPES, deleteDocument, docTypeLabel, downloadDocument, getOfferDetails, getOfferTimeline,
-  listDocuments, MAX_FILE_BYTES, uploadDocument,
+  ACCEPT, addDocumentNote, DOC_TYPES, deleteDocument, deleteDocumentNote, docTypeLabel, downloadDocument,
+  getOfferDetails, getOfferTimeline, listDocumentNotes, listDocuments, MAX_FILE_BYTES, uploadDocument,
 } from '../services/offerDocuments'
 
 const when = d => (d ? new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '')
@@ -49,9 +49,10 @@ const showValue = (field, v) => (v == null || v === '' ? 'none' : (FIELDS[field]
 
 export default function OfferDetailsPage() {
   const { kind, id } = useParams()
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const [details, setDetails] = useState(null)
   const [docs, setDocs] = useState([])
+  const [docNotes, setDocNotes] = useState({}) // document id -> notes
   const [timeline, setTimeline] = useState([])
   const [history, setHistory] = useState([])
   const [error, setError] = useState('')
@@ -60,6 +61,8 @@ export default function OfferDetailsPage() {
   const loadOfferSide = useCallback(async () => {
     const [d, t] = await Promise.all([listDocuments(kind, id), getOfferTimeline(kind, id)])
     setDocs(d); setTimeline(t)
+    // Notes are an extra; a failure here shouldn't hide the documents
+    setDocNotes(await listDocumentNotes(d.map(x => x.id)).catch(e => { console.error('Could not load document notes:', e); return {} }))
   }, [kind, id])
 
   useEffect(() => {
@@ -129,13 +132,13 @@ export default function OfferDetailsPage() {
         </dl>
       </section>
 
-      <DocumentsSection kind={kind} id={id} docs={docs} userId={user?.id} onChange={loadOfferSide} />
+      <DocumentsSection kind={kind} id={id} docs={docs} notes={docNotes} setNotes={setDocNotes} userId={user?.id} isAdmin={!!isAdmin?.()} onChange={loadOfferSide} />
       <TimelineSection offerItems={timeline} propertyItems={history} />
     </div>
   )
 }
 
-function DocumentsSection({ kind, id, docs, userId, onChange }) {
+function DocumentsSection({ kind, id, docs, notes: docNotes, setNotes: setDocNotes, userId, isAdmin, onChange }) {
   const [docType, setDocType] = useState(DOC_TYPES[0].id)
   const [file, setFile] = useState(null)
   const [notes, setNotes] = useState('')
@@ -213,7 +216,6 @@ function DocumentsSection({ kind, id, docs, userId, onChange }) {
                   <div className="min-w-0">
                     <button type="button" onClick={() => view(d)} className="text-left font-medium text-blue-700 underline break-all">{d.file_name}</button>
                     <p className="text-xs text-gray-500">{when(d.created_at)}{d.size_bytes ? ` · ${fileSize(d.size_bytes)}` : ''}</p>
-                    {d.notes && <p className="text-sm text-gray-600">{d.notes}</p>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
@@ -221,6 +223,8 @@ function DocumentsSection({ kind, id, docs, userId, onChange }) {
                   <button type="button" onClick={() => download(d)} className="rounded-lg border px-3 py-1">Download</button>
                   {d.uploaded_by === userId && <button type="button" onClick={() => remove(d)} className="px-1 text-red-700 underline">Remove</button>}
                 </div>
+                <DocumentNotes doc={d} notes={docNotes[d.id] || []} userId={userId} isAdmin={isAdmin}
+                  onNotes={list => setDocNotes(prev => ({ ...prev, [d.id]: list }))} />
               </li>
             ))}
           </ul>
@@ -230,6 +234,78 @@ function DocumentsSection({ kind, id, docs, userId, onChange }) {
         <OfferDocumentViewer docs={ordered} index={viewing} onIndex={setViewing} onClose={() => setViewing(null)} />
       )}
     </section>
+  )
+}
+
+function DocumentNotes({ doc, notes, userId, isAdmin, onNotes }) {
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const count = notes.length + (doc.notes ? 1 : 0)
+
+  const add = async (e) => {
+    e.preventDefault()
+    if (!text.trim()) return
+    setBusy(true); setError('')
+    try {
+      const note = await addDocumentNote(doc.id, text)
+      onNotes([...notes, note]); setText('')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (note) => {
+    if (!window.confirm('Delete this note?')) return
+    try { await deleteDocumentNote(note.id); onNotes(notes.filter(n => n.id !== note.id)) } catch (err) { setError(err.message) }
+  }
+
+  return (
+    <div className="w-full pl-6">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open}
+        className="inline-flex items-center gap-1 text-sm font-medium text-blue-700 hover:underline">
+        <MessageSquare className="h-4 w-4" />
+        {count ? `${count} note${count === 1 ? '' : 's'}` : 'Add a note'}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          {(doc.notes || notes.length > 0) && (
+            <ul className="space-y-2">
+              {doc.notes && (
+                <li className="rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                  <p className="text-xs text-gray-500">Upload note · {when(doc.created_at)}</p>
+                  <p className="whitespace-pre-wrap text-gray-800">{doc.notes}</p>
+                </li>
+              )}
+              {notes.map(n => (
+                <li key={n.id} className="rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs text-gray-500">{n.author_name || 'Someone'} · {when(n.created_at)}</p>
+                    {(n.author_id === userId || isAdmin) && (
+                      <button type="button" onClick={() => remove(n)} className="text-xs text-red-700 underline">Delete</button>
+                    )}
+                  </div>
+                  <p className="whitespace-pre-wrap text-gray-800">{n.body}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form onSubmit={add} className="flex flex-col gap-2 sm:flex-row sm:items-start">
+            <textarea value={text} onChange={e => setText(e.target.value)} maxLength={2000} rows={2}
+              placeholder="Write a note about this document…" aria-label={`Note on ${doc.file_name}`}
+              className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm" />
+            <button type="submit" disabled={busy || !text.trim()}
+              className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              {busy ? 'Saving…' : 'Add note'}
+            </button>
+          </form>
+          {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+        </div>
+      )}
+    </div>
   )
 }
 

@@ -89,4 +89,32 @@ export async function deleteDocument(doc) {
   await supabase.storage.from(BUCKET).remove([doc.storage_path])
 }
 
+/** Notes left on the offer's documents, oldest first, grouped by document id. */
+export async function listDocumentNotes(documentIds) {
+  if (!documentIds.length) return {}
+  const { data, error } = await supabase.from('offer_document_notes')
+    .select('id, document_id, body, author_id, author_name, created_at')
+    .in('document_id', documentIds).order('created_at', { ascending: true })
+  if (error) throw error
+  const byDoc = {}
+  for (const n of data || []) (byDoc[n.document_id] ||= []).push(n)
+  return byDoc
+}
+
+export async function addDocumentNote(documentId, body) {
+  const text = String(body || '').trim()
+  if (!text) throw new Error('Write a note first.')
+  const { data, error } = await supabase.from('offer_document_notes')
+    .insert([{ document_id: documentId, body: text }])
+    .select('id, document_id, body, author_id, author_name, created_at').single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteDocumentNote(noteId) {
+  const { data, error } = await supabase.from('offer_document_notes').delete().eq('id', noteId).select('id')
+  if (error) throw error
+  if (!data?.length) throw new Error('Only the person who wrote this note (or an admin) can remove it.')
+}
+
 export const offerPagePath = (kind, id) => `/offers/${kind}/${id}`
