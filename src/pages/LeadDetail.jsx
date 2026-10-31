@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -170,6 +170,11 @@ export default function LeadDetail() {
   const navigate = useNavigate();
   const { profile, user } = useAuth();
   const { start: startClientMode, refreshPicks: refreshClientPicks } = useActiveClient();
+  const clientModeStartedFor = useRef(null);
+  // refreshPicks changes identity when client mode starts or stops; read it through a
+  // ref so that change doesn't refire the load effect (which used to restart the mode)
+  const refreshClientPicksRef = useRef(refreshClientPicks);
+  refreshClientPicksRef.current = refreshClientPicks;
 
   const [lead, setLead] = useState(null);
   const [property, setProperty] = useState(null);
@@ -221,8 +226,12 @@ export default function LeadDetail() {
       };
       setLead(merged);
       setForm(merged);
-      // While on this lead, every save or share across the site goes to this client
-      startClientMode(merged);
+      // Opening a lead puts the broker in "Working for" mode once per visit. Refetches
+      // (after a save or send) must not restart it, or Exit would never stick.
+      if (clientModeStartedFor.current !== id) {
+        clientModeStartedFor.current = id;
+        startClientMode(merged);
+      }
       let prop = data.property;
       if (!prop && data.case_number) {
         const { data: byCase } = await supabase.from('properties').select('*').eq('case_number', data.case_number).maybeSingle();
@@ -252,12 +261,12 @@ export default function LeadDetail() {
   const fetchPicks = useCallback(async () => {
     try {
       setPicks(await listPicks(id));
-      refreshClientPicks();
+      refreshClientPicksRef.current();
     } catch (e) {
       console.error('Could not load picks:', e);
       setPicks([]);
     }
-  }, [id, refreshClientPicks]);
+  }, [id]);
 
   useEffect(() => {
     fetchLead();
