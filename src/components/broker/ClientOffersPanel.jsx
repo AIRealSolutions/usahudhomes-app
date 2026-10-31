@@ -4,7 +4,7 @@
  * With attentionOnly it shows just the offers waiting on the broker (for Overview).
  */
 
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../config/supabase'
 import { useActiveClient } from '../../contexts/ActiveClientContext'
@@ -16,17 +16,21 @@ import { offerPagePath } from '../../services/offerDocuments'
 const money = n => Number(n || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 const when = d => (d ? new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '')
 const FINANCING = { fha: 'FHA', '203k': 'FHA 203(k)', conventional: 'Conventional', cash: 'Cash' }
+// Submitted bids are still open until HUD answers, so they lead the page
 const GROUPS = [
+  { title: 'Submitted to HUD', statuses: ['submitted'] },
   { title: 'Needs you', statuses: ['accepted', 'changes_requested'] },
   { title: 'With buyers', statuses: ['sent'] },
   { title: 'Drafts', statuses: ['draft'] },
-  { title: 'Closed', statuses: ['submitted', 'declined', 'withdrawn'] },
+  { title: 'Closed', statuses: ['declined', 'withdrawn'] },
 ]
 
 export default function ClientOffersPanel({ attentionOnly = false, onShowAll }) {
   const [offers, setOffers] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  // ?offer=<id> (linked from a lead's page) scrolls to and highlights that offer
+  const [focusId] = useState(() => new URLSearchParams(window.location.search).get('offer'))
 
   const load = useCallback(async () => {
     try {
@@ -69,7 +73,7 @@ export default function ClientOffersPanel({ attentionOnly = false, onShowAll }) 
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">{g.title} ({rows.length})</h2>
             {rows.length === 0
               ? <p className="text-sm text-gray-400">None.</p>
-              : <div className="space-y-3">{rows.map(o => <OfferCard key={o.id} offer={o} onChange={replace} onRemoved={load} />)}</div>}
+              : <div className="space-y-3">{rows.map(o => <OfferCard key={o.id} offer={o} onChange={replace} onRemoved={load} focused={o.id === focusId} />)}</div>}
           </section>
         )
       })}
@@ -77,8 +81,12 @@ export default function ClientOffersPanel({ attentionOnly = false, onShowAll }) 
   )
 }
 
-function OfferCard({ offer: o, onChange, onRemoved }) {
+function OfferCard({ offer: o, onChange, onRemoved, focused = false }) {
   const navigate = useNavigate()
+  const cardRef = useRef(null)
+  useEffect(() => {
+    if (focused) cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [focused])
   const { start } = useActiveClient()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -127,7 +135,7 @@ function OfferCard({ offer: o, onChange, onRemoved }) {
   }
 
   return (
-    <div className="bg-white border rounded-xl p-4">
+    <div ref={cardRef} className={`bg-white border rounded-xl p-4 ${focused ? 'ring-2 ring-blue-500 border-blue-500' : ''}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-semibold">{o.buyer?.name} · {money(o.offer_price)}

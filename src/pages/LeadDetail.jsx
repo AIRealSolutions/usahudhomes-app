@@ -8,10 +8,12 @@ import { listPicks, addPicks, markPicks, removePick } from '../services/property
 import { suggestedReplies, labelFor } from '../services/leadReplies';
 import { US_STATES } from '../utils/states';
 import ClientActivity from '../components/broker/ClientActivity';
+import { listProposals, PROPOSAL_STATUS } from '../services/offerProposals';
+import { offerPagePath } from '../services/offerDocuments';
 import {
   ArrowLeft, Edit2, Save, X, Mail, Phone, MessageSquare, Calendar, MapPin, Clock,
   User, FileText, Home, CheckCircle, Star, ThumbsUp, ThumbsDown, Trash2,
-  Copy, Sparkles, DollarSign, StickyNote, ExternalLink, Loader
+  Copy, Sparkles, DollarSign, StickyNote, ExternalLink, Loader, FileSignature, ChevronRight
 } from 'lucide-react';
 
 const EmailComposer = lazy(() => import('../components/broker/EmailComposer'));
@@ -85,6 +87,8 @@ const PROFILE_FIELDS = [
 const money = (v) => (v || v === 0 ? `$${Number(v).toLocaleString()}` : null);
 const dateTime = (v) => (v ? new Date(v).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
 const pretty = (v) => (v ? String(v).replace(/_/g, ' ') : null);
+// Open offers first: submitted to HUD, then waiting on the broker, then the buyer
+const OFFER_ORDER = ['submitted', 'accepted', 'changes_requested', 'sent', 'draft', 'declined', 'withdrawn'];
 
 // Timeline values come from several forms
 const TIMELINES = {
@@ -176,6 +180,7 @@ export default function LeadDetail() {
   const [saving, setSaving] = useState(false);
   const [timeline, setTimeline] = useState([]);
   const [picks, setPicks] = useState(null);
+  const [offers, setOffers] = useState([]);
   const [composer, setComposer] = useState(null); // { kind: 'email'|'sms', subject?, body? }
   const [modal, setModal] = useState(null); // 'note' | 'call' | 'showing'
   const [modalText, setModalText] = useState('');
@@ -258,7 +263,10 @@ export default function LeadDetail() {
     fetchLead();
     fetchTimeline();
     fetchPicks();
-  }, [fetchLead, fetchTimeline, fetchPicks]);
+    listProposals(id)
+      .then(list => setOffers([...(list || [])].sort((a, b) => OFFER_ORDER.indexOf(a.status) - OFFER_ORDER.indexOf(b.status))))
+      .catch(e => console.error('Could not load offers:', e));
+  }, [id, fetchLead, fetchTimeline, fetchPicks]);
 
   const logEvent = async (type, notes) => {
     const { error } = await supabase.from('consultation_events').insert({
@@ -443,6 +451,36 @@ export default function LeadDetail() {
           <div className="lg:col-span-2 space-y-6">
             {activeTab === 'overview' && (
               <>
+                {offers.length > 0 && (
+                  <Card
+                    title={`Offers (${offers.length})`}
+                    icon={FileSignature}
+                    action={<Link to="/broker-dashboard?panel=client-offers" className="text-sm font-medium text-blue-700 hover:underline">All offers</Link>}
+                  >
+                    <ul className="divide-y divide-gray-100">
+                      {offers.map(o => {
+                        const status = PROPOSAL_STATUS[o.status] || {};
+                        const where = [o.property?.address, o.property?.city].filter(Boolean).join(', ') || `Case #${o.case_number}`;
+                        return (
+                          <li key={o.id} className="py-2 first:pt-0 last:pb-0 flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-gray-900">
+                                {money(o.offer_price)}
+                                <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${status.tone || 'bg-gray-100 text-gray-700'}`}>{status.label || o.status}</span>
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">{where} · updated {dateTime(o.updated_at)}</p>
+                            </div>
+                            <Link to={offerPagePath('proposal', o.id)} className="text-sm font-medium text-blue-700 hover:underline">Documents &amp; timeline</Link>
+                            <Link to={`/broker-dashboard?panel=client-offers&offer=${o.id}`} className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+                              Open offer <ChevronRight className="h-4 w-4" />
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </Card>
+                )}
+
                 {/* What they asked for */}
                 <Card title="What they asked for" icon={Sparkles}>
                   <div className="flex flex-col sm:flex-row gap-4">
