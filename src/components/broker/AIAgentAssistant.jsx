@@ -39,7 +39,6 @@ import { WORKFLOW_PRESETS, COMMUNICATION_CHANNELS, AI_CAPABILITIES } from '../..
 
 const AIAgentAssistant = ({ lead, onAction }) => {
   const [activeWorkflow, setActiveWorkflow] = useState(null)
-  const [selectedChannel, setSelectedChannel] = useState('email')
   const [showWorkflowModal, setShowWorkflowModal] = useState(false)
   const [showMessageComposer, setShowMessageComposer] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
@@ -49,7 +48,7 @@ const AIAgentAssistant = ({ lead, onAction }) => {
     channel: 'email'
   })
   const [clientInsights, setClientInsights] = useState(null)
-  const [recommendedProperties, setRecommendedProperties] = useState([])
+  const [recommendedProperties] = useState([])
   const [showPropertySelector, setShowPropertySelector] = useState(false)
   const [selectedProperties, setSelectedProperties] = useState([])
   const [showShareModal, setShowShareModal] = useState(false)

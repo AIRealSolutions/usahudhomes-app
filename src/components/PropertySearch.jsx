@@ -28,7 +28,6 @@ import { getImageUrl } from '../utils/imageUtils'
 
 const PropertySearch = () => {
   const [searchQuery, setSearchQuery] = useState('')
-  const [totalProperties, setTotalProperties] = useState(0)
   const [filters, setFilters] = useState({
     state: '',
     minPrice: 0,
@@ -430,7 +429,7 @@ const PropertySearch = () => {
               status: '',
               county: ''
             })
-            setProperties(propertyManagement.getAllProperties())
+            propertyService.getAllProperties().then(r => { if (r.success) setProperties(r.data) })
           }}>
             Clear All Filters
           </Button>

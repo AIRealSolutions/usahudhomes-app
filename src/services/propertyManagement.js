@@ -3,7 +3,7 @@
 
 
 
-class PropertyManagement {PropertyManagement {
+class PropertyManagement {
   constructor() {
     this.properties = this.loadProperties();
   }

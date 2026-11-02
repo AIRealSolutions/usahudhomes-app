@@ -128,7 +128,7 @@ export class BrokerNetwork {
 
   // Find best broker for a customer based on location and needs
   findBestBroker(customerData) {
-    const { state, county, propertyType, budget, specialNeeds } = customerData
+    const { state, county, specialNeeds } = customerData
 
     // Filter brokers by state
     let availableBrokers = this.brokers.filter(broker => 

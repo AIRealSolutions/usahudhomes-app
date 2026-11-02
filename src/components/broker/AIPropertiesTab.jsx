@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
 import { propertyService } from '../../services/database'
-import { useAuth } from '../../contexts/AuthContext'
 import PropertyDetailModal from '../admin/PropertyDetailModal'
 import PropertyShareModal from '../admin/PropertyShareModal'
 import { 
@@ -31,7 +30,6 @@ import {
 } from 'lucide-react'
 
 const AIPropertiesTab = ({ lead, onAddToClients }) => {
-  const { profile } = useAuth()
   const [properties, setProperties] = useState([])
   const [aiRecommendations, setAiRecommendations] = useState([])
   const [loading, setLoading] = useState(true)

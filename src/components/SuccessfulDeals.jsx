@@ -75,12 +75,6 @@ export default function SuccessfulDeals() {
     })
   }
 
-  const calculateSavings = (estimated, actual) => {
-    if (!actual || !estimated) return null
-    const savings = estimated - actual
-    return savings > 0 ? savings : null
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -168,7 +162,6 @@ export default function SuccessfulDeals() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {deals.map((deal) => {
-                const savings = calculateSavings(deal.estimated_sale_price, deal.actual_sale_price)
                 
                 return (
                   <div key={deal.id} className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow">

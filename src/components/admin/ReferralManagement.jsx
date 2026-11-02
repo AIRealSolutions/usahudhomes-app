@@ -13,7 +13,7 @@ const ReferralManagement = () => {
   const [expandedRow, setExpandedRow] = useState(null)
   const [selectedReferral, setSelectedReferral] = useState(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [, setShowCreateModal] = useState(false)
   const [stats, setStats] = useState({
     total: 0,
     unassigned: 0,

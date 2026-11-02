@@ -26,7 +26,7 @@ import {
   Sparkles,
   Brain
 } from 'lucide-react'
-import { consultationService, customerService, propertyService, agentService, referralService } from '../../services/database'
+import { consultationService, customerService, agentService, referralService } from '../../services/database'
 
 function LeadAdmin() {
   const [leads, setLeads] = useState([])

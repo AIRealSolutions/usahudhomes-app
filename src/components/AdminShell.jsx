@@ -304,7 +304,7 @@ export default function AdminShell({ initialTab = 'overview' }) {
           .select('id', { count: 'exact', head: true })
           .eq('status', 'new_lead')
         setAlerts({ newLeads: count || 0 })
-      } catch (_) {}
+      } catch { /* best effort; leave the previous value on screen */ }
     }
     fetchAlerts()
     const interval = setInterval(fetchAlerts, 60000)

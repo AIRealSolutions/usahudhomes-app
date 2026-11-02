@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import customerDB from '../services/customerDatabase.js'
 import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Input } from '@/components/ui/input.jsx'
@@ -42,11 +43,11 @@ function CustomerDetail() {
   const [customer, setCustomer] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
-  const [brokers, setBrokers] = useState([])
-  const [activities, setActivities] = useState([])
-  const [referrals, setReferrals] = useState([])
   const [isEditing, setIsEditing] = useState(false)
   const [editedCustomer, setEditedCustomer] = useState({})
+  const [, setBrokers] = useState([])
+  const [, setActivities] = useState([])
+  const [, setReferrals] = useState([])
   
   // Communication modals
   const [showEmailModal, setShowEmailModal] = useState(false)
@@ -263,28 +264,7 @@ Lightkeeper Realty
       const broker = availableBrokers.find(b => b.id === brokerReferralData.brokerId)
       if (!broker) return
 
-      // Send email to the broker
-      const brokerEmailSubject = `Client Referral: ${customer.name}`
-      const brokerEmailBody = `Dear ${broker.name},
-
-I'm referring a client to you for HUD home assistance:
-
-Client Information:
-Name: ${customer.name}
-Email: ${customer.email}
-Phone: ${customer.phone}
-State: ${customer.state}
-
-Reason for Referral: ${brokerReferralData.reason}
-
-Additional Notes: ${brokerReferralData.notes}
-
-Please contact them within 24 hours.
-
-Best regards,
-Marc Spencer
-Lightkeeper Realty
-(910) 363-6147`
+      // Broker email is not sent from here yet (no email integration in this legacy view)
 
       // In real app, send to broker's email
       console.log('Sending referral email to broker:', broker.name)

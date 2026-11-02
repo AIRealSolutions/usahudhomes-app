@@ -40,8 +40,9 @@ class AutoAssignService {
    * @returns {boolean} True if enabled
    */
   isAutoAssignEnabled() {
-    // Can be controlled via environment variable
-    return process.env.VITE_AUTO_ASSIGN_ENABLED !== 'false'
+    // Opt-in: set VITE_AUTO_ASSIGN_ENABLED=true in Vercel to turn it on
+    // (process.env does not exist in the browser and used to throw here)
+    return import.meta.env.VITE_AUTO_ASSIGN_ENABLED === 'true'
   }
 }
 

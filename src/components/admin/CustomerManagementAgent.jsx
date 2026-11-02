@@ -27,7 +27,7 @@ function CustomerManagementAgent({ customer, events, consultations }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [copiedIndex, setCopiedIndex] = useState(null)
-  const [recommendations, setRecommendations] = useState(null)
+  const [, setRecommendations] = useState(null)
   const [loadingRecommendations, setLoadingRecommendations] = useState(false)
   const messagesEndRef = useRef(null)
 
@@ -62,7 +62,7 @@ function CustomerManagementAgent({ customer, events, consultations }) {
           content: `Sorry, I encountered an error: ${result.error}. Please try again.`
         }])
       }
-    } catch (error) {
+    } catch {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: 'Sorry, something went wrong. Please try again.'
@@ -118,7 +118,7 @@ function CustomerManagementAgent({ customer, events, consultations }) {
           content: `Error: ${result.error}`
         }])
       }
-    } catch (error) {
+    } catch {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: 'Sorry, something went wrong. Please try again.'
@@ -202,7 +202,7 @@ function CustomerManagementAgent({ customer, events, consultations }) {
           content: result.content || 'I analyzed the properties but couldn\'t generate structured recommendations. Please try again.'
         }])
       }
-    } catch (error) {
+    } catch {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: 'Sorry, I couldn\'t analyze properties right now. Please try again.'

@@ -19,13 +19,11 @@ import {
   Image as ImageIcon,
   Loader2
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import { propertyService } from '../../services/database'
 import { supabase } from '../../config/supabase'
 import { getImageUrl, getImageUrlFromCaseNumber } from '../../utils/imageUtils'
 
 function PropertyAdmin() {
-  const navigate = useNavigate()
   const [properties, setProperties] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -176,7 +174,7 @@ function PropertyAdmin() {
       const fileName = `${caseNumber}.${fileExt}`
       const filePath = fileName
 
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('USAHUDhomes')
         .upload(filePath, file, {
           cacheControl: '3600',

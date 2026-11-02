@@ -28,7 +28,6 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 export default function HUDSyncAdmin() {
   const [states, setStates] = useState([])
   const [selectedState, setSelectedState] = useState('NC')
-  const [loading, setLoading] = useState(false)
   const [scraping, setScraping] = useState(false)
   const [importing, setImporting] = useState(false)
   
@@ -266,7 +265,7 @@ export default function HUDSyncAdmin() {
             <div className="space-y-2">
               <h4 className="font-semibold">Properties Preview (First 5)</h4>
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {scrapedData.properties.slice(0, 5).map((property, index) => (
+                {scrapedData.properties.slice(0, 5).map((property) => (
                   <Card key={property.case_number} className="p-4">
                     <div className="flex justify-between items-start">
                       <div className="space-y-1 flex-1">

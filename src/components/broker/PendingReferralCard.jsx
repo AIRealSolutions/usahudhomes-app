@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { useAuth } from '../../contexts/AuthContext'
 import { consultationService } from '../../services/database/consultationService'
 import { 
   Clock, 
@@ -19,7 +18,6 @@ import AcceptReferralModal from './AcceptReferralModal'
 import DeclineReferralModal from './DeclineReferralModal'
 
 const PendingReferralCard = ({ referral, agentId, onAction }) => {
-  const { profile } = useAuth()
   const [showAcceptModal, setShowAcceptModal] = useState(false)
   const [showDeclineModal, setShowDeclineModal] = useState(false)
   const [loading, setLoading] = useState(false)

@@ -86,7 +86,7 @@ const StatCard = ({ label, value, color, onClick }) => (
 )
 
 // ── New Leads Tab ─────────────────────────────────────────────────────────────
-function NewLeadsTab({ onNavigate }) {
+function NewLeadsTab() {
   const navigate = useNavigate()
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)

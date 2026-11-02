@@ -51,7 +51,7 @@ export default function VideoStudio() {
 
       {/* Sub-tab navigation */}
       <div className="flex gap-2 flex-wrap">
-        {TABS.map(({ id, label, icon: Icon, desc }) => (
+        {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}

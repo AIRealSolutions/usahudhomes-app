@@ -7,9 +7,9 @@ import { facebookLeadsImportService } from '../../services/facebookLeadsImportSe
  * Allows admins to import leads from Facebook Lead Ads CSV exports
  */
 const FacebookLeadsImport = ({ onImportComplete }) => {
-  const [file, setFile] = useState(null)
+  const [, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
-  const [importing, setImporting] = useState(false)
+  const [, setImporting] = useState(false)
   const [importResult, setImportResult] = useState(null)
   const [step, setStep] = useState('upload') // upload, preview, importing, complete
   const [skipDuplicates, setSkipDuplicates] = useState(true)

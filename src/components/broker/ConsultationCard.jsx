@@ -18,7 +18,6 @@ const ConsultationCard = ({ consultation, onUpdate }) => {
   const [showEmailComposer, setShowEmailComposer] = useState(false)
   const [showSMSComposer, setShowSMSComposer] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
-  const [showDetails, setShowDetails] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
 
   // Use joined customer data if available, otherwise fallback to embedded fields

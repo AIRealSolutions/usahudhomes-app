@@ -182,14 +182,6 @@ const PropertySearchTab = ({ customer }) => {
     }).format(price)
   }
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    })
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">

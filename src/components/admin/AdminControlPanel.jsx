@@ -71,8 +71,8 @@ export default function AdminControlPanel({ onNavigate }) {
   })
   const [recentLeads, setRecentLeads] = useState([])
   const [recentProperties, setRecentProperties] = useState([])
-  const [lastHudSync, setLastHudSync] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [, setLastHudSync] = useState(null)
+  const [, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [lastRefreshed, setLastRefreshed] = useState(null)
   const [marketState, setMarketState] = useState('') // '' = all states
@@ -123,7 +123,7 @@ export default function AdminControlPanel({ onNavigate }) {
           .limit(1)
           .single()
         setLastHudSync(syncData)
-      } catch (_) {}
+      } catch { /* best effort; leave the previous value on screen */ }
 
       setLastRefreshed(new Date())
     } catch (err) {

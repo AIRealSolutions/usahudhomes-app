@@ -30,7 +30,7 @@ function caseNumberToFilename(caseNumber) {
 // Utility: Check if image exists in Supabase Storage
 async function checkImageExists(filename) {
   try {
-    const { data, error } = await supabase.storage
+    const { data } = await supabase.storage
       .from('USAHUDhomes')
       .list('', {
         limit: 1,
@@ -38,7 +38,7 @@ async function checkImageExists(filename) {
       })
     
     return data && data.length > 0
-  } catch (error) {
+  } catch {
     return false
   }
 }
@@ -72,7 +72,7 @@ async function auditPropertyImages() {
 
   // Audit each property
   for (const property of properties) {
-    const { case_number, main_image, status, is_active } = property
+    const { main_image, status, is_active } = property
 
     // Check for missing image
     if (!main_image || main_image === '') {

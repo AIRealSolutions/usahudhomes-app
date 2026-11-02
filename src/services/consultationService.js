@@ -317,8 +317,8 @@ This is an automated confirmation. Please do not reply to this email.
 
   // Phone validation
   isValidPhone(phone) {
-    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/
-    const cleanPhone = phone.replace(/[\s\-\(\)\.]/g, '')
+    const phoneRegex = /^[+]?[1-9][\d]{0,15}$/
+    const cleanPhone = phone.replace(/[\s\-().]/g, '')
     return cleanPhone.length >= 10 && phoneRegex.test(cleanPhone)
   }
 

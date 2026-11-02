@@ -53,7 +53,7 @@ async function checkNCProperties() {
   
   // Check if there's a case sensitivity issue
   console.log('\n--- Checking for case variations ---\n')
-  const { data: ncLower, error: ncLowerError } = await supabase
+  const { data: ncLower } = await supabase
     .from('properties')
     .select('count')
     .ilike('state', 'nc')

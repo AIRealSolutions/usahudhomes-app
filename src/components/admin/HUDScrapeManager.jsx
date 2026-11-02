@@ -771,7 +771,7 @@ function HistoryTab() {
         const res  = await api.history(50)
         const data = await res.json()
         if (data.success) setRuns(data.runs)
-      } catch (_) {}
+      } catch { /* best effort; leave the previous value on screen */ }
       setLoading(false)
     }
     load()

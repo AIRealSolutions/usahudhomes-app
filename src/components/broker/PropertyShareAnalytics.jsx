@@ -71,55 +71,6 @@ const PropertyShareAnalytics = ({ leadId, agentId }) => {
     setAnalytics(stats)
   }
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  }
-
-  const formatTime = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  }
-
-  const getResponseStatusBadge = (status) => {
-    const statusConfig = {
-      'interested': { color: 'bg-green-100 text-green-800', icon: CheckCircle, label: 'Interested' },
-      'not_interested': { color: 'bg-red-100 text-red-800', icon: XCircle, label: 'Not Interested' },
-      'showing_scheduled': { color: 'bg-blue-100 text-blue-800', icon: Calendar, label: 'Showing Scheduled' },
-      'offer_made': { color: 'bg-purple-100 text-purple-800', icon: TrendingUp, label: 'Offer Made' },
-      'no_response': { color: 'bg-gray-100 text-gray-800', icon: Clock, label: 'No Response' }
-    }
-
-    const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-600', icon: Clock, label: 'Pending' }
-    const Icon = config.icon
-
-    return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
-        <Icon className="w-3 h-3" />
-        {config.label}
-      </span>
-    )
-  }
-
-  const getShareMethodBadge = (method) => {
-    const methodConfig = {
-      'email': { color: 'bg-blue-100 text-blue-800', label: 'Email' },
-      'sms': { color: 'bg-green-100 text-green-800', label: 'SMS' },
-      'facebook': { color: 'bg-blue-100 text-blue-800', label: 'Facebook' },
-      'instagram': { color: 'bg-pink-100 text-pink-800', label: 'Instagram' },
-      'whatsapp': { color: 'bg-green-100 text-green-800', label: 'WhatsApp' },
-      'link': { color: 'bg-gray-100 text-gray-800', label: 'Link' }
-    }
-
-    const config = methodConfig[method] || { color: 'bg-gray-100 text-gray-600', label: method }
-
-    return (
-      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${config.color}`}>
-        {config.label}
-      </span>
-    )
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
