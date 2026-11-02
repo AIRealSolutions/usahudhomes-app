@@ -85,7 +85,7 @@ class ErrorBoundary extends React.Component {
 
 // Header Component
 function Header() {
-  const { user, role, signOut, isAdmin, isBroker, isEndUser, canAccessAdmin, canAccessBroker } = useAuth()
+  const { user, signOut, canAccessAdmin, canAccessBroker } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const location = useLocation()
 
@@ -96,20 +96,6 @@ function Header() {
   const handleSignOut = async () => {
     await signOut()
     window.location.href = '/'
-  }
-
-  const getRoleLabel = () => {
-    if (isAdmin?.()) return 'Admin Dashboard'
-    if (isBroker?.()) return 'Broker Portal'
-    if (isEndUser?.()) return 'My Account'
-    return 'Dashboard'
-  }
-
-  const getDashboardPath = () => {
-    if (isAdmin?.()) return '/dashboard'
-    if (isBroker?.()) return '/dashboard'
-    if (isEndUser?.()) return '/dashboard'
-    return '/dashboard'
   }
 
   return (

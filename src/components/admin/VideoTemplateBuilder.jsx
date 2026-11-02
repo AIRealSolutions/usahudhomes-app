@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '../../config/supabase'
 import {
   Save, Plus, Trash2, Copy, ChevronDown, ChevronUp, Eye,

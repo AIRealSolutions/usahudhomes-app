@@ -26,7 +26,7 @@ function AIMarketingAssistant({ property }) {
   const [loading, setLoading] = useState(false)
   const [copiedIndex, setCopiedIndex] = useState(null)
   const [customerContext, setCustomerContext] = useState(null)
-  const [loadingContext, setLoadingContext] = useState(true)
+  const [, setLoadingContext] = useState(true)
   const messagesEndRef = useRef(null)
 
   // Load customer context on mount
@@ -75,7 +75,7 @@ function AIMarketingAssistant({ property }) {
           content: `Sorry, I encountered an error: ${result.error}. Please try again.`
         }])
       }
-    } catch (error) {
+    } catch {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: 'Sorry, something went wrong. Please try again.'
@@ -128,7 +128,7 @@ function AIMarketingAssistant({ property }) {
           content: `Error: ${result.error}`
         }])
       }
-    } catch (error) {
+    } catch {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: 'Sorry, something went wrong. Please try again.'

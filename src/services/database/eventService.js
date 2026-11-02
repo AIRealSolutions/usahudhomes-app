@@ -92,7 +92,7 @@ class EventService {
       const {
         customerId,
         consultationId = null,
-        agentId = null,
+        agentId: _agentId = null, // not saved yet; see the agent_id TODO below
         eventType,
         eventCategory,
         eventTitle,

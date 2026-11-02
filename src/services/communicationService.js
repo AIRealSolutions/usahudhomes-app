@@ -81,7 +81,7 @@ export const communicationService = {
         body: JSON.stringify({
           to,
           message: body,
-          from: messageData.from || process.env.TWILIO_PHONE_NUMBER
+          from: messageData.from // the server picks its own Twilio number when this is empty
         })
       })
 

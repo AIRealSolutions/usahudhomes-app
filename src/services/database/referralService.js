@@ -187,7 +187,7 @@ class ReferralService {
   async reassignConsultation(consultationId) {
     try {
       // Reset assignment fields
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from(TABLES.CONSULTATIONS)
         .update({
           agent_id: null,

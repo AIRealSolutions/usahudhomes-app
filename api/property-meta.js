@@ -98,7 +98,7 @@ export default async function handler(req, res) {
       const html = await loadIndexHtml(req);
       res.setHeader('Content-Type', 'text/html');
       return res.status(200).send(html);
-    } catch (error) {
+    } catch {
       return res.status(500).send('Error loading page');
     }
   }

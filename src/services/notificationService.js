@@ -46,7 +46,7 @@ export async function sendConsultationNotification(consultation) {
       try {
         const errorJson = JSON.parse(errorText)
         console.error('Notification API error (parsed):', errorJson)
-      } catch (e) {
+      } catch {
         console.error('Could not parse error as JSON')
       }
       return false

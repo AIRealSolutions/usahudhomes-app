@@ -53,7 +53,7 @@ function HUDImport({ onImportComplete }) {
     try {
       JSON.parse(trimmed)
       return 'json'
-    } catch (e) {
+    } catch {
       // Not JSON
     }
 

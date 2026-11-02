@@ -132,7 +132,7 @@ export default function AdminPropertyDetails() {
       const filePath = fileName;
 
       // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('USAHUDhomes')
         .upload(filePath, file, {
           cacheControl: '3600',

@@ -88,7 +88,7 @@ export default function BuyerBidBuilder({ user, property, onTermsChange, financi
   setMessage('')
  }
  const load=async()=>{ if(!user?.id)return; const {data,error}=await supabase.from('buyer_bid_drafts').select('*').eq('buyer_id',user.id).order('created_at',{ascending:false}); if(error)setMessage(error.message);else setBids(data||[]) }
- useEffect(()=>{load()},[user?.id])
+ useEffect(()=>{load()},[user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
  const editDraft=(draft)=>{
   if(!['draft','changes_requested'].includes(draft.status)){setMessage('This proposal can no longer be edited.');return}
   editingRef.current=draft.id

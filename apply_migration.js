@@ -22,12 +22,12 @@ async function applyMigration() {
     
     console.log(`Executing: ${statement.substring(0, 100)}...`)
     
-    const { data, error } = await supabase.rpc('exec_sql', { sql_query: statement })
+    const { error } = await supabase.rpc('exec_sql', { sql_query: statement })
     
     if (error) {
       console.error('Error:', error)
       // Try direct query
-      const { data: data2, error: error2 } = await supabase.from('properties').select('id').limit(1)
+      const { error: error2 } = await supabase.from('properties').select('id').limit(1)
       if (error2) {
         console.error('Cannot execute SQL. Need to use Supabase dashboard.')
         console.log('\nPlease run this migration manually in Supabase SQL Editor:')

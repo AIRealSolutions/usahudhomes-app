@@ -155,7 +155,7 @@ class ChatbotService {
   }
 
   // Get suggested follow-up questions based on the conversation
-  getSuggestedQuestions(property) {
+  getSuggestedQuestions(_property) {
     const suggestions = [
       "What financing options are available?",
       "How does the bidding process work?",
@@ -194,7 +194,7 @@ class ChatbotService {
   }
 
   // Handle quick response button clicks
-  handleQuickResponse(buttonText, property) {
+  handleQuickResponse(buttonText, _property) {
     const responses = {
       "💰 Financing Options": "What financing options are available for this property?",
       "📅 Bid Deadline": "When is the bid deadline and how do I submit an offer?",

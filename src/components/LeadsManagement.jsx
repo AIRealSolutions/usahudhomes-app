@@ -104,11 +104,12 @@ function LeadsManagement() {
           aValue = new Date(a.createdAt)
           bValue = new Date(b.createdAt)
           break
-        case 'priority':
+        case 'priority': {
           const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 }
           aValue = priorityOrder[a.priority] || 0
           bValue = priorityOrder[b.priority] || 0
           break
+        }
         case 'status':
           aValue = a.status
           bValue = b.status

@@ -146,14 +146,6 @@ const PropertySelector = ({ onSelectProperties, selectedProperties = [], maxSele
     setSearchTerm('')
   }
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0
-    }).format(price)
-  }
-
   const getUniqueStates = () => {
     const states = [...new Set(properties.map(p => p.state).filter(Boolean))]
     return states.sort()

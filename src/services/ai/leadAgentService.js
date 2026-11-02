@@ -311,7 +311,7 @@ Be concise, actionable, and highlight the most important information.`
    * @param {Object} analysis - Lead analysis
    * @returns {string} Reasoning text
    */
-  buildMatchReasoning(agent, analysis) {
+  buildMatchReasoning(agent, _analysis) {
     const reasons = []
     
     if (agent.states_covered && agent.states_covered.length > 0) {

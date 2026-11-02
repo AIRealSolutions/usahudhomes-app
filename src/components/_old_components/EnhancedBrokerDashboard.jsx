@@ -16,7 +16,6 @@ import {
   Briefcase, FileText, Settings, LogOut
 } from 'lucide-react'
 import customerDatabase from '../services/customerDatabase.js'
-import { brokerNetwork } from '../services/brokerNetwork.js'
 import PropertyAdmin from './admin/PropertyAdmin.jsx'
 import CustomerAdmin from './admin/CustomerAdmin.jsx'
 import AgentAdmin from './admin/AgentAdmin.jsx'
@@ -29,7 +28,7 @@ function EnhancedBrokerDashboard({ onLogout }) {
   const [adminSubTab, setAdminSubTab] = useState('properties')
   const [searchTerm, setSearchTerm] = useState('')
   const [customers, setCustomers] = useState([])
-  const [leads, setLeads] = useState([])
+  const [, setLeads] = useState([])
   const [consultations, setConsultations] = useState([])
   const [stats, setStats] = useState({})
   const [recentActivity, setRecentActivity] = useState([])
@@ -110,13 +109,6 @@ function EnhancedBrokerDashboard({ onLogout }) {
     { name: 'Property Consultations', value: 30, color: '#10B981' },
     { name: 'Chatbot Interactions', value: 15, color: '#F59E0B' },
     { name: 'Direct Referrals', value: 10, color: '#EF4444' }
-  ]
-
-  const propertyInterestData = [
-    { state: 'NC', properties: 28, value: 1250000 },
-    { state: 'TN', properties: 12, value: 580000 },
-    { state: 'SC', properties: 8, value: 420000 },
-    { state: 'VA', properties: 5, value: 310000 }
   ]
 
   const handleLogout = () => {
@@ -315,7 +307,7 @@ function EnhancedBrokerDashboard({ onLogout }) {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {recentActivity.map((activity, index) => (
+            {recentActivity.map((activity) => (
               <div key={activity.id} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50">
                 <div className={`p-2 rounded-full ${
                   activity.type === 'lead' ? 'bg-blue-100' : 'bg-green-100'

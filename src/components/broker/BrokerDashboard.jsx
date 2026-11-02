@@ -20,7 +20,7 @@ import ConsultationCard from './ConsultationCard'
 import StatsCards from './StatsCards'
 
 const BrokerDashboard = () => {
-  const { user, profile, logout } = useAuth()
+  const { profile, logout } = useAuth()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [agentId, setAgentId] = useState(null)
@@ -100,7 +100,7 @@ const BrokerDashboard = () => {
     setRefreshing(false)
   }
 
-  const handleReferralAction = async (action) => {
+  const handleReferralAction = async () => {
     // Reload data after referral action
     await loadDashboardData()
   }

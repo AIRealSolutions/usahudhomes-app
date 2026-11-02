@@ -21,9 +21,8 @@ import {
   Tag
 } from 'lucide-react'
 
-const PropertyDetailModal = ({ property, onClose, onShare }) => {
+const PropertyDetailModal = ({ property, onClose }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [copySuccess, setCopySuccess] = useState(false)
 
   const images = property.images && property.images.length > 0 
     ? property.images 

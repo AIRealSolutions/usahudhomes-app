@@ -135,7 +135,6 @@ export const propertyRecommendationService = {
       } = shareData
 
       // Generate property list content
-      const propertyList = this.formatPropertyList(properties)
       
       // Create message based on channel
       let messageContent
@@ -219,7 +218,7 @@ P.S. HUD properties move quickly! Let me know if you'd like to submit an offer o
   /**
    * Generate SMS content for property sharing
    */
-  generatePropertySMSContent(clientName, properties, customMessage) {
+  generatePropertySMSContent(clientName, properties, _customMessage) {
     if (properties.length === 1) {
       const p = properties[0]
       return `Hi ${clientName}! Found a great HUD home for you: ${p.address}, ${p.city} - ${p.bedrooms}BR/${p.bathrooms}BA - $${p.list_price.toLocaleString()}. View: usahudhomes.com/properties/${p.case_number} Interested?`

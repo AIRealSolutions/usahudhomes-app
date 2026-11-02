@@ -109,7 +109,7 @@ export async function processPropertyImages(imageUrls) {
  * Upload image to Supabase storage
  * Note: This requires Supabase storage to be configured
  */
-export async function uploadImageToStorage(file, propertyId) {
+export async function uploadImageToStorage(file, _propertyId) {
   // TODO: Implement Supabase storage upload
   // For now, we'll store images as base64 in the database
   // In production, you should upload to Supabase Storage or S3

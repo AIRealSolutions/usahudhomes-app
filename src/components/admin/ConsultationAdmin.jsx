@@ -22,7 +22,7 @@ import {
   Save,
   Trash2
 } from 'lucide-react'
-import { consultationService, customerService, propertyService, agentService, referralService } from '../../services/database'
+import { consultationService, agentService, referralService } from '../../services/database'
 
 function ConsultationAdmin() {
   const [consultations, setConsultations] = useState([])

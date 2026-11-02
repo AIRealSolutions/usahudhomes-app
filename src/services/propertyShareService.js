@@ -22,8 +22,8 @@ class PropertyShareService {
         shareMethod, // 'email', 'sms', 'facebook', 'instagram', 'whatsapp', 'link'
         message,
         subject,
-        includeAgentInfo = true,
-        includePropertyDetails = true
+        includeAgentInfo: _includeAgentInfo = true,
+        includePropertyDetails: _includePropertyDetails = true
       } = shareData
 
       // Generate unique tracking token
@@ -530,7 +530,7 @@ class PropertyShareService {
   /**
    * Send via social media
    */
-  async sendViaSocial(share, shareData) {
+  async sendViaSocial(share, _shareData) {
     // Placeholder for social media integration
     return {
       success: true,

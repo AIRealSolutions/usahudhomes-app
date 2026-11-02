@@ -22,7 +22,7 @@ import VideoStudio from './admin/VideoStudio'
 import HUDScrapeManager from './admin/HUDScrapeManager'
 
 const AdminDashboard = ({ showVideoStudio = false }) => {
-  const { user, profile, logout } = useAuth()
+  const { logout } = useAuth()
   const [activeTab, setActiveTab] = useState('properties')
 
   const baseTabs = [

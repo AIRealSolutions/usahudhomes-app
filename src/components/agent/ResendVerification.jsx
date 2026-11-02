@@ -34,7 +34,7 @@ const ResendVerification = () => {
         setStatus('error')
         setMessage(result.error || 'Failed to send verification email')
       }
-    } catch (error) {
+    } catch {
       setStatus('error')
       setMessage('An unexpected error occurred. Please try again.')
     }

@@ -97,7 +97,7 @@ async function scrapeBidResults(state) {
         },
         { timeout: 15000 }
       )
-    } catch (e) {
+    } catch {
       console.log('Timeout waiting for results, checking what we got...')
     }
     

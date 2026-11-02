@@ -1,5 +1,5 @@
 import { getAIClient } from './proxyClient'
-import { propertyService, consultationService, eventService } from '../database'
+import { consultationService } from '../database'
 
 // Lazy OpenAI client - only instantiated when called, not at module load time
 // Calls go through /api/ai so the OpenAI key stays on the server.

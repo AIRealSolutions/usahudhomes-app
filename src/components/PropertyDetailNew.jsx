@@ -23,7 +23,6 @@ function PropertyDetailNew() {
   const navigate = useNavigate()
   const [property, setProperty] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showContactForm, setShowContactForm] = useState(false)
   const [isFavorited, setIsFavorited] = useState(false)
 
   useEffect(() => {

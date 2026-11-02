@@ -691,7 +691,7 @@ function Footer() {
 // Main App Component
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [userRole, setUserRole] = useState(null)
+  const [, setUserRole] = useState(null)
   const [stateStats, setStateStats] = useState({})
   const [error, setError] = useState(null)
 
