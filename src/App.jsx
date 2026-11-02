@@ -117,7 +117,7 @@ function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex justify-between items-center">
           <Link to="/" className="flex items-center min-w-0 xl:flex-shrink-0">
-            <HomeIcon className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 mr-2 flex-shrink-0" />
+            <img src="/logo.png" alt="USAHUDhomes logo" width="40" height="40" className="h-9 w-9 sm:h-10 sm:w-10 object-contain mr-2 flex-shrink-0" />
             <span className="text-lg sm:text-2xl xl:text-lg font-bold text-gray-900 truncate">USAHUDhomes.com</span>
           </Link>
 
