@@ -39,7 +39,7 @@ export default function BuyerBidBuilder({ user, property, onTermsChange, financi
  const editingRef=useRef(null)
  const [mode,setModeState]=useState(readMode)
  const setMode=m=>{setModeState(m);try{localStorage.setItem(MODE_KEY,m)}catch{/* private window */}}
- const [loanRate,setLoanRate]=useState(6.25)
+ const [loanRate,setLoanRate]=useState(7)
  const [commission,setCommission]=useState({listing:3,buyer:3}), [form,setForm]=useState(initial), [bids,setBids]=useState([]), [busy,setBusy]=useState(false), [message,setMessage]=useState('')
  // A broker in client mode builds the offer for that client instead of for themselves
  const {client,clientFirstName}=useActiveClient()
@@ -83,7 +83,7 @@ export default function BuyerBidBuilder({ user, property, onTermsChange, financi
  const change=(key,value)=>setForm(old=>({...old,[key]:value}))
  const chooseBuyerType=(type)=>{
   if(!['owner','investor'].includes(type))return
-  setLoanRate(type==='investor'?7.25:6.25)
+  setLoanRate(type==='investor'?7.25:7)
   setForm(old=>({...old,occupancy:type,financing:type==='investor'&&['fha','203k'].includes(old.financing)?'cash':old.financing,closing_cost_percent:type==='investor'?0:old.closing_cost_percent}))
   setMessage('')
  }
