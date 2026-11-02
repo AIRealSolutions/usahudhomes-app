@@ -126,7 +126,7 @@ export default function PaymentBreakdown({ property, offerTerms, onEstimate }) {
   const [annualInsurance, setAnnualInsurance] = useState(1800)
   const [hoa, setHoa] = useState(0)
   const [otherFees, setOtherFees] = useState(0)
-  const [fhaRate, setFhaRate] = useState(6.25)
+  const [fhaRate, setFhaRate] = useState(7)
   const [convRate, setConvRate] = useState(6.5)
   const [termYears, setTermYears] = useState(30)
   const [convDownPct, setConvDownPct] = useState(5)
