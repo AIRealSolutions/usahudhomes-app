@@ -1,8 +1,9 @@
 /**
- * Broker Leads — companies that have had a HUD home under contract (hud_broker_companies).
- * Warm prospects for broker partners: who is winning HUD bids, where, and how often,
- * with contact details and outreach status tracked here.
- * The list fills itself from the daily accepted-offer sync (database triggers).
+ * Broker Leads — broker prospects (hud_broker_companies): companies that have had a HUD
+ * home under contract, plus every company found in a HUD broker search (Broker Finder).
+ * Warm prospects for broker partners, with contact details and outreach status.
+ * The list fills itself (database triggers): from the daily accepted-offer sync, and
+ * from each broker search result (hud_brokers → company, matched by name).
  */
 
 import React, { useEffect, useMemo, useState } from 'react'
@@ -43,6 +44,7 @@ export default function BrokerLeadsAdmin() {
   const [state, setState] = useState('')
   const [status, setStatus] = useState('')
   const [sort, setSort] = useState('contracts')
+  const [source, setSource] = useState('')
   const [selected, setSelected] = useState(null)
 
   const load = async () => {
@@ -53,22 +55,25 @@ export default function BrokerLeadsAdmin() {
       .order(s.col, { ascending: !!s.asc, nullsFirst: false })
       .order('last_contract_at', { ascending: false, nullsFirst: false })
       .limit(2000)
-    if (state) q = q.contains('states', [state])
+    if (state) q = q.or(`states.cs.{${state}},search_states.cs.{${state}},office_state.eq.${state}`)
     if (status) q = q.eq('lead_status', status)
+    if (source === 'contracts') q = q.gt('total_contracts', 0)
+    if (source === 'search') q = q.eq('in_broker_search', true)
+    if (source === 'search_only') q = q.eq('in_broker_search', true).eq('total_contracts', 0)
     const { data, error: err } = await q
     if (err) setError(err.message)
     else setCompanies(data || [])
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [state, status, sort]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [state, status, sort, source]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const term = search.trim().toLowerCase()
   const shown = useMemo(() => !term ? companies : companies.filter(c =>
     [c.name, c.contact_name, c.email, c.office_city, ...(c.cities || [])].some(v => String(v || '').toLowerCase().includes(term))
   ), [companies, term])
 
-  const allStates = useMemo(() => [...new Set(['NC', 'SC', ...companies.flatMap(c => c.states || [])])].sort(), [companies])
+  const allStates = useMemo(() => [...new Set(['NC', 'SC', ...companies.flatMap(c => [...(c.states || []), ...(c.search_states || []), c.office_state].filter(Boolean))])].sort(), [companies])
   const stats = {
     total: companies.length,
     repeat: companies.filter(c => c.total_contracts > 1).length,
@@ -99,8 +104,8 @@ export default function BrokerLeadsAdmin() {
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2"><Briefcase className="h-6 w-6 text-indigo-600" /> Broker Leads</h2>
           <p className="text-sm text-gray-600 mt-1 max-w-2xl">
-            Every company that has had a HUD home under contract, from HUD's published accepted bids. New companies are added
-            automatically by the daily accepted-offer sync.
+            Every company that has had a HUD home under contract (HUD's published accepted bids), plus every HUD-registered
+            broker found in a Broker Finder search. Both are added automatically.
           </p>
         </div>
         <button onClick={exportCsv} disabled={!shown.length} className="flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-semibold hover:bg-gray-50 disabled:opacity-50">
@@ -131,6 +136,12 @@ export default function BrokerLeadsAdmin() {
           <option value="">All statuses</option>
           {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
+        <select value={source} onChange={e => setSource(e.target.value)} className="px-3 py-2 border rounded-lg text-sm" aria-label="Source">
+          <option value="">All sources</option>
+          <option value="contracts">Won HUD contracts</option>
+          <option value="search">Found in broker search</option>
+          <option value="search_only">Broker search only (no contracts yet)</option>
+        </select>
         <select value={sort} onChange={e => setSort(e.target.value)} className="px-3 py-2 border rounded-lg text-sm">
           {Object.entries(SORTS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}
         </select>
@@ -159,14 +170,17 @@ export default function BrokerLeadsAdmin() {
             ) : shown.map(c => (
               <tr key={c.id} onClick={() => setSelected(c)} className="border-t hover:bg-blue-50 cursor-pointer">
                 <td className="px-4 py-3">
-                  <div className="font-semibold text-gray-900">{c.name}</div>
+                  <div className="font-semibold text-gray-900">
+                    {c.name}
+                    {c.in_broker_search && <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-teal-100 text-teal-800 align-middle">Broker search</span>}
+                  </div>
                   {c.contact_name && <div className="text-xs text-gray-500">{c.contact_name}</div>}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <span className="font-semibold">{c.total_contracts}</span>
                   <span className="text-xs text-gray-500"> ({c.owner_occupant_deals} OO · {c.investor_deals} Inv)</span>
                 </td>
-                <td className="px-4 py-3 text-xs">{(c.states || []).join(', ')}</td>
+                <td className="px-4 py-3 text-xs">{[...new Set([...(c.states || []), ...(c.search_states || [])])].join(', ') || c.office_state || ''}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatDate(c.last_contract_at)}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatMoney(c.total_net_to_hud)}</td>
                 <td className="px-4 py-3"><StatusPill value={c.lead_status} /></td>
@@ -192,6 +206,7 @@ export default function BrokerLeadsAdmin() {
 function CompanyDrawer({ company, onClose, onSaved }) {
   const [form, setForm] = useState(() => Object.fromEntries(EDIT_FIELDS.map(k => [k, company[k] ?? ''])))
   const [offers, setOffers] = useState(null)
+  const [agents, setAgents] = useState(null)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
   const [error, setError] = useState(null)
@@ -206,6 +221,11 @@ function CompanyDrawer({ company, onClose, onSaved }) {
       .select('id, case_number, address, city, state, net_to_hud, purchaser_type, accepted_at, outcome')
       .eq('company_id', company.id).order('accepted_at', { ascending: false })
       .then(({ data }) => { if (!cancelled) setOffers(data || []) })
+    setAgents(null)
+    supabase.from('hud_brokers')
+      .select('id, contact_name, phone, email, address, city, state, zip, status, last_seen_at')
+      .eq('company_id', company.id).order('contact_name')
+      .then(({ data }) => { if (!cancelled) setAgents(data || []) })
     return () => { cancelled = true }
   }, [company.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -248,7 +268,10 @@ function CompanyDrawer({ company, onClose, onSaved }) {
           <div>
             <h3 className="text-xl font-bold">{company.name}</h3>
             <p className="text-sm text-gray-600">
-              {company.total_contracts} HUD {company.total_contracts === 1 ? 'contract' : 'contracts'} · {formatMoney(company.total_net_to_hud)} net to HUD
+              {company.total_contracts
+                ? <>{company.total_contracts} HUD {company.total_contracts === 1 ? 'contract' : 'contracts'} · {formatMoney(company.total_net_to_hud)} net to HUD</>
+                : 'No HUD contracts on record yet'}
+              {company.in_broker_search && <> · found in HUD broker search{company.broker_search_at ? ` ${formatDate(company.broker_search_at)}` : ''}</>}
               {company.first_contract_at && <> · since {formatDate(company.first_contract_at)}</>}
             </p>
             {company.last_contacted_at && <p className="text-xs text-gray-500 mt-1">Last contacted {formatDate(company.last_contacted_at)}</p>}
@@ -295,6 +318,28 @@ function CompanyDrawer({ company, onClose, onSaved }) {
             {message && <span className="text-sm text-green-700">{message}</span>}
             {error && <span className="text-sm text-red-600">{error}</span>}
           </div>
+
+          {agents?.length > 0 && (
+            <div>
+              <h4 className="font-semibold mb-2">HUD-registered brokers at this company ({agents.length})</h4>
+              <ul className="divide-y border rounded-lg">
+                {agents.map(a => (
+                  <li key={a.id} className="px-4 py-3 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <span className="font-medium">{a.contact_name || '—'}</span>
+                      {a.phone && <a href={`tel:${a.phone}`} className="text-blue-600 whitespace-nowrap">{a.phone}</a>}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {[a.address, a.city, [a.state, a.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
+                      {a.email && <> · {a.email}</>}
+                      {' · '}{String(a.status || 'new').replace(/_/g, ' ')}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-gray-500 mt-1">From HUD's broker search. Send referrals to them from Broker Finder.</p>
+            </div>
+          )}
 
           <div>
             <h4 className="font-semibold mb-2">HUD contracts</h4>
