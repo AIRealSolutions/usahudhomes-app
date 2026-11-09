@@ -11,7 +11,8 @@ import { US_STATES } from '../../utils/states'
 import LeafletMap from '../../components/maps/LeafletMap'
 import {
   suggestBrokers, sendReferralRequests, resendReferralRequest, getEconomicRegions,
-  BROKER_STATUS, REQUEST_STATUS,
+  BROKER_STATUS, REQUEST_STATUS, DEFAULT_FEE_PERCENT,
+  agreementFormStatus, uploadAgreementForm, previewAgreement,
 } from '../../services/brokerFinder'
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -36,6 +37,23 @@ export default function BrokerFinderAdmin() {
   const [sending, setSending] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const [feePercent, setFeePercent] = useState(DEFAULT_FEE_PERCENT)
+  const [prospectAware, setProspectAware] = useState(true)
+  const [form, setForm] = useState(undefined) // undefined = loading, null = not uploaded
+  const [uploading, setUploading] = useState(false)
+
+  useEffect(() => { agreementFormStatus().then(setForm).catch(() => setForm(null)) }, [])
+
+  const uploadForm = async file => {
+    if (!file) return
+    setUploading(true); setError('')
+    try {
+      await uploadAgreementForm(file)
+      setForm(await agreementFormStatus())
+      setNotice('Referral agreement form saved. Use "Preview" to check the filled-in version.')
+    } catch (e) { setError(e.message) } finally { setUploading(false) }
+  }
+  const preview = async requestId => { try { await previewAgreement(requestId) } catch (e) { setError(e.message) } }
 
   // Property list for the chosen state (search by case #, address or city)
   useEffect(() => {
@@ -90,7 +108,7 @@ export default function BrokerFinderAdmin() {
     setSending(true); setError('')
     try {
       const r = await sendReferralRequests({
-        propertyId: property.id, leadId: leadId || null, note,
+        propertyId: property.id, leadId: leadId || null, note, feePercent: Number(feePercent), prospectAware,
         recipients: brokers.map(b => ({ brokerId: b.id, email: emails[b.id].trim(), distanceMiles: b.distance_miles })),
       })
       const failed = r.results.filter(x => x.status !== 'sent')
@@ -221,6 +239,7 @@ export default function BrokerFinderAdmin() {
                           {b.request.response_note && ` — “${b.request.response_note}”`}
                           {b.request.wants_more_leads && ' · wants more leads'}
                           {['sent', 'opened', 'failed'].includes(b.request.status) && <button type="button" className="ml-2 text-blue-700 underline" onClick={() => resend(b.request.id)}>Resend</button>}
+                          {b.request.status === 'accepted' && <button type="button" className="ml-2 text-blue-700 underline" onClick={() => preview(b.request.id)}>Referral agreement</button>}
                         </span>
                       )}
                     </span>
@@ -235,12 +254,40 @@ export default function BrokerFinderAdmin() {
             <textarea className="border rounded p-2 w-full mt-1" rows={3} maxLength={2000} value={note} onChange={e => setNote(e.target.value)}
               placeholder="e.g. Buyer is an owner-occupant, pre-approved FHA, wants to bid before the deadline on Friday." />
           </label>
+          <div className="flex flex-wrap gap-4 items-center text-sm">
+            <label>Referral fee
+              <input type="number" min="1" max="100" step="0.5" className="border rounded p-2 w-20 mx-2" value={feePercent} onChange={e => setFeePercent(e.target.value)} />
+              % of buyer-side compensation
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={prospectAware} onChange={e => setProspectAware(e.target.checked)} />
+              The buyer knows about this referral and that a fee may be paid
+            </label>
+          </div>
+          {!prospectAware && <p className="text-xs text-amber-700">NC license law requires telling the buyer about the referral and that a fee may be paid. The agreement will show “is not aware”.</p>}
+          {!leadId && <p className="text-xs text-gray-500">Link a lead ID above to put the buyer's name and contact on the referral agreement.</p>}
           <button type="button" disabled={sending || !selected.length} onClick={send} className="bg-green-700 text-white rounded px-5 py-3 disabled:opacity-50">
             {sending ? 'Sending…' : `Send referral request to ${selected.length} broker${selected.length === 1 ? '' : 's'}`}
           </button>
-          <p className="text-xs text-gray-500">Each broker gets a link to accept or decline, and to sign up for more HUD buyer leads in the regions of {property.state} they cover.</p>
+          <p className="text-xs text-gray-500">Each broker gets a link to accept or decline, and to sign up for more HUD buyer leads in the regions of {property.state} they cover. When a broker accepts, the referral agreement is filled in and emailed to them to sign, with a copy to you.</p>
         </section>
       )}
+
+      {/* Referral agreement form */}
+      <section className="bg-white rounded shadow p-4 sm:p-5 space-y-2">
+        <h2 className="font-semibold">Referral agreement (NC REALTORS® Form 730)</h2>
+        {form === undefined && <p className="text-sm text-gray-500">Checking…</p>}
+        {form === null && <p className="text-sm text-amber-700">Not uploaded yet. Upload your copy of Form 730 so accepted referrals get a filled-in agreement automatically.</p>}
+        {form && <p className="text-sm text-green-800">Uploaded {form.updated_at ? new Date(form.updated_at).toLocaleDateString() : ''}. Brokers who accept get it filled in with the property, buyer, their firm, a {DEFAULT_FEE_PERCENT}% buyer-side fee (or the % you set), a 6-month End Date and payment within 10 days.</p>}
+        <div className="flex flex-wrap gap-3 items-center">
+          <label className="text-sm border rounded px-3 py-2 cursor-pointer bg-gray-50">
+            {uploading ? 'Uploading…' : form ? 'Replace form PDF' : 'Upload form PDF'}
+            <input type="file" accept="application/pdf" className="hidden" disabled={uploading} onChange={e => { uploadForm(e.target.files?.[0]); e.target.value = '' }} />
+          </label>
+          {form && <button type="button" className="text-blue-700 underline text-sm" onClick={() => preview(null)}>Preview with sample data</button>}
+        </div>
+        <p className="text-xs text-gray-500">Use the copy that already shows your name and office address (as produced in Lone Wolf Transact). It is stored privately and only sent out filled in, to the broker who accepted. Set your firm and agent license numbers in Vercel as REFERRAL_FIRM_LICENSE and REFERRAL_AGENT_LICENSE.</p>
+      </section>
     </main>
   )
 }

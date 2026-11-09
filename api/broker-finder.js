@@ -12,7 +12,15 @@
  *   scan      (admin)  { state } — fill the directory for a state's property cities (call until done)
  *   geocode   (admin)  { limit? } — place directory brokers that have no map pin yet
  *   lookup    (public) { token } — the broker's referral page reads its request
- *   respond   (public) { token, response: 'accept'|'decline'|'optout', note?, wantsMoreLeads?, regions? }
+ *   respond   (public) { token, response: 'accept'|'decline'|'optout', note?, wantsMoreLeads?, regions?,
+ *                        agentLicense?, firmLicense? } — on accept, emails the filled referral agreement
+ *   agreement (public, GET ?token=) — the filled referral agreement PDF, once the broker accepted
+ *   agreement-preview (admin) { requestId? } — the filled PDF for a request, or with sample data
+ *
+ * Referral agreement: NC REALTORS® Form 730, uploaded by an admin to the private
+ * 'private-forms' bucket (see api/_referral-agreement.js). Optional env for the
+ * referring firm: REFERRAL_FIRM_NAME, REFERRAL_FIRM_LICENSE, REFERRAL_AGENT_NAME,
+ * REFERRAL_AGENT_LICENSE, REFERRAL_FIRM_ADDRESS, REFERRAL_FIRM_PHONE, REFERRAL_FIRM_EMAIL.
  *
  * HUD only publishes company, contact, office address and phone — no email — so the
  * admin adds an email before a request can be sent. Office addresses are geocoded with
@@ -27,6 +35,10 @@ import { createClient } from '@supabase/supabase-js'
 import { randomBytes } from 'crypto'
 import nodemailer from 'nodemailer'
 import zipcodes from 'zipcodes'
+import {
+  fillReferralAgreement, referringFirm, FORM_BUCKET, FORM_PATH,
+  DEFAULT_FEE_PERCENT, DEFAULT_TERM_MONTHS, DEFAULT_PAYMENT_DAYS,
+} from './_referral-agreement.js'
 
 export const config = { maxDuration: 60 }
 
@@ -245,11 +257,14 @@ function mailer() {
   if (process.env.RESEND_API_KEY) {
     const from = process.env.REFERRAL_FROM_EMAIL || process.env.INVITE_FROM_EMAIL || 'referrals@usahudhomes.com'
     return {
-      async send({ fromName, to, replyTo, subject, html, text, headers }) {
+      async send({ fromName, to, replyTo, subject, html, text, headers, attachments }) {
         const r = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from: `${fromName} <${from}>`, to: [to], reply_to: replyTo, subject, html, text, headers }),
+          body: JSON.stringify({
+            from: `${fromName} <${from}>`, to: [to], reply_to: replyTo, subject, html, text, headers,
+            ...(attachments?.length ? { attachments: attachments.map(a => ({ filename: a.filename, content: Buffer.from(a.content).toString('base64') })) } : {}),
+          }),
         })
         if (!r.ok) {
           const e = await r.json().catch(() => ({}))
@@ -281,6 +296,8 @@ function buildReferralEmail(reqRow, broker, sender, regionNames) {
   const signature = [sender.name, [sender.company, sender.phone].filter(Boolean).join(' · '), 'USAHUDhomes.com'].filter(Boolean)
   const business = process.env.BUSINESS_MAILING_ADDRESS || ''
   const subject = `HUD buyer referral: ${where || 'a HUD home near you'}`
+  const fee = Number(reqRow.fee_percent ?? DEFAULT_FEE_PERCENT)
+  const ask = `I found your office on HUD's registered broker list. I have a buyer who wants to bid on a HUD home near you, and I don't have an agent in that area. Would you be able to represent the buyer and submit the bid? The referral fee is ${fee}% of the buyer-side compensation; I'll send the referral agreement (NC REALTORS® Form 730) once you accept.`
   const regionsLine = regionNames.length
     ? `We also send HUD buyer leads by region${regionNames.length <= 3 ? ` (${regionNames.join(', ')})` : ` across ${regionNames.length} regions of ${reqRow.property_state}`}. You can choose the regions you cover from the same page.`
     : `You can also sign up from the same page to receive more HUD buyer leads in ${reqRow.property_state || 'your state'}.`
@@ -289,7 +306,7 @@ function buildReferralEmail(reqRow, broker, sender, regionNames) {
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#111827">
       <p>Hi ${escapeHtml(first)},</p>
-      <p>I found your office on HUD's registered broker list. I have a buyer who wants to bid on a HUD home near you, and I don't have an agent in that area. Would you be able to represent the buyer and submit the bid? A standard referral agreement applies.</p>
+      <p>${escapeHtml(ask)}</p>
       <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;margin:16px 0;background:#f9fafb">
         <strong>${escapeHtml(where)}</strong>
         ${facts.length ? `<div style="color:#374151;margin-top:6px">${facts.map(escapeHtml).join('<br>')}</div>` : ''}
@@ -304,7 +321,7 @@ function buildReferralEmail(reqRow, broker, sender, regionNames) {
     </div>`
   const text = [
     `Hi ${first},`, '',
-    "I found your office on HUD's registered broker list. I have a buyer who wants to bid on a HUD home near you, and I don't have an agent in that area. Would you be able to represent the buyer and submit the bid? A standard referral agreement applies.", '',
+    ask, '',
     where, ...facts, ...(propertyUrl ? [propertyUrl] : []), '',
     ...(reqRow.note ? [reqRow.note, ''] : []),
     `Yes, I can help: ${link}?r=accept`, `Not this one: ${link}?r=decline`, '',
@@ -434,6 +451,9 @@ async function handleSend(req, res, client, admin) {
   const recipients = (Array.isArray(req.body?.recipients) ? req.body.recipients : []).slice(0, MAX_SEND)
   if (!recipients.length) return res.status(400).json({ error: 'Choose at least one broker.' })
   const note = clip(req.body?.note, 2000) || null
+  const feeIn = Number(req.body?.feePercent)
+  const feePercent = Number.isFinite(feeIn) && feeIn > 0 && feeIn <= 100 ? Math.round(feeIn * 100) / 100 : DEFAULT_FEE_PERCENT
+  const prospectAware = typeof req.body?.prospectAware === 'boolean' ? req.body.prospectAware : null
   const leadId = UUID_RE.test(String(req.body?.leadId || '')) ? req.body.leadId : null
   const ids = recipients.map(r => r.brokerId).filter(id => UUID_RE.test(String(id)))
   const { data: brokers, error } = await client.from('hud_brokers').select('*').in('id', ids)
@@ -460,7 +480,10 @@ async function handleSend(req, res, client, admin) {
       let row = prior?.[0]
       if (row) {
         const { data } = await client.from('broker_referral_requests')
-          .update({ email, note: note ?? row.note, lead_id: leadId ?? row.lead_id, updated_at: new Date().toISOString() })
+          .update({
+            email, note: note ?? row.note, lead_id: leadId ?? row.lead_id, fee_percent: feePercent,
+            prospect_aware: prospectAware ?? row.prospect_aware, updated_at: new Date().toISOString(),
+          })
           .eq('id', row.id).select('*').single()
         row = data || row
       } else {
@@ -471,6 +494,7 @@ async function handleSend(req, res, client, admin) {
           property_city: property.city, property_state: property.state, property_price: property.price,
           distance_miles: Number.isFinite(Number(r.distanceMiles)) ? Number(r.distanceMiles) : null,
           note, email, created_by: admin.id,
+          fee_percent: feePercent, payment_days: DEFAULT_PAYMENT_DAYS, prospect_aware: prospectAware,
         }).select('*').single()
         if (e) { results.push({ brokerId: broker.id, status: 'failed', error: e.message }); continue }
         row = data
@@ -538,6 +562,93 @@ async function loadByToken(client, token) {
   return data
 }
 
+// ─── Referral agreement (Form 730) ──────────────────────────────────────────
+async function loadFormTemplate(client) {
+  const { data, error } = await client.storage.from(FORM_BUCKET).download(FORM_PATH)
+  if (error || !data) return null
+  return new Uint8Array(await data.arrayBuffer())
+}
+
+const wrap = (text, width = 115, maxLines = 2) => {
+  const words = clean(text).split(' '), lines = ['']
+  for (const w of words) {
+    if ((lines[lines.length - 1] + ' ' + w).trim().length > width) lines.push('')
+    lines[lines.length - 1] = (lines[lines.length - 1] + ' ' + w).trim()
+  }
+  return lines.filter(Boolean).slice(0, maxLines)
+}
+
+function addMonths(date, months) {
+  const d = new Date(date)
+  d.setUTCMonth(d.getUTCMonth() + months)
+  return d.toISOString().slice(0, 10)
+}
+
+async function agreementPdf(client, row, template) {
+  const tpl = template || await loadFormTemplate(client)
+  if (!tpl) return null
+  const b = row.broker || {}
+  let prospect = {}
+  if (row.lead_id) {
+    const { data: l } = await client.from('leads').select('first_name,last_name,email,phone').eq('id', row.lead_id).maybeSingle()
+    if (l) prospect = { name: clean(`${l.first_name || ''} ${l.last_name || ''}`), phone: l.phone, email: l.email }
+  }
+  const home = [row.property_address, row.property_city, row.property_state].filter(Boolean).join(', ')
+  const notes = [
+    `HUD home: ${home}${row.case_number ? ` · HUD case #${row.case_number}` : ''}${money(row.property_price) ? ` · List price ${money(row.property_price)}` : ''}`,
+    ...(row.note ? wrap(`Notes: ${row.note}`) : []),
+    'Referred through USAHUDhomes.com Broker Finder.',
+  ]
+  return fillReferralAgreement(tpl, {
+    referring: referringFirm(),
+    receiving: {
+      firmName: b.company_name, agentName: b.contact_name,
+      address: [b.address, [b.city, [b.state, b.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', '),
+      phone: b.phone, email: row.email,
+      firmLicense: row.receiving_firm_license, agentLicense: row.receiving_agent_license,
+    },
+    prospect, prospectAware: row.prospect_aware, notes,
+    feePercent: row.fee_percent ?? DEFAULT_FEE_PERCENT,
+    endDate: row.agreement_end_date || addMonths(new Date(), DEFAULT_TERM_MONTHS),
+    paymentDays: row.payment_days ?? DEFAULT_PAYMENT_DAYS,
+  })
+}
+
+const agreementFilename = row => `Referral-Agreement-${(row.case_number || row.property_city || 'HUD').replace(/[^A-Za-z0-9-]+/g, '-')}.pdf`
+
+// GET ?action=agreement&token= — the broker's copy, once they accepted
+async function handleAgreementDownload(req, res, client) {
+  const row = await loadByToken(client, req.query?.token)
+  if (!row || row.status !== 'accepted') return res.status(404).json({ error: 'No referral agreement for this link.' })
+  const pdf = await agreementPdf(client, row)
+  if (!pdf) return res.status(404).json({ error: 'The referral agreement is not available yet. We will email it to you.' })
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `inline; filename="${agreementFilename(row)}"`)
+  res.setHeader('Cache-Control', 'private, no-store')
+  return res.status(200).send(Buffer.from(pdf))
+}
+
+// Admin: the filled agreement for a request, or with sample data to check the uploaded form
+async function handleAgreementPreview(req, res, client) {
+  const tpl = await loadFormTemplate(client)
+  if (!tpl) return res.status(404).json({ error: 'Upload the referral agreement form (NC Form 730) first.' })
+  let row
+  if (UUID_RE.test(String(req.body?.requestId || ''))) {
+    const { data } = await client.from('broker_referral_requests').select('*, broker:hud_brokers(*)').eq('id', req.body.requestId).maybeSingle()
+    row = data
+  }
+  row = row || {
+    case_number: '387-000000', property_address: '123 Sample St', property_city: 'Tabor City', property_state: 'NC', property_price: 85000,
+    note: 'Sample preview: buyer is an owner-occupant, pre-approved FHA.', email: 'broker@example.com', fee_percent: DEFAULT_FEE_PERCENT,
+    payment_days: DEFAULT_PAYMENT_DAYS, prospect_aware: true, receiving_firm_license: 'C00000', receiving_agent_license: '000000',
+    broker: { company_name: 'SAMPLE REALTY LLC', contact_name: 'Pat Sample', address: '1 Main St', city: 'Tabor City', state: 'NC', zip: '28463', phone: '(910) 555-0100' },
+  }
+  const pdf = await agreementPdf(client, row, tpl)
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Cache-Control', 'private, no-store')
+  return res.status(200).send(Buffer.from(pdf))
+}
+
 async function handleLookup(req, res, client) {
   const row = await loadByToken(client, req.body?.token)
   if (!row) return res.status(404).json({ error: 'This referral link is not valid.' })
@@ -553,6 +664,9 @@ async function handleLookup(req, res, client) {
       status: row.status, caseNumber: row.case_number, address: row.property_address, city: row.property_city,
       state: row.property_state, price: row.property_price, distanceMiles: row.distance_miles, note: row.note,
       respondedAt: row.responded_at, wantsMoreLeads: row.wants_more_leads, regionsRequested: row.regions_requested,
+      feePercent: Number(row.fee_percent ?? DEFAULT_FEE_PERCENT),
+      agentLicense: row.receiving_agent_license, firmLicense: row.receiving_firm_license,
+      agreementUrl: row.status === 'accepted' ? `/api/broker-finder?action=agreement&token=${row.token}` : null,
     },
     broker: { company: b.company_name, contactName: b.contact_name, phone: b.phone, email: row.email, city: b.city, state: b.state, optedOut: b.status === 'do_not_contact' },
     regions,
@@ -570,9 +684,48 @@ async function handleRespond(req, res, client) {
   const wantsMoreLeads = response !== 'optout' && !!req.body?.wantsMoreLeads
   const note = clip(req.body?.note, 1000) || null
   const status = response === 'accept' ? 'accepted' : 'declined'
-  await client.from('broker_referral_requests').update({
-    status, responded_at: now, response_note: note, wants_more_leads: wantsMoreLeads, regions_requested: regions, updated_at: now,
-  }).eq('id', row.id)
+  const accepted = status === 'accepted'
+  const update = { status, responded_at: now, response_note: note, wants_more_leads: wantsMoreLeads, regions_requested: regions, updated_at: now }
+  if (accepted) {
+    update.receiving_agent_license = clip(req.body?.agentLicense, 30) || row.receiving_agent_license || null
+    update.receiving_firm_license = clip(req.body?.firmLicense, 30) || row.receiving_firm_license || null
+    update.agreement_end_date = row.agreement_end_date || addMonths(now, DEFAULT_TERM_MONTHS)
+  }
+  await client.from('broker_referral_requests').update(update).eq('id', row.id)
+  Object.assign(row, update)
+
+  // Accepted: fill the referral agreement and email it to the broker to sign
+  let agreement = null, agreementNote = ''
+  if (accepted) {
+    try {
+      agreement = await agreementPdf(client, row)
+      if (!agreement) agreementNote = 'Referral agreement not sent: upload NC Form 730 in Admin > Broker Finder.'
+    } catch (e) { agreementNote = `Referral agreement could not be filled: ${e.message}` }
+  }
+  if (agreement) {
+    const firm = referringFirm()
+    const fee = Number(row.fee_percent ?? DEFAULT_FEE_PERCENT)
+    const link = `${SITE_URL}/broker-referral/${row.token}`
+    const body = [
+      `Hi ${clean(row.broker?.contact_name).split(' ')[0] || 'there'},`, '',
+      `Thank you for taking this buyer. Attached is the referral agreement (NC REALTORS® Form 730) for ${[row.property_address, row.property_city, row.property_state].filter(Boolean).join(', ')}: ${fee}% of the buyer-side compensation, through ${row.agreement_end_date}.`, '',
+      'Please sign it and reply to this email with the signed copy. I will countersign and send you the buyer\'s details if they are not already on the agreement.', '',
+      `You can download it again any time: ${link}`, '',
+      firm.agentName, [firm.firmName, firm.phone].filter(Boolean).join(' · '),
+    ]
+    try {
+      const m = mailer()
+      try {
+        await m.send({
+          fromName: `${firm.agentName} via USAHUDhomes`, to: row.email, replyTo: firm.email || process.env.GMAIL_USER,
+          subject: `Referral agreement: ${row.property_address || row.case_number || 'HUD buyer referral'}`,
+          text: body.join('\n'), html: body.map(l => (l ? `<p>${escapeHtml(l)}</p>` : '')).join(''),
+          attachments: [{ filename: agreementFilename(row), content: Buffer.from(agreement), contentType: 'application/pdf' }],
+        })
+        await client.from('broker_referral_requests').update({ agreement_sent_at: new Date().toISOString() }).eq('id', row.id)
+      } finally { m.close() }
+    } catch (e) { agreementNote = `Referral agreement email failed: ${e.message}` }
+  }
   const brokerStatus = response === 'optout' ? 'do_not_contact'
     : row.broker?.status === 'registered' ? 'registered'
       : response === 'accept' || wantsMoreLeads ? 'interested' : 'declined'
@@ -593,6 +746,8 @@ async function handleRespond(req, res, client) {
         `Phone: ${b.phone || '-'} · Email: ${row.email}`,
         note ? `Note: ${note}` : '',
         wantsMoreLeads ? `Wants more leads in ${row.property_state}: ${regions.length ? regions.join(', ') : 'whole state'}` : '',
+        agreement ? `The referral agreement (${Number(row.fee_percent ?? DEFAULT_FEE_PERCENT)}%) was emailed to the broker to sign; a copy is attached.` : '',
+        agreementNote,
         `${SITE_URL}/admin`,
       ].filter(Boolean)
       const m = mailer()
@@ -601,21 +756,29 @@ async function handleRespond(req, res, client) {
           fromName: 'USAHUDhomes Broker Finder', to, replyTo: row.email,
           subject: `Broker ${verb}: ${row.property_address || row.case_number || 'HUD referral'}`,
           text: lines.join('\n'), html: lines.map(l => `<p>${escapeHtml(l)}</p>`).join(''),
+          ...(agreement ? { attachments: [{ filename: agreementFilename(row), content: Buffer.from(agreement), contentType: 'application/pdf' }] } : {}),
         })
       } finally { m.close() }
     }
   } catch (e) { console.error('[broker-finder] admin notice failed:', e.message) }
 
   const registerUrl = wantsMoreLeads ? `/broker/register?ref=${row.token}` : null
-  return res.status(200).json({ ok: true, status, registerUrl })
+  return res.status(200).json({
+    ok: true, status, registerUrl,
+    agreementUrl: accepted ? `/api/broker-finder?action=agreement&token=${row.token}` : null,
+    agreementEmailed: !!agreement && !agreementNote,
+  })
 }
 
 // ─── Router ──────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   if (!process.env.SUPABASE_SERVICE_KEY) return res.status(503).json({ error: 'Server database credentials missing' })
   const action = req.query?.action
   const client = db()
+  if (req.method === 'GET' && action === 'agreement') {
+    try { return await handleAgreementDownload(req, res, client) } catch (e) { return res.status(500).json({ error: e.message }) }
+  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   try {
     if (action === 'lookup') return await handleLookup(req, res, client)
     if (action === 'respond') return await handleRespond(req, res, client)
@@ -626,7 +789,8 @@ export default async function handler(req, res) {
     if (action === 'resend') return await handleResend(req, res, client, admin)
     if (action === 'scan') return await handleScan(req, res, client)
     if (action === 'geocode') return await handleGeocode(req, res, client)
-    return res.status(400).json({ error: 'Unknown action', valid_actions: ['suggest', 'send', 'resend', 'scan', 'geocode', 'lookup', 'respond'] })
+    if (action === 'agreement-preview') return await handleAgreementPreview(req, res, client)
+    return res.status(400).json({ error: 'Unknown action', valid_actions: ['suggest', 'send', 'resend', 'scan', 'geocode', 'lookup', 'respond', 'agreement', 'agreement-preview'] })
   } catch (e) {
     console.error(`[broker-finder/${action}]`, e)
     return res.status(500).json({ error: e.message || 'Unexpected error' })
@@ -634,4 +798,4 @@ export default async function handler(req, res) {
 }
 
 // Exposed for local checks of the HUD / geocoding steps (not routed)
-export const _internals = { nearbyCities, openHudSession, hudBrokerSearch, mapHudBroker, geocodeBroker, miles, zipPoint, buildReferralEmail }
+export const _internals = { nearbyCities, openHudSession, hudBrokerSearch, mapHudBroker, geocodeBroker, miles, zipPoint, buildReferralEmail, agreementPdf }

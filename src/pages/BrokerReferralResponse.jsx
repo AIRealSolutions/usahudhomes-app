@@ -19,6 +19,8 @@ export default function BrokerReferralResponse() {
   const [note, setNote] = useState('')
   const [wantsMore, setWantsMore] = useState(initial !== 'optout')
   const [regions, setRegions] = useState([])
+  const [agentLicense, setAgentLicense] = useState('')
+  const [firmLicense, setFirmLicense] = useState('')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(null)
 
@@ -26,6 +28,8 @@ export default function BrokerReferralResponse() {
     lookupReferral(token).then(d => {
       setData(d)
       if (d.request.regionsRequested?.length) setRegions(d.request.regionsRequested)
+      setAgentLicense(d.request.agentLicense || '')
+      setFirmLicense(d.request.firmLicense || '')
     }).catch(e => setError(e.message))
   }, [token])
 
@@ -33,7 +37,7 @@ export default function BrokerReferralResponse() {
     if (!response) return setError('Choose a response.')
     setBusy(true); setError('')
     try {
-      setDone(await respondToReferral({ token, response, note, wantsMoreLeads: response !== 'optout' && wantsMore, regions }))
+      setDone(await respondToReferral({ token, response, note, wantsMoreLeads: response !== 'optout' && wantsMore, regions, agentLicense, firmLicense }))
     } catch (e) { setError(e.message) } finally { setBusy(false) }
   }
 
@@ -56,7 +60,8 @@ export default function BrokerReferralResponse() {
               <div className="text-sm text-gray-700">
                 {r.caseNumber && <>HUD case #{r.caseNumber}<br /></>}
                 {money(r.price) && <>List price {money(r.price)}<br /></>}
-                {r.distanceMiles != null && <>About {r.distanceMiles} miles from your office</>}
+                {r.distanceMiles != null && <>About {r.distanceMiles} miles from your office<br /></>}
+                Referral fee: {r.feePercent}% of the buyer-side compensation
               </div>
               {r.caseNumber && <a className="text-blue-700 underline text-sm" href={`/property/${encodeURIComponent(r.caseNumber)}`} target="_blank" rel="noreferrer">View the listing</a>}
               {r.note && <p className="mt-3 text-sm whitespace-pre-wrap border-l-4 border-blue-800 pl-3">{r.note}</p>}
@@ -71,6 +76,17 @@ export default function BrokerReferralResponse() {
                 </label>
               ))}
             </fieldset>
+
+            {response === 'accept' && (
+              <div className="border rounded p-3 space-y-2">
+                <p className="text-sm">We'll email you the referral agreement (NC REALTORS® Form 730) to sign. Add your license numbers to fill them in (optional).</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label className="text-sm">Your license #<input className="border rounded p-2 w-full" maxLength={30} value={agentLicense} onChange={e => setAgentLicense(e.target.value)} /></label>
+                  <label className="text-sm">Firm license #<input className="border rounded p-2 w-full" maxLength={30} value={firmLicense} onChange={e => setFirmLicense(e.target.value)} /></label>
+                </div>
+              </div>
+            )}
+            {r.agreementUrl && <p className="text-sm"><a className="text-blue-700 underline" href={r.agreementUrl} target="_blank" rel="noreferrer">Download your referral agreement</a></p>}
 
             {response !== 'optout' && (
               <>
@@ -108,10 +124,15 @@ export default function BrokerReferralResponse() {
         {done && (
           <div className="space-y-4">
             <p className="text-lg">
-              {response === 'accept' && 'Thank you! We will call you shortly with the buyer’s details.'}
+              {response === 'accept' && (done.agreementEmailed
+                ? 'Thank you! We emailed you the referral agreement to sign. Reply to that email with the signed copy and we will be in touch about the buyer.'
+                : 'Thank you! We will call you shortly with the buyer’s details and the referral agreement.')}
               {response === 'decline' && 'Thanks for letting us know.'}
               {response === 'optout' && 'You will not receive more referral requests from us.'}
             </p>
+            {done.agreementUrl && done.agreementEmailed && (
+              <p><a className="text-blue-700 underline" href={done.agreementUrl} target="_blank" rel="noreferrer">Download the referral agreement</a></p>
+            )}
             {done.registerUrl && (
               <div className="border rounded p-4 bg-green-50 space-y-2">
                 <p className="font-semibold">Finish your partner sign-up to get HUD buyer leads in your regions.</p>
