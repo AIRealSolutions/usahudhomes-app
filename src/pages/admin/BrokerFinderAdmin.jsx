@@ -13,7 +13,7 @@ import {
   suggestBrokers, sendReferralRequests, resendReferralRequest, getEconomicRegions,
   BROKER_STATUS, REQUEST_STATUS, DEFAULT_FEE_PERCENT,
   agreementFormStatus, uploadAgreementForm, previewAgreement,
-  createReferralLink, smsHref, mailtoHref,
+  createReferralLink, smsHref, mailtoHref, releaseReferral,
 } from '../../services/brokerFinder'
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -139,9 +139,29 @@ export default function BrokerFinderAdmin() {
     } catch (e) { setError(e.message) } finally { setSending(false) }
   }
 
+  const release = async b => {
+    if (!window.confirm(`Release ${b.company_name}? Use this if the buyer fell through with them. The other brokers' links open up again so someone else can accept.`)) return
+    try { await releaseReferral(b.request.id); setNotice(`${b.company_name} released. Other brokers can accept this buyer again.`); await search() } catch (e) { setError(e.message) }
+  }
+
+  // Short "this one has been placed" text for brokers who didn't get the buyer
+  const takenText = b => {
+    const first = String(b.contact_name || '').trim().split(/\s+/)[0]
+    return `Hi${first ? ` ${first}` : ''}, thanks for your time. The buyer for the HUD home at ${[property?.address, property?.city].filter(Boolean).join(', ')} has been placed with another agent. I'll reach out when I have the next buyer near you.`
+  }
+
   const resend = async reqId => {
     try { await resendReferralRequest(reqId); setNotice('Request sent again.'); await search() } catch (e) { setError(e.message) }
   }
+
+  // The broker who accepted this home (first to accept gets the buyer), even if not in the distance list
+  const acceptedBy = useMemo(() => {
+    if (!result) return null
+    const inList = result.brokers?.find(b => b.request?.status === 'accepted')
+    if (inList) return inList
+    const a = result.accepted
+    return a ? { id: a.broker_id, company_name: a.broker?.company_name || 'another broker', contact_name: a.broker?.contact_name, request: { id: a.id, responded_at: a.responded_at } } : null
+  }, [result])
 
   const mapPoints = useMemo(() => {
     if (!result) return []
@@ -238,12 +258,20 @@ export default function BrokerFinderAdmin() {
         <section className="bg-white rounded shadow p-4 sm:p-5 space-y-3">
           <div className="flex flex-wrap justify-between gap-2 items-center">
             <h2 className="font-semibold">3. Choose brokers and send a referral request ({selected.length} selected)</h2>
-            <button type="button" className="text-blue-700 underline text-sm" onClick={() => setSelected(result.brokers.filter(b => b.status !== 'do_not_contact').slice(0, 5).map(b => b.id))}>Select nearest 5</button>
+            {!acceptedBy && <button type="button" className="text-blue-700 underline text-sm" onClick={() => setSelected(result.brokers.filter(b => b.status !== 'do_not_contact').slice(0, 5).map(b => b.id))}>Select nearest 5</button>}
           </div>
+          {acceptedBy && (
+            <div className="border border-green-300 bg-green-50 rounded p-3 text-sm">
+              <strong>Accepted by {acceptedBy.company_name}</strong>{acceptedBy.contact_name ? ` (${acceptedBy.contact_name})` : ''}
+              {acceptedBy.request.responded_at && ` on ${new Date(acceptedBy.request.responded_at).toLocaleDateString()}`}.
+              {' '}Every other broker's link for this home now shows it as already accepted. If the buyer falls through with them, use Release to open it up again.
+            </div>
+          )}
           <div className="divide-y border rounded">
             {result.brokers.map(b => {
               const st = BROKER_STATUS[b.status] || BROKER_STATUS.new
-              const blocked = b.status === 'do_not_contact'
+              const taken = !!acceptedBy && acceptedBy.id !== b.id
+              const blocked = b.status === 'do_not_contact' || taken
               return (
                 <div key={b.id} className={selected.includes(b.id) ? 'bg-violet-50' : ''}>
                 <div className="p-3 flex flex-col sm:flex-row gap-3">
@@ -262,6 +290,7 @@ export default function BrokerFinderAdmin() {
                           {b.request.wants_more_leads && ' · wants more leads'}
                           {['sent', 'opened', 'failed'].includes(b.request.status) && <button type="button" className="ml-2 text-blue-700 underline" onClick={() => resend(b.request.id)}>Resend</button>}
                           {b.request.status === 'accepted' && <button type="button" className="ml-2 text-blue-700 underline" onClick={() => preview(b.request.id)}>Referral agreement</button>}
+                          {b.request.status === 'accepted' && <button type="button" className="ml-2 text-red-700 underline" onClick={() => release(b)}>Release (buyer fell through)</button>}
                         </span>
                       )}
                     </span>
@@ -269,6 +298,12 @@ export default function BrokerFinderAdmin() {
                   <div className="flex flex-col gap-1 sm:w-64">
                     <input type="email" aria-label={`Email for ${b.company_name}`} className="border rounded p-2 text-sm" placeholder="broker email (to send by email)"
                       value={emails[b.id] || ''} disabled={blocked} onChange={e => setEmails(m => ({ ...m, [b.id]: e.target.value }))} />
+                    {taken && (
+                      <span className="text-xs text-gray-600">
+                        Taken — accepted by {acceptedBy.company_name}.
+                        {b.request && b.phone && <> <a className="text-teal-800 underline" href={smsHref(b.phone, takenText(b))}>Text update</a></>}
+                      </span>
+                    )}
                     {!blocked && (
                       <button type="button" className="text-sm border border-teal-700 text-teal-800 rounded px-2 py-1.5 disabled:opacity-50"
                         disabled={share?.brokerId === b.id && share.busy} onClick={() => openShare(b)}>

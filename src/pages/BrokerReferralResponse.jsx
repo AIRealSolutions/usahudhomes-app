@@ -29,6 +29,7 @@ export default function BrokerReferralResponse() {
     lookupReferral(token).then(d => {
       setData(d)
       if (d.request.regionsRequested?.length) setRegions(d.request.regionsRequested)
+      if (d.request.taken) { setResponse(r0 => (r0 === 'optout' ? r0 : 'decline')); setWantsMore(true) }
       setAgentLicense(d.request.agentLicense || '')
       setFirmLicense(d.request.firmLicense || '')
       setEmail(d.broker.email || '')
@@ -44,7 +45,13 @@ export default function BrokerReferralResponse() {
     setBusy(true); setError('')
     try {
       setDone(await respondToReferral({ token, response, note, wantsMoreLeads: response !== 'optout' && wantsMore, regions, agentLicense, firmLicense, email: email.trim() }))
-    } catch (e) { setError(e.message) } finally { setBusy(false) }
+    } catch (e) {
+      if (e.data?.taken) {
+        setData(d => ({ ...d, request: { ...d.request, taken: true } }))
+        setResponse('decline'); setWantsMore(true)
+      }
+      setError(e.message)
+    } finally { setBusy(false) }
   }
 
   const r = data?.request
@@ -74,9 +81,18 @@ export default function BrokerReferralResponse() {
             </div>
             {r.respondedAt && <p className="text-sm text-gray-600">You already answered on {new Date(r.respondedAt).toLocaleDateString()} ({r.status}). You can change your answer below.</p>}
 
+            {r.taken && (
+              <div role="status" className="border border-amber-300 bg-amber-50 rounded p-4">
+                <p className="font-semibold">Already accepted</p>
+                <p className="text-sm text-gray-700">Thank you — this buyer has already been placed with another agent. We'd still like to send you HUD buyers near your office.</p>
+              </div>
+            )}
             <fieldset className="space-y-2">
-              <legend className="font-semibold mb-1">Can you represent this buyer and submit the bid?</legend>
-              {[['accept', 'Yes, I can help this buyer'], ['decline', 'Not this one'], ['optout', "Don't send me referrals"]].map(([v, label]) => (
+              <legend className="font-semibold mb-1">{r.taken ? 'Would you like future HUD buyer referrals?' : 'Can you represent this buyer and submit the bid?'}</legend>
+              {(r.taken
+                ? [['decline', 'Yes, send me future buyers'], ['optout', "Don't send me referrals"]]
+                : [['accept', 'Yes, I can help this buyer'], ['decline', 'Not this one'], ['optout', "Don't send me referrals"]]
+              ).map(([v, label]) => (
                 <label key={v} className={`flex items-center gap-3 border rounded p-3 cursor-pointer ${response === v ? 'border-blue-700 bg-blue-50' : ''}`}>
                   <input type="radio" name="response" value={v} checked={response === v} onChange={() => setResponse(v)} /> {label}
                 </label>
@@ -137,7 +153,7 @@ export default function BrokerReferralResponse() {
               {response === 'accept' && (done.agreementEmailed
                 ? 'Thank you! We emailed you the referral agreement to sign. Reply to that email with the signed copy and we will be in touch about the buyer.'
                 : 'Thank you! We will call you shortly with the buyer’s details and the referral agreement.')}
-              {response === 'decline' && 'Thanks for letting us know.'}
+              {response === 'decline' && (r?.taken ? 'Thank you! We will reach out with the next buyer near you.' : 'Thanks for letting us know.')}
               {response === 'optout' && 'You will not receive more referral requests from us.'}
             </p>
             {done.agreementUrl && done.agreementEmailed && (
