@@ -8,7 +8,7 @@ import React, { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-export default function LeafletMap({ points = [], fitKey, onSelect, height = 520, center = [35.5, -79.4], zoom = 7 }) {
+export default function LeafletMap({ points = [], fitKey, onSelect, height = 520, center = [39.5, -98.35], zoom = 4 }) {
   const el = useRef(null)
   const map = useRef(null)
   const layer = useRef(null)

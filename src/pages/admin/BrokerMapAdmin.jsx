@@ -1,8 +1,8 @@
 /**
  * Broker & Property Map — HUD homes and HUD-registered brokers on one map,
- * filtered by state and economic region, with coverage counts per region.
+ * nationwide or by state and economic region, with coverage counts per state or region.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../../config/supabase'
 import { US_STATES } from '../../utils/states'
 import LeafletMap from '../../components/maps/LeafletMap'
@@ -24,7 +24,7 @@ async function fetchAll(build) {
 }
 
 export default function BrokerMapAdmin({ onNavigate }) {
-  const [state, setState] = useState('NC')
+  const [state, setState] = useState('')
   const [region, setRegion] = useState('')
   const [regions, setRegions] = useState([])
   const [properties, setProperties] = useState([])
@@ -36,23 +36,25 @@ export default function BrokerMapAdmin({ onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState('')
   const [notice, setNotice] = useState('')
+  const stopRef = useRef(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      const byState = q => (state ? q.eq('state', state) : q)
       const [regs, props, brks, ags] = await Promise.all([
-        getEconomicRegions(state),
-        fetchAll(() => supabase.from('properties').select('id,case_number,address,city,state,zip_code,county,price,status,economic_region,latitude,longitude').eq('state', state).eq('is_active', true)),
-        fetchAll(() => supabase.from('hud_brokers').select('*').eq('state', state)),
+        getEconomicRegions(state || undefined),
+        fetchAll(() => byState(supabase.from('properties').select('id,case_number,address,city,state,zip_code,county,price,status,economic_region,latitude,longitude').eq('is_active', true))),
+        fetchAll(() => byState(supabase.from('hud_brokers').select('*'))),
         supabase.from('agents').select('id,first_name,last_name,company,states_covered,economic_regions,is_active').eq('is_active', true).then(r => r.data || []),
       ])
       setRegions(regs); setProperties(props); setBrokers(brks)
-      setAgents(ags.filter(a => (a.states_covered || []).includes(state)))
+      setAgents(state ? ags.filter(a => (a.states_covered || []).includes(state)) : ags)
     } catch (e) { setNotice(e.message) } finally { setLoading(false) }
   }, [state])
   useEffect(() => { setRegion(''); setSelected(null); load() }, [load])
 
-  const regionName = slug => regions.find(r => r.slug === slug)?.name || slug || 'No region'
+  const regionName = (slug, st = state) => regions.find(r => r.slug === slug && (!st || r.state === st))?.name || slug || 'No region'
 
   const visibleProps = useMemo(() => properties.filter(p => !region || p.economic_region === region), [properties, region])
   const visibleBrokers = useMemo(() => brokers.filter(b => (!region || b.economic_region === region) && (!statusFilter || b.status === statusFilter)), [brokers, region, statusFilter])
@@ -67,10 +69,24 @@ export default function BrokerMapAdmin({ onNavigate }) {
     ...(show.properties ? visibleProps.filter(p => p.latitude != null).map(p => ({
       id: `p:${p.id}`, lat: Number(p.latitude), lng: Number(p.longitude), radius: 8, color: PROPERTY_COLOR,
       label: `${p.address}, ${p.city} — ${money(p.price)}`,
-      popup: `<strong>${esc(p.address)}</strong><br>${esc(p.city)}, ${esc(p.state)} ${esc(p.zip_code)}<br>#${esc(p.case_number)} · ${esc(money(p.price))}<br>${esc(p.county)} County · ${esc(regionName(p.economic_region))}`,
+      popup: `<strong>${esc(p.address)}</strong><br>${esc(p.city)}, ${esc(p.state)} ${esc(p.zip_code)}<br>#${esc(p.case_number)} · ${esc(money(p.price))}<br>${esc(p.county)} County · ${esc(regionName(p.economic_region, p.state))}`,
     })) : []),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [visibleBrokers, visibleProps, show, regions])
+
+  // Nationwide: coverage per state
+  const stateCoverage = useMemo(() => {
+    if (state) return []
+    const codes = [...new Set([...properties.map(p => p.state), ...brokers.map(b => b.state)].filter(Boolean))]
+    return codes.map(code => ({
+      code,
+      homes: properties.filter(p => p.state === code).length,
+      brokers: brokers.filter(b => b.state === code).length,
+      contacted: brokers.filter(b => b.state === code && b.status !== 'new').length,
+      partners: agents.filter(a => (a.states_covered || []).includes(code)).length,
+      regions: new Set(regions.filter(r => r.state === code).map(r => r.slug)).size,
+    })).sort((a, b) => b.homes - a.homes || a.code.localeCompare(b.code))
+  }, [state, properties, brokers, agents, regions])
 
   // Coverage per region: homes, HUD brokers, partners who registered for it
   const coverage = useMemo(() => {
@@ -108,6 +124,26 @@ export default function BrokerMapAdmin({ onNavigate }) {
     } catch (e) { setNotice(e.message) } finally { setBusy('') }
   }
 
+  // Nationwide: work through every state that has HUD homes until each one's towns are searched
+  const fillAllStates = async () => {
+    const states = stateCoverage.filter(r => r.homes).map(r => r.code)
+    stopRef.current = false
+    setBusy('scan-all'); setNotice('')
+    let found = 0
+    try {
+      for (const [i, st] of states.entries()) {
+        for (let round = 0; round < 40 && !stopRef.current; round++) {
+          const r = await scanStateBrokers(st)
+          found += r.foundNow
+          setNotice(`${st} (${i + 1} of ${states.length}): ${r.cities - r.remaining} of ${r.cities} towns checked · ${found} broker listings found so far`)
+          if (!r.remaining || (!r.searchedNow && r.errors.length)) break
+        }
+        if (stopRef.current) { setNotice(n => `${n} — stopped. Run again to continue; finished towns are skipped.`); break }
+      }
+      await load()
+    } catch (e) { setNotice(e.message) } finally { setBusy('') }
+  }
+
   const placePins = async () => {
     setBusy('geo')
     try {
@@ -134,12 +170,16 @@ export default function BrokerMapAdmin({ onNavigate }) {
       <section className="bg-white rounded shadow p-4 space-y-3">
         <div className="flex flex-wrap gap-2 items-center">
           <select aria-label="State" className="border rounded p-2" value={state} onChange={e => setState(e.target.value)}>
+            <option value="">All states</option>
             {US_STATES.map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
+            <option value="PR">Puerto Rico</option>
           </select>
-          <select aria-label="Economic region" className="border rounded p-2" value={region} onChange={e => setRegion(e.target.value)}>
-            <option value="">All regions{regions.length ? ` (${regions.length})` : ''}</option>
-            {regions.map(r => <option key={r.slug} value={r.slug}>{r.name}</option>)}
-          </select>
+          {state && (
+            <select aria-label="Economic region" className="border rounded p-2" value={region} onChange={e => setRegion(e.target.value)}>
+              <option value="">All regions{regions.length ? ` (${regions.length})` : ''}</option>
+              {regions.map(r => <option key={r.slug} value={r.slug}>{r.name}</option>)}
+            </select>
+          )}
           <select aria-label="Broker status" className="border rounded p-2" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="">All broker statuses</option>
             {Object.entries(BROKER_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -147,7 +187,7 @@ export default function BrokerMapAdmin({ onNavigate }) {
           <label className="text-sm flex items-center gap-1"><input type="checkbox" checked={show.properties} onChange={e => setShow(s => ({ ...s, properties: e.target.checked }))} /> Homes ({visibleProps.length})</label>
           <label className="text-sm flex items-center gap-1"><input type="checkbox" checked={show.brokers} onChange={e => setShow(s => ({ ...s, brokers: e.target.checked }))} /> Brokers ({visibleBrokers.length})</label>
         </div>
-        {!regions.length && !loading && <p className="text-sm text-amber-700">No economic regions are set up for {state} yet. Add them in Economic Regions.</p>}
+        {state && !regions.length && !loading && <p className="text-sm text-amber-700">No economic regions are set up for {state} yet. Add them in Economic Regions.</p>}
         <LeafletMap points={points} fitKey={`${state}|${region}|${loading}`} onSelect={setSelected} height={520} />
         <div className="flex flex-wrap gap-3 text-xs text-gray-600">
           <span className="flex items-center gap-1"><i className="inline-block w-3 h-3 rounded-full" style={{ background: PROPERTY_COLOR }} /> HUD home</span>
@@ -161,7 +201,37 @@ export default function BrokerMapAdmin({ onNavigate }) {
         )}
       </section>
 
-      <section className="bg-white rounded shadow p-4 space-y-3">
+      {!state && (
+        <section className="bg-white rounded shadow p-4 space-y-3">
+          <div className="flex flex-wrap justify-between gap-2 items-center">
+            <h2 className="font-semibold">Coverage by state</h2>
+            {busy === 'scan-all'
+              ? <button type="button" onClick={() => { stopRef.current = true }} className="border border-red-700 text-red-700 rounded px-3 py-2 text-sm">Stop after this step</button>
+              : <button type="button" disabled={!!busy || loading} onClick={fillAllStates} className="border border-blue-700 text-blue-700 rounded px-3 py-2 text-sm disabled:opacity-50">Fill broker directory for every state</button>}
+          </div>
+          <p className="text-xs text-gray-500">Searches HUD for brokers in every town that has a HUD home, state by state. This takes a while; keep the page open. Towns searched in the last 14 days are skipped, so you can stop and resume.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="text-left text-gray-500 border-b"><th className="py-2 pr-3">State</th><th className="pr-3">HUD homes</th><th className="pr-3">HUD brokers</th><th className="pr-3">Contacted</th><th className="pr-3">Partner agents</th><th>Regions</th></tr></thead>
+              <tbody>
+                {stateCoverage.map(r => (
+                  <tr key={r.code} className="border-b cursor-pointer hover:bg-gray-50" onClick={() => setState(r.code)}>
+                    <td className="py-2 pr-3 font-medium">{r.code}</td>
+                    <td className="pr-3">{r.homes}</td>
+                    <td className="pr-3">{r.brokers}</td>
+                    <td className="pr-3">{r.contacted}</td>
+                    <td className={`pr-3 ${r.homes && !r.partners ? 'text-red-700 font-semibold' : ''}`}>{r.partners}{r.homes && !r.partners ? ' — needs an agent' : ''}</td>
+                    <td className={r.regions ? '' : 'text-amber-700'}>{r.regions || 'none'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-500">Click a state to see its regions and fill its broker directory.</p>
+        </section>
+      )}
+
+      {state && <section className="bg-white rounded shadow p-4 space-y-3">
         <div className="flex flex-wrap justify-between gap-2 items-center">
           <h2 className="font-semibold">Coverage by region — {state}</h2>
           <div className="flex flex-wrap gap-2">
@@ -188,7 +258,7 @@ export default function BrokerMapAdmin({ onNavigate }) {
           </table>
         </div>
         <p className="text-xs text-gray-500">Brokers are placed at their office address (U.S. Census geocoder) and filed into a region by county. Partner agents count for a region if they chose it, or if they cover the whole state.</p>
-      </section>
+      </section>}
     </main>
   )
 }

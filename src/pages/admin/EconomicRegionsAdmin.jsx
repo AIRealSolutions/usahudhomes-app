@@ -1,14 +1,20 @@
 /**
  * Economic Regions — named groups of counties per state. Properties and HUD brokers
  * are filed into a region automatically (by county); brokers who sign up choose the
- * regions they want leads in. North Carolina starts with the eight Prosperity Zones.
+ * regions they want leads in. North Carolina starts with the eight Prosperity Zones;
+ * every other state can load metro-area regions (src/data/economicRegionsUS.json,
+ * built by scripts/generate_economic_regions.py) and then edit them.
  */
 import React, { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../config/supabase'
 import { US_STATES } from '../../utils/states'
 import { getEconomicRegions } from '../../services/brokerFinder'
 
-const countyKey = c => String(c || '').trim().replace(/\s+(county|parish|borough)$/i, '').replace(/\s+/g, ' ').toLowerCase()
+// Mirrors county_key() in the database
+const countyKey = c => String(c || '').trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/\s+(county|parish|borough|city and borough|census area|municipality|municipio)$/, '')
+  .replace(/^st\.?\s+/, 'saint ').replace(/^ste\.?\s+/, 'sainte ').replace(/[^a-z0-9]/g, '')
+const loadPresets = () => import('../../data/economicRegionsUS.json').then(m => (m.default || m).regions)
 const slugify = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)
 const parseCounties = text => [...new Map(text.split(/[,\n]/).map(c => c.trim().replace(/\s+(county|parish|borough)$/i, '')).filter(Boolean).map(c => [countyKey(c), c])).values()]
 const blank = { id: null, name: '', slug: '', description: '', countiesText: '', sort_order: 0 }
@@ -20,6 +26,33 @@ export default function EconomicRegionsAdmin() {
   const [edit, setEdit] = useState(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [statesWithRegions, setStatesWithRegions] = useState(null)
+
+  const loadStateCoverage = async () => {
+    const { data } = await supabase.from('economic_regions').select('state').limit(5000)
+    setStatesWithRegions(new Set((data || []).map(r => r.state)))
+  }
+  useEffect(() => { loadStateCoverage() }, [])
+
+  // Insert preset metro-area regions for the given states (skips states that already have regions)
+  const loadMetroRegions = async (states) => {
+    setBusy(true); setNotice('')
+    try {
+      const presets = await loadPresets()
+      const { data: existing } = await supabase.from('economic_regions').select('state').limit(5000)
+      const have = new Set((existing || []).map(r => r.state))
+      const rows = presets.filter(r => states.includes(r.state) && !have.has(r.state))
+      if (!rows.length) { setNotice('Those states already have regions — nothing loaded.'); return }
+      for (let i = 0; i < rows.length; i += 25) {
+        const { error } = await supabase.from('economic_regions').upsert(rows.slice(i, i + 25), { onConflict: 'state,slug', ignoreDuplicates: true })
+        if (error) throw error
+        setNotice(`Loading regions… ${Math.min(i + 25, rows.length)} of ${rows.length}`)
+      }
+      const n = new Set(rows.map(r => r.state)).size
+      setNotice(`Loaded ${rows.length} metro-area regions in ${n} state${n === 1 ? '' : 's'}. Homes and brokers were filed into them.`)
+      await Promise.all([load(), loadStateCoverage()])
+    } catch (e) { setNotice(`Loading regions failed: ${e.message}`) } finally { setBusy(false) }
+  }
 
   const load = async () => {
     try {
@@ -76,9 +109,24 @@ export default function EconomicRegionsAdmin() {
         <div className="flex flex-wrap gap-2 items-center justify-between">
           <select aria-label="State" className="border rounded p-2" value={state} onChange={e => setState(e.target.value)}>
             {US_STATES.map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
+            <option value="PR">Puerto Rico</option>
           </select>
-          <button type="button" className="bg-blue-700 text-white rounded px-4 py-2 text-sm" onClick={() => setEdit({ ...blank, sort_order: regions.length + 1 })}>Add region</button>
+          <div className="flex flex-wrap gap-2">
+            {!regions.length && state !== 'NC' && (
+              <button type="button" disabled={busy} className="bg-teal-700 text-white rounded px-4 py-2 text-sm disabled:opacity-50" onClick={() => loadMetroRegions([state])}>Load metro-area regions for {state}</button>
+            )}
+            <button type="button" className="bg-blue-700 text-white rounded px-4 py-2 text-sm" onClick={() => setEdit({ ...blank, sort_order: regions.length + 1 })}>Add region</button>
+          </div>
         </div>
+        {statesWithRegions && (() => {
+          const missing = [...US_STATES.map(s => s.code), 'PR'].filter(c => !statesWithRegions.has(c) && c !== 'NC')
+          return missing.length > 0 && (
+            <div className="border border-teal-200 bg-teal-50 rounded p-3 text-sm flex flex-wrap items-center justify-between gap-2">
+              <span>{missing.length} state{missing.length === 1 ? ' has' : 's have'} no regions yet. Start them from OMB metro areas (each metro plus its nearest rural counties), then edit as needed.</span>
+              <button type="button" disabled={busy} className="bg-teal-700 text-white rounded px-3 py-2 disabled:opacity-50" onClick={() => loadMetroRegions(missing)}>{busy ? 'Loading…' : 'Load regions for all states'}</button>
+            </div>
+          )
+        })()}
 
         {edit && (
           <div className="border rounded p-3 space-y-2 bg-gray-50">

@@ -32,10 +32,15 @@ DROP POLICY IF EXISTS "Admins manage economic regions" ON economic_regions;
 CREATE POLICY "Admins manage economic regions" ON economic_regions
   FOR ALL TO authenticated USING (is_admin(auth.uid())) WITH CHECK (is_admin(auth.uid()));
 
--- "New Hanover County" / "new hanover" / " New  Hanover " all compare equal
+-- County names from HUD and the Census differ in spelling, so compare a normalized key:
+-- "New Hanover County" = "new hanover", "St. Mary's" = "Saint Marys", "DeSoto" = "De Soto",
+-- "Doña Ana" = "Dona Ana", "Kenai Peninsula Borough" = "Kenai Peninsula".
 CREATE OR REPLACE FUNCTION county_key(p_county TEXT) RETURNS TEXT
 LANGUAGE sql IMMUTABLE AS $$
-  SELECT nullif(lower(regexp_replace(regexp_replace(trim(coalesce(p_county, '')), '\s+(county|parish|borough)$', '', 'i'), '\s+', ' ', 'g')), '')
+  SELECT nullif(regexp_replace(regexp_replace(regexp_replace(regexp_replace(
+    translate(lower(trim(coalesce(p_county, ''))), 'áàâäãåéèêëíìîïóòôöõúùûüñç', 'aaaaaaeeeeiiiiooooouuuunc'),
+    '\s+(county|parish|borough|city and borough|census area|municipality|municipio)$', ''),
+    '^st\.?\s+', 'saint '), '^ste\.?\s+', 'sainte '), '[^a-z0-9]', '', 'g'), '')
 $$;
 
 -- The region slug for a state + county, or NULL

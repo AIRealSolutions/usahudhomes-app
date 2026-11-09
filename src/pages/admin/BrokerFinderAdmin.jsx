@@ -132,6 +132,7 @@ export default function BrokerFinderAdmin() {
         <div className="flex flex-wrap gap-2">
           <select aria-label="State" className="border rounded p-2" value={state} onChange={e => { setState(e.target.value); setProperty(null); setResult(null) }}>
             {US_STATES.map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
+            <option value="PR">Puerto Rico</option>
           </select>
           <input className="border rounded p-2 flex-1 min-w-48" placeholder="Case #, address, city or county" value={query} onChange={e => setQuery(e.target.value)} />
         </div>

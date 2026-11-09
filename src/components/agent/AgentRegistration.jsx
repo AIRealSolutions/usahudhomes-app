@@ -10,6 +10,7 @@ import BusinessInfoStep from './registration/BusinessInfoStep'
 import StatesAndSpecialtiesStep from './registration/StatesAndSpecialtiesStep'
 import ReferralAgreementStep from './registration/ReferralAgreementStep'
 import ReviewAndSubmitStep from './registration/ReviewAndSubmitStep'
+import { lookupReferral } from '../../services/brokerFinder'
 
 const STEPS = [
   { id: 1, title: 'Partner Profile', icon: Building, description: 'Basic contact information' },
@@ -59,7 +60,7 @@ const AgentRegistration = () => {
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get('ref')
     if (!ref || !/^[0-9a-f]{40}$/.test(ref)) return
-    import('../../services/brokerFinder').then(({ lookupReferral }) => lookupReferral(ref)).then(({ request, broker }) => {
+    lookupReferral(ref).then(({ request, broker }) => {
       const [first, ...rest] = String(broker.contactName || '').trim().split(/\s+/)
       const st = request.state || broker.state
       setFormData(prev => ({
