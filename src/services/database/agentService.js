@@ -18,8 +18,9 @@ class AgentService {
       let query = supabase
         .from(TABLES.AGENTS)
         .select('*')
-        .eq('is_active', true)
         .order('created_at', { ascending: false })
+      // Deactivated agents are hidden unless asked for (Manage Agents shows them to reactivate)
+      if (!filters.includeInactive) query = query.eq('is_active', true)
 
       if (filters.state) {
         // states_covered is jsonb, so pass a JSON array (a JS array would be sent as a Postgres array literal)
@@ -121,6 +122,7 @@ class AgentService {
           license_state: pick('licenseState', 'license_state'),
           specialties: pick('specialties', 'specialties') || [],
           states_covered: pick('statesCovered', 'states_covered') || [],
+          economic_regions: pick('economicRegions', 'economic_regions') || [],
           auto_referral_enabled: pick('autoReferralEnabled', 'auto_referral_enabled') || false,
           auto_referral_states: pick('autoReferralStates', 'auto_referral_states') || [],
           years_experience: pick('yearsExperience', 'years_experience'),
@@ -184,6 +186,11 @@ class AgentService {
       if (updates.licenseState) updateData.license_state = updates.licenseState
       if (updates.specialties) updateData.specialties = updates.specialties
       if (updates.statesCovered) updateData.states_covered = updates.statesCovered
+      if (updates.economicRegions) updateData.economic_regions = updates.economicRegions
+      if (updates.referralAgreementSigned !== undefined) {
+        updateData.referral_agreement_signed = !!updates.referralAgreementSigned
+        updateData.referral_agreement_date = updates.referralAgreementSigned ? (updates.referralAgreementDate || new Date().toISOString()) : null
+      }
       if (updates.autoReferralEnabled !== undefined) updateData.auto_referral_enabled = updates.autoReferralEnabled
       if (updates.autoReferralStates) updateData.auto_referral_states = updates.autoReferralStates
       if (updates.yearsExperience !== undefined) updateData.years_experience = updates.yearsExperience

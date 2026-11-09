@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Input } from '@/components/ui/input.jsx'
@@ -17,11 +17,18 @@ import {
   Download,
   Upload,
   Building,
-  Send
+  Send,
+  RotateCcw,
+  FileCheck,
+  MapPin
 } from 'lucide-react'
 import { agentService } from '../../services/database'
 import { US_STATES } from '../../utils/states'
 import { agentInvitationService } from '../../services/agentInvitationService'
+import { supabase } from '../../config/supabase'
+import { getEconomicRegions, previewAgreement } from '../../services/brokerFinder'
+
+const ALL_STATES = [...US_STATES, { code: 'PR', name: 'Puerto Rico' }]
 
 function AgentAdmin() {
   const [agents, setAgents] = useState([])
@@ -30,10 +37,51 @@ function AgentAdmin() {
   const [editingAgent, setEditingAgent] = useState(null)
   const [formData, setFormData] = useState(getEmptyFormData())
   const [loading, setLoading] = useState(false)
+  const [showStatus, setShowStatus] = useState('active') // active | inactive | all
+  const [stateFilter, setStateFilter] = useState('')
+  const [regions, setRegions] = useState([])           // every economic region (for names and the form)
+  const [workload, setWorkload] = useState({})         // agentId -> { total, new, accepted }
+  const [referrals, setReferrals] = useState({})       // agentId -> accepted Broker Finder referrals
+  const [viaBrokerFinder, setViaBrokerFinder] = useState(new Set())
 
   useEffect(() => {
     loadAgents()
-  }, [])
+    getEconomicRegions().then(setRegions).catch(() => setRegions([]))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Buyers assigned to each agent, and Broker Finder referrals they accepted
+  async function loadActivity() {
+    try {
+      const [{ data: cons }, { data: linked }] = await Promise.all([
+        supabase.from('consultations').select('agent_id,status').not('agent_id', 'is', null).or('is_deleted.is.null,is_deleted.eq.false').limit(5000),
+        supabase.from('hud_brokers').select('id,agent_id').not('agent_id', 'is', null).limit(5000),
+      ])
+      const w = {}
+      for (const c of cons || []) {
+        const x = (w[c.agent_id] ||= { total: 0, new: 0, accepted: 0 })
+        x.total++
+        if (c.status === 'new' || c.status === 'referred') x.new++
+        if (c.status === 'accepted') x.accepted++
+      }
+      setWorkload(w)
+      const brokerToAgent = Object.fromEntries((linked || []).map(b => [b.id, b.agent_id]))
+      setViaBrokerFinder(new Set(Object.values(brokerToAgent)))
+      const ids = Object.keys(brokerToAgent)
+      if (ids.length) {
+        const { data: reqs } = await supabase.from('broker_referral_requests')
+          .select('id,broker_id,status,property_address,property_city,property_state,case_number,responded_at,fee_percent')
+          .in('broker_id', ids).eq('status', 'accepted').order('responded_at', { ascending: false })
+        const r = {}
+        for (const q of reqs || []) (r[brokerToAgent[q.broker_id]] ||= []).push(q)
+        setReferrals(r)
+      } else setReferrals({})
+    } catch (e) { console.error('Agent activity:', e) }
+  }
+
+  const regionName = key => {
+    const [st, slug] = String(key).split(':')
+    return regions.find(r => r.state === st && r.slug === slug)?.name || slug
+  }
 
   function getEmptyFormData() {
     return {
@@ -50,14 +98,16 @@ function AgentAdmin() {
       bio: '',
       isAdmin: false,
       autoReferralEnabled: false,
-      autoReferralStates: []
+      autoReferralStates: [],
+      economicRegions: [],
+      referralAgreementSigned: false
     }
   }
 
   async function loadAgents() {
     setLoading(true)
     try {
-      const result = await agentService.getAllAgents()
+      const result = await agentService.getAllAgents({ includeInactive: true })
       if (result.success) {
         setAgents(result.data)
       } else {
@@ -67,20 +117,23 @@ function AgentAdmin() {
       console.error('Error loading agents:', error)
     }
     setLoading(false)
+    loadActivity()
   }
 
-  async function handleSearch() {
-    if (searchQuery.trim()) {
-      setLoading(true)
-      const result = await agentService.searchAgents(searchQuery)
-      if (result.success) {
-        setAgents(result.data)
-      }
-      setLoading(false)
-    } else {
-      loadAgents()
-    }
-  }
+  // Search and filters run on the loaded list (names, contact, company, states, regions)
+  const shown = useMemo(() => {
+    const term = searchQuery.trim().toLowerCase()
+    return agents.filter(a => {
+      if (showStatus === 'active' && !a.is_active) return false
+      if (showStatus === 'inactive' && a.is_active) return false
+      if (stateFilter && !(a.states_covered || []).includes(stateFilter)) return false
+      if (!term) return true
+      const regionNames = (a.economic_regions || []).map(regionName)
+      return [a.first_name, a.last_name, `${a.first_name} ${a.last_name}`, a.email, a.phone, a.company, a.license_number,
+        ...(a.states_covered || []), ...regionNames].some(v => String(v || '').toLowerCase().includes(term))
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agents, searchQuery, showStatus, stateFilter, regions])
 
   function handleAdd() {
     setEditingAgent(null)
@@ -104,17 +157,37 @@ function AgentAdmin() {
       bio: agent.bio || '',
       isAdmin: agent.is_admin || false,
       autoReferralEnabled: agent.auto_referral_enabled || false,
-      autoReferralStates: agent.auto_referral_states || []
+      autoReferralStates: agent.auto_referral_states || [],
+      economicRegions: agent.economic_regions || [],
+      referralAgreementSigned: !!agent.referral_agreement_signed,
+      referralAgreementDate: agent.referral_agreement_date || null
     })
     setShowForm(true)
   }
 
+  async function handleReactivate(agent) {
+    if (!confirm(`Reactivate ${agent.first_name} ${agent.last_name}? They can sign in and receive buyer referrals again.`)) return
+    const result = await agentService.updateAgent(agent.id, { isActive: true })
+    if (result.success) loadAgents()
+    else alert('Error: ' + result.error)
+  }
+
+  async function toggleAgreement(agent) {
+    const signed = !agent.referral_agreement_signed
+    if (!confirm(signed
+      ? `Mark that you received ${agent.first_name}'s signed referral agreement (NC Form 730)?`
+      : `Mark ${agent.first_name}'s referral agreement as not received?`)) return
+    const result = await agentService.updateAgent(agent.id, { referralAgreementSigned: signed })
+    if (result.success) setAgents(list => list.map(a => (a.id === agent.id ? result.data : a)))
+    else alert('Error: ' + result.error)
+  }
+
   async function handleDelete(agent) {
-    if (confirm(`Are you sure you want to delete ${agent.first_name} ${agent.last_name}?`)) {
+    if (confirm(`Deactivate ${agent.first_name} ${agent.last_name}? They won't receive buyer referrals or be able to use the broker dashboard. You can reactivate them later.`)) {
       try {
         const result = await agentService.deleteAgent(agent.id)
         if (result.success) {
-          alert('Agent deleted successfully!')
+          alert('Agent deactivated.')
           loadAgents()
         } else {
           alert('Error: ' + result.error)
@@ -160,18 +233,20 @@ function AgentAdmin() {
       return
     }
     setLoading(true)
+    // Keep only regions in states the agent still covers
+    const payload = { ...formData, economicRegions: formData.economicRegions.filter(k => formData.statesCovered.includes(String(k).split(':')[0])) }
 
     try {
       let result
       if (editingAgent) {
-        result = await agentService.updateAgent(editingAgent.id, formData)
+        result = await agentService.updateAgent(editingAgent.id, payload)
         if (result.success) {
           alert('Agent updated successfully!')
         } else {
           alert('Error: ' + result.error)
         }
       } else {
-        result = await agentService.addAgent(formData)
+        result = await agentService.addAgent(payload)
         if (result.success) {
           if (result.invitationSent) {
             alert('Agent added successfully! Invitation email sent to ' + formData.email)
@@ -244,7 +319,7 @@ function AgentAdmin() {
     const newStates = formData.statesCovered.includes(state)
       ? formData.statesCovered.filter(s => s !== state)
       : [...formData.statesCovered, state]
-    setFormData({...formData, statesCovered: newStates})
+    setFormData({ ...formData, statesCovered: newStates, economicRegions: formData.economicRegions.filter(k => newStates.includes(String(k).split(':')[0])) })
   }
 
   function handleSpecialtyToggle(specialty) {
@@ -254,17 +329,14 @@ function AgentAdmin() {
     setFormData({...formData, specialties: newSpecialties})
   }
 
-  const [stats, setStats] = useState({ total: 0, active: 0, totalListings: 0, totalSales: 0 })
-  
-  useEffect(() => {
-    async function loadStats() {
-      const result = await agentService.getAgentStats()
-      if (result.success) {
-        setStats(result.data)
-      }
-    }
-    loadStats()
-  }, [agents])
+  const stats = {
+    active: agents.filter(a => a.is_active).length,
+    inactive: agents.filter(a => !a.is_active).length,
+    buyers: Object.values(workload).reduce((n, w) => n + w.new + w.accepted, 0),
+    viaBrokerFinder: agents.filter(a => viaBrokerFinder.has(a.id)).length,
+    agreementsMissing: agents.filter(a => a.is_active && !a.referral_agreement_signed && !a.is_admin).length,
+  }
+  const coveredStates = [...new Set(agents.flatMap(a => a.states_covered || []))].sort()
 
   return (
     <div className="space-y-6">
@@ -272,7 +344,7 @@ function AgentAdmin() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Agent/Broker Management</h2>
-          <p className="text-gray-600">Add, edit, and manage HUD-registered agents</p>
+          <p className="text-gray-600">Partner agents: coverage, referral agreements, buyers assigned, and how they joined</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExport}>
@@ -294,48 +366,45 @@ function AgentAdmin() {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-sm text-gray-600">Total Agents</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{stats.active}</div>
-            <p className="text-sm text-gray-600">Active Agents</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{stats.totalListings}</div>
-            <p className="text-sm text-gray-600">Total Listings</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{stats.totalSales}</div>
-            <p className="text-sm text-gray-600">Total Sales</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {[
+          ['Active partners', stats.active, () => setShowStatus('active')],
+          ['Inactive', stats.inactive, () => setShowStatus('inactive')],
+          ['Open buyers assigned', stats.buyers, null],
+          ['Joined via Broker Finder', stats.viaBrokerFinder, null],
+          ['Agreements not received', stats.agreementsMissing, null],
+        ].map(([label, n, onClick]) => (
+          <Card key={label} className={onClick ? 'cursor-pointer hover:shadow' : ''} onClick={onClick || undefined}>
+            <CardContent className="pt-6">
+              <div className={`text-2xl font-bold ${label === 'Agreements not received' && n ? 'text-amber-700' : ''}`}>{n}</div>
+              <p className="text-sm text-gray-600">{label}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Search */}
-      <div className="flex gap-2">
-        <Input
-          placeholder="Search by name, email, phone, company, or state..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-          className="flex-1"
-        />
-        <Button onClick={handleSearch} disabled={loading}>
-          <Search className="h-4 w-4 mr-2" />
-          Search
-        </Button>
-        {searchQuery && (
-          <Button variant="outline" onClick={() => { setSearchQuery(''); loadAgents(); }}>
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search name, email, phone, company, license, state or region"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <select aria-label="Status" value={showStatus} onChange={e => setShowStatus(e.target.value)} className="px-3 py-2 border rounded-md text-sm">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="all">All agents</option>
+        </select>
+        <select aria-label="State covered" value={stateFilter} onChange={e => setStateFilter(e.target.value)} className="px-3 py-2 border rounded-md text-sm">
+          <option value="">All states</option>
+          {coveredStates.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        {(searchQuery || stateFilter || showStatus !== 'active') && (
+          <Button variant="outline" onClick={() => { setSearchQuery(''); setStateFilter(''); setShowStatus('active') }}>
             Clear
           </Button>
         )}
@@ -440,21 +509,45 @@ function AgentAdmin() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">States Covered</label>
-                <div className="flex flex-wrap gap-2">
-                  {['NC', 'TN', 'SC', 'VA', 'GA', 'FL', 'AL', 'MS'].map(state => (
-                    <Button
-                      key={state}
-                      type="button"
-                      variant={formData.statesCovered.includes(state) ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => handleStateToggle(state)}
-                    >
-                      {state}
-                    </Button>
+                <label className="block text-sm font-medium mb-2">States Covered ({formData.statesCovered.length})</label>
+                <div className="grid grid-cols-5 sm:grid-cols-9 gap-2 max-h-48 overflow-auto border rounded p-2">
+                  {ALL_STATES.map(st => (
+                    <label key={st.code} title={st.name} className="flex items-center gap-1 text-sm">
+                      <input type="checkbox" checked={formData.statesCovered.includes(st.code)} onChange={() => handleStateToggle(st.code)} />
+                      {st.code}
+                    </label>
                   ))}
                 </div>
               </div>
+
+              {formData.statesCovered.some(st => regions.some(r => r.state === st)) && (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">Economic regions</label>
+                  <p className="text-xs text-gray-500">Leave a state's regions unchecked to cover the whole state.</p>
+                  {formData.statesCovered.filter(st => regions.some(r => r.state === st)).map(st => (
+                    <div key={st} className="border rounded p-2">
+                      <div className="text-sm font-medium mb-1">{st} — {formData.economicRegions.some(k => k.startsWith(`${st}:`)) ? `${formData.economicRegions.filter(k => k.startsWith(`${st}:`)).length} selected` : 'whole state'}</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-1">
+                        {regions.filter(r => r.state === st).map(r => {
+                          const key = `${st}:${r.slug}`
+                          return (
+                            <label key={key} className="flex items-center gap-2 text-sm" title={r.counties.join(', ')}>
+                              <input type="checkbox" checked={formData.economicRegions.includes(key)}
+                                onChange={() => setFormData(d => ({ ...d, economicRegions: d.economicRegions.includes(key) ? d.economicRegions.filter(k => k !== key) : [...d.economicRegions, key] }))} />
+                              {r.name}
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" checked={formData.referralAgreementSigned} onChange={e => setFormData({ ...formData, referralAgreementSigned: e.target.checked })} />
+                Signed referral agreement received
+              </label>
 
               <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-3">
                 <label className="flex items-center gap-3 font-semibold text-gray-900">
@@ -540,8 +633,8 @@ function AgentAdmin() {
 
       {/* Agents List */}
       <div className="grid grid-cols-1 gap-4">
-        {agents.map((agent) => (
-          <Card key={agent.id} className="hover:shadow-lg transition-shadow">
+        {shown.map((agent) => (
+          <Card key={agent.id} className={`hover:shadow-lg transition-shadow ${agent.is_active ? '' : 'opacity-75'}`}>
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div className="flex gap-4 flex-1">
@@ -558,6 +651,9 @@ function AgentAdmin() {
                           )}
                           <Badge variant={agent.is_active ? 'default' : 'secondary'}>
                             {agent.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {viaBrokerFinder.has(agent.id) ? 'Joined via Broker Finder' : agent.application_id ? 'Applied online' : 'Added by admin'}
                           </Badge>
                         </div>
                         <p className="text-gray-600 flex items-center gap-1">
@@ -586,14 +682,49 @@ function AgentAdmin() {
                         <div className="font-semibold">{agent.years_experience} years</div>
                       </div>
                       <div>
-                        <span className="text-gray-600">Listings:</span>
-                        <div className="font-semibold">{agent.total_listings || 0}</div>
+                        <span className="text-gray-600">Buyers assigned:</span>
+                        <div className="font-semibold">
+                          {(workload[agent.id]?.new || 0) + (workload[agent.id]?.accepted || 0)} open
+                          {workload[agent.id]?.new ? <span className="text-amber-700 font-normal"> ({workload[agent.id].new} new)</span> : null}
+                        </div>
                       </div>
                       <div>
                         <span className="text-gray-600">License:</span>
                         <div className="font-semibold">{agent.license_state} {agent.license_number}</div>
                       </div>
                     </div>
+                    <div className="mt-3 text-sm flex flex-wrap gap-x-6 gap-y-1">
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-4 w-4 text-gray-500" />
+                        Regions: {(agent.economic_regions || []).length
+                          ? agent.economic_regions.map(k => `${regionName(k)} (${String(k).split(':')[0]})`).join(', ')
+                          : 'whole state(s)'}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <FileCheck className={`h-4 w-4 ${agent.referral_agreement_signed ? 'text-green-600' : 'text-amber-600'}`} />
+                        {agent.referral_agreement_signed
+                          ? `Referral agreement received${agent.referral_agreement_date ? ` ${new Date(agent.referral_agreement_date).toLocaleDateString()}` : ''}`
+                          : 'Referral agreement not received'}
+                        {!agent.is_admin && (
+                          <button type="button" className="ml-1 text-blue-700 underline text-xs" onClick={() => toggleAgreement(agent)}>
+                            {agent.referral_agreement_signed ? 'Undo' : 'Mark received'}
+                          </button>
+                        )}
+                      </span>
+                    </div>
+                    {(referrals[agent.id] || []).length > 0 && (
+                      <div className="mt-2 text-sm">
+                        <span className="text-gray-600">Broker Finder referrals accepted:</span>
+                        <ul className="mt-1 space-y-1">
+                          {referrals[agent.id].map(r => (
+                            <li key={r.id} className="flex flex-wrap items-center gap-2">
+                              <span>{[r.property_address, r.property_city, r.property_state].filter(Boolean).join(', ')}{r.case_number ? ` · #${r.case_number}` : ''} · {Number(r.fee_percent || 25)}%{r.responded_at ? ` · ${new Date(r.responded_at).toLocaleDateString()}` : ''}</span>
+                              <button type="button" className="text-blue-700 underline text-xs" onClick={() => previewAgreement(r.id).catch(e => alert(e.message))}>Referral agreement</button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     {agent.specialties && agent.specialties.length > 0 && (
                       <div className="flex gap-2 mt-3 flex-wrap">
                         {agent.specialties.map(specialty => (
@@ -613,20 +744,22 @@ function AgentAdmin() {
                     variant="outline" 
                     size="sm" 
                     onClick={() => handleResendInvitation(agent)}
-                    title="Send invitation email"
+                    title="Resend login invitation email"
                   >
                     <Send className="h-4 w-4 text-blue-600" />
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => handleEdit(agent)}>
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleDelete(agent)}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-600" />
-                  </Button>
+                  {agent.is_active ? (
+                    <Button variant="outline" size="sm" onClick={() => handleDelete(agent)} title="Deactivate">
+                      <Trash2 className="h-4 w-4 text-red-600" />
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={() => handleReactivate(agent)} title="Reactivate">
+                      <RotateCcw className="h-4 w-4 text-green-700" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -640,6 +773,10 @@ function AgentAdmin() {
             <p className="text-gray-600">Loading agents...</p>
           </CardContent>
         </Card>
+      )}
+
+      {!loading && agents.length > 0 && shown.length === 0 && (
+        <Card><CardContent className="py-8 text-center text-gray-600">No agents match these filters.</CardContent></Card>
       )}
 
       {!loading && agents.length === 0 && (
