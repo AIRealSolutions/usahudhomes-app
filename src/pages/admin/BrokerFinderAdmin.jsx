@@ -13,6 +13,7 @@ import {
   suggestBrokers, sendReferralRequests, resendReferralRequest, getEconomicRegions,
   BROKER_STATUS, REQUEST_STATUS, DEFAULT_FEE_PERCENT,
   agreementFormStatus, uploadAgreementForm, previewAgreement,
+  createReferralLink, smsHref, mailtoHref,
 } from '../../services/brokerFinder'
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -41,6 +42,26 @@ export default function BrokerFinderAdmin() {
   const [prospectAware, setProspectAware] = useState(true)
   const [form, setForm] = useState(undefined) // undefined = loading, null = not uploaded
   const [uploading, setUploading] = useState(false)
+  const [share, setShare] = useState(null) // { brokerId, url, message, subject, phone, email, busy }
+  const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share
+
+  const openShare = async b => {
+    setShare({ brokerId: b.id, busy: true }); setError('')
+    try {
+      const r = await createReferralLink({
+        propertyId: property.id, brokerId: b.id, leadId: leadId || null, note,
+        feePercent: Number(feePercent), prospectAware, distanceMiles: b.distance_miles,
+      })
+      setShare({ brokerId: b.id, ...r, email: emails[b.id] || r.email })
+      setResult(res => res && ({ ...res, brokers: res.brokers.map(x => x.id === b.id ? { ...x, status: x.status === 'new' ? 'contacted' : x.status, request: x.request || { id: r.requestId, status: r.status } } : x) }))
+    } catch (e) { setShare(null); setError(e.message) }
+  }
+  const copy = async (text, what) => {
+    try { await navigator.clipboard.writeText(text); setNotice(`${what} copied.`) } catch { setNotice('Copy failed — select the text and copy it.') }
+  }
+  const nativeShare = async () => {
+    try { await navigator.share({ title: share.subject, text: share.message }) } catch { /* cancelled */ }
+  }
 
   useEffect(() => { agreementFormStatus().then(setForm).catch(() => setForm(null)) }, [])
 
@@ -224,7 +245,8 @@ export default function BrokerFinderAdmin() {
               const st = BROKER_STATUS[b.status] || BROKER_STATUS.new
               const blocked = b.status === 'do_not_contact'
               return (
-                <div key={b.id} className={`p-3 flex flex-col sm:flex-row gap-3 ${selected.includes(b.id) ? 'bg-violet-50' : ''}`}>
+                <div key={b.id} className={selected.includes(b.id) ? 'bg-violet-50' : ''}>
+                <div className="p-3 flex flex-col sm:flex-row gap-3">
                   <label className="flex gap-3 flex-1 min-w-0 cursor-pointer">
                     <input type="checkbox" className="mt-1" disabled={blocked} checked={selected.includes(b.id)} onChange={() => toggle(b.id)} />
                     <span className="min-w-0">
@@ -244,8 +266,37 @@ export default function BrokerFinderAdmin() {
                       )}
                     </span>
                   </label>
-                  <input type="email" aria-label={`Email for ${b.company_name}`} className="border rounded p-2 text-sm sm:w-64" placeholder="broker email (required to send)"
-                    value={emails[b.id] || ''} disabled={blocked} onChange={e => setEmails(m => ({ ...m, [b.id]: e.target.value }))} />
+                  <div className="flex flex-col gap-1 sm:w-64">
+                    <input type="email" aria-label={`Email for ${b.company_name}`} className="border rounded p-2 text-sm" placeholder="broker email (to send by email)"
+                      value={emails[b.id] || ''} disabled={blocked} onChange={e => setEmails(m => ({ ...m, [b.id]: e.target.value }))} />
+                    {!blocked && (
+                      <button type="button" className="text-sm border border-teal-700 text-teal-800 rounded px-2 py-1.5 disabled:opacity-50"
+                        disabled={share?.brokerId === b.id && share.busy} onClick={() => openShare(b)}>
+                        {share?.brokerId === b.id && share.busy ? 'Creating link…' : 'Share link (text / other)'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {share?.brokerId === b.id && !share.busy && (
+                  <div className="mx-3 mb-3 border border-teal-200 bg-teal-50 rounded p-3 space-y-2">
+                    <div className="flex justify-between items-center gap-2">
+                      <strong className="text-sm">Share with {b.contact_name || b.company_name}</strong>
+                      <button type="button" className="text-sm text-gray-600 underline" onClick={() => setShare(null)}>Close</button>
+                    </div>
+                    <label className="block text-xs">Message (edit before sending)
+                      <textarea className="border rounded p-2 w-full text-sm mt-1 bg-white" rows={4} value={share.message} onChange={e => setShare(sh => ({ ...sh, message: e.target.value }))} />
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {share.phone && <a className="bg-green-700 text-white rounded px-3 py-2 text-sm" href={smsHref(share.phone, share.message)}>Text {share.phone}</a>}
+                      <a className="bg-blue-700 text-white rounded px-3 py-2 text-sm" href={mailtoHref(emails[b.id] || share.email, share.subject, share.message)}>Email</a>
+                      {canNativeShare && <button type="button" className="bg-gray-800 text-white rounded px-3 py-2 text-sm" onClick={nativeShare}>Share…</button>}
+                      <button type="button" className="border rounded px-3 py-2 text-sm bg-white" onClick={() => copy(share.message, 'Message')}>Copy message</button>
+                      <button type="button" className="border rounded px-3 py-2 text-sm bg-white" onClick={() => copy(share.url, 'Link')}>Copy link</button>
+                    </div>
+                    <input readOnly aria-label="Referral link" className="border rounded p-2 w-full text-xs bg-white" value={share.url} onFocus={e => e.target.select()} />
+                    <p className="text-xs text-gray-600">The link is this broker's own referral page: they can accept, decline or ask for more leads. When they accept, they give their email and the referral agreement is sent to them. Text works best from your phone; on a computer, use Copy message.</p>
+                  </div>
+                )}
                 </div>
               )
             })}

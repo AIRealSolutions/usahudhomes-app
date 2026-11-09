@@ -21,6 +21,7 @@ export default function BrokerReferralResponse() {
   const [regions, setRegions] = useState([])
   const [agentLicense, setAgentLicense] = useState('')
   const [firmLicense, setFirmLicense] = useState('')
+  const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(null)
 
@@ -30,14 +31,19 @@ export default function BrokerReferralResponse() {
       if (d.request.regionsRequested?.length) setRegions(d.request.regionsRequested)
       setAgentLicense(d.request.agentLicense || '')
       setFirmLicense(d.request.firmLicense || '')
+      setEmail(d.broker.email || '')
     }).catch(e => setError(e.message))
   }, [token])
 
   const submit = async () => {
     if (!response) return setError('Choose a response.')
+    const needsEmail = response === 'accept' || (response === 'decline' && wantsMore)
+    if (needsEmail && !/^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/.test(email.trim())) {
+      return setError(response === 'accept' ? 'Add your email so we can send you the referral agreement.' : 'Add your email so we can send you leads.')
+    }
     setBusy(true); setError('')
     try {
-      setDone(await respondToReferral({ token, response, note, wantsMoreLeads: response !== 'optout' && wantsMore, regions, agentLicense, firmLicense }))
+      setDone(await respondToReferral({ token, response, note, wantsMoreLeads: response !== 'optout' && wantsMore, regions, agentLicense, firmLicense, email: email.trim() }))
     } catch (e) { setError(e.message) } finally { setBusy(false) }
   }
 
@@ -80,6 +86,7 @@ export default function BrokerReferralResponse() {
             {response === 'accept' && (
               <div className="border rounded p-3 space-y-2">
                 <p className="text-sm">We'll email you the referral agreement (NC REALTORS® Form 730) to sign. Add your license numbers to fill them in (optional).</p>
+                <label className="block text-sm">Your email *<input type="email" required className="border rounded p-2 w-full" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@yourfirm.com" /></label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <label className="text-sm">Your license #<input className="border rounded p-2 w-full" maxLength={30} value={agentLicense} onChange={e => setAgentLicense(e.target.value)} /></label>
                   <label className="text-sm">Firm license #<input className="border rounded p-2 w-full" maxLength={30} value={firmLicense} onChange={e => setFirmLicense(e.target.value)} /></label>
@@ -99,6 +106,9 @@ export default function BrokerReferralResponse() {
                     <input type="checkbox" checked={wantsMore} onChange={e => setWantsMore(e.target.checked)} />
                     Send me more HUD buyer leads in {r.state || 'my state'}
                   </label>
+                  {wantsMore && response === 'decline' && (
+                    <label className="block text-sm">Your email *<input type="email" className="border rounded p-2 w-full" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@yourfirm.com" /></label>
+                  )}
                   {wantsMore && data.regions.length > 0 && (
                     <div className="space-y-1">
                       <p className="text-sm text-gray-600">Which regions do you cover? Leave all unchecked for the whole state.</p>

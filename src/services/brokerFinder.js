@@ -19,6 +19,12 @@ async function call(action, body, { auth = true } = {}) {
 export const suggestBrokers = (propertyId, opts = {}) => call('suggest', { propertyId, ...opts })
 export const sendReferralRequests = payload => call('send', payload)
 export const resendReferralRequest = requestId => call('resend', { requestId })
+/** Creates (or reuses) the request without emailing; returns { url, message, subject, phone, email } */
+export const createReferralLink = payload => call('link', payload)
+
+/** sms: link that opens the phone's messaging app with the message filled in (works on iPhone and Android) */
+export const smsHref = (phone, body) => `sms:${String(phone || '').replace(/[^\d+]/g, '')}?&body=${encodeURIComponent(body)}`
+export const mailtoHref = (email, subject, body) => `mailto:${encodeURIComponent(email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 export const scanStateBrokers = state => call('scan', { state })
 export const geocodeBrokers = limit => call('geocode', { limit })
 export const lookupReferral = token => call('lookup', { token }, { auth: false })
@@ -45,7 +51,7 @@ export const BROKER_STATUS = {
 }
 
 export const REQUEST_STATUS = {
-  pending: 'Not sent', sent: 'Sent', opened: 'Opened', accepted: 'Accepted', declined: 'Declined', failed: 'Failed',
+  pending: 'Link created', sent: 'Emailed', opened: 'Opened', accepted: 'Accepted', declined: 'Declined', failed: 'Failed',
 }
 
 // ─── Referral agreement form (NC Form 730) ──────────────────────────────────

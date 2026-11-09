@@ -9,6 +9,9 @@
  *   suggest   (admin)  { propertyId, maxMiles?, want? } — nearest HUD brokers to a property
  *   send      (admin)  { propertyId, leadId?, note?, recipients: [{ brokerId, email, distanceMiles }] }
  *   resend    (admin)  { requestId }
+ *   link      (admin)  { propertyId, brokerId, leadId?, note?, feePercent?, prospectAware?, distanceMiles? }
+ *                      — creates the request without emailing and returns its link plus a short
+ *                        message to text or share (HUD lists phones, not emails)
  *   scan      (admin)  { state } — fill the directory for a state's property cities (call until done)
  *   geocode   (admin)  { limit? } — place directory brokers that have no map pin yet
  *   lookup    (public) { token } — the broker's referral page reads its request
@@ -445,16 +448,84 @@ async function handleSuggest(req, res, client) {
   })
 }
 
+// Options shared by emailed and shared-link requests
+function requestOptions(body) {
+  const feeIn = Number(body?.feePercent)
+  return {
+    note: clip(body?.note, 2000) || null,
+    feePercent: Number.isFinite(feeIn) && feeIn > 0 && feeIn <= 100 ? Math.round(feeIn * 100) / 100 : DEFAULT_FEE_PERCENT,
+    prospectAware: typeof body?.prospectAware === 'boolean' ? body.prospectAware : null,
+    leadId: UUID_RE.test(String(body?.leadId || '')) ? body.leadId : null,
+  }
+}
+
+// One request per broker per property: reuse the existing one instead of duplicating.
+// email '' = not known yet (a shared link); the broker gives it when they accept.
+async function upsertRequest(client, { property, broker, admin, email, distanceMiles, opts }) {
+  const { note, feePercent, prospectAware, leadId } = opts
+  const { data: prior } = await client.from('broker_referral_requests').select('*')
+    .eq('broker_id', broker.id).eq('property_id', property.id).order('created_at', { ascending: false }).limit(1)
+  const row = prior?.[0]
+  if (row) {
+    const { data, error } = await client.from('broker_referral_requests')
+      .update({
+        email: email || row.email || '', note: note ?? row.note, lead_id: leadId ?? row.lead_id, fee_percent: feePercent,
+        prospect_aware: prospectAware ?? row.prospect_aware, updated_at: new Date().toISOString(),
+      })
+      .eq('id', row.id).select('*').single()
+    if (error) throw error
+    return data
+  }
+  const { data, error } = await client.from('broker_referral_requests').insert({
+    token: randomBytes(20).toString('hex'),
+    broker_id: broker.id, property_id: property.id, lead_id: leadId,
+    case_number: property.case_number, property_address: property.address,
+    property_city: property.city, property_state: property.state, property_price: property.price,
+    distance_miles: Number.isFinite(Number(distanceMiles)) && distanceMiles !== null ? Number(distanceMiles) : null,
+    note, email: email || '', created_by: admin.id,
+    fee_percent: feePercent, payment_days: DEFAULT_PAYMENT_DAYS, prospect_aware: prospectAware,
+  }).select('*').single()
+  if (error) throw error
+  return data
+}
+
+// The short message that goes with a shared link (text message, chat, email)
+function shareMessage(row, broker, sender) {
+  const first = clean(broker.contact_name).split(' ')[0]
+  const home = [row.property_address, row.property_city].filter(Boolean).join(', ')
+  const dist = row.distance_miles != null ? ` (about ${Math.round(Number(row.distance_miles))} mi from your office)` : ''
+  const fee = Number(row.fee_percent ?? DEFAULT_FEE_PERCENT)
+  return `Hi${first ? ` ${first}` : ''}, this is ${sender.name} with ${sender.company} / USAHUDhomes.com. ` +
+    `I have a buyer who wants to bid on the HUD home at ${home}${dist}, and I don't have an agent there. ` +
+    `${fee}% referral. Can you help? Details and reply: ${SITE_URL}/broker-referral/${row.token}`
+}
+
+async function handleLink(req, res, client, admin) {
+  const property = await loadProperty(client, req.body?.propertyId)
+  if (!property) return res.status(404).json({ error: 'Property not found' })
+  const brokerId = String(req.body?.brokerId || '')
+  if (!UUID_RE.test(brokerId)) return res.status(400).json({ error: 'Choose a broker' })
+  const { data: broker } = await client.from('hud_brokers').select('*').eq('id', brokerId).maybeSingle()
+  if (!broker) return res.status(404).json({ error: 'Broker not found' })
+  if (broker.status === 'do_not_contact') return res.status(400).json({ error: 'This broker asked not to be contacted.' })
+  const row = await upsertRequest(client, { property, broker, admin, email: clean(broker.email).toLowerCase(), distanceMiles: req.body?.distanceMiles, opts: requestOptions(req.body) })
+  const now = new Date().toISOString()
+  await client.from('hud_brokers').update({ last_contacted_at: now, ...(broker.status === 'new' ? { status: 'contacted' } : {}) }).eq('id', broker.id)
+  const sender = await senderProfile(client, admin)
+  const message = shareMessage(row, broker, sender)
+  return res.status(200).json({
+    requestId: row.id, url: `${SITE_URL}/broker-referral/${row.token}`, message,
+    subject: `HUD buyer referral: ${[row.property_address, row.property_city, row.property_state].filter(Boolean).join(', ')}`,
+    phone: broker.phone, email: broker.email || '', status: row.status,
+  })
+}
+
 async function handleSend(req, res, client, admin) {
   const property = await loadProperty(client, req.body?.propertyId)
   if (!property) return res.status(404).json({ error: 'Property not found' })
   const recipients = (Array.isArray(req.body?.recipients) ? req.body.recipients : []).slice(0, MAX_SEND)
   if (!recipients.length) return res.status(400).json({ error: 'Choose at least one broker.' })
-  const note = clip(req.body?.note, 2000) || null
-  const feeIn = Number(req.body?.feePercent)
-  const feePercent = Number.isFinite(feeIn) && feeIn > 0 && feeIn <= 100 ? Math.round(feeIn * 100) / 100 : DEFAULT_FEE_PERCENT
-  const prospectAware = typeof req.body?.prospectAware === 'boolean' ? req.body.prospectAware : null
-  const leadId = UUID_RE.test(String(req.body?.leadId || '')) ? req.body.leadId : null
+  const opts = requestOptions(req.body)
   const ids = recipients.map(r => r.brokerId).filter(id => UUID_RE.test(String(id)))
   const { data: brokers, error } = await client.from('hud_brokers').select('*').in('id', ids)
   if (error) throw error
@@ -474,31 +545,10 @@ async function handleSend(req, res, client, admin) {
         await client.from('hud_brokers').update({ email }).eq('id', broker.id)
         broker.email = email
       }
-      // One request per broker per property: resend the existing one instead of duplicating
-      const { data: prior } = await client.from('broker_referral_requests').select('*')
-        .eq('broker_id', broker.id).eq('property_id', property.id).order('created_at', { ascending: false }).limit(1)
-      let row = prior?.[0]
-      if (row) {
-        const { data } = await client.from('broker_referral_requests')
-          .update({
-            email, note: note ?? row.note, lead_id: leadId ?? row.lead_id, fee_percent: feePercent,
-            prospect_aware: prospectAware ?? row.prospect_aware, updated_at: new Date().toISOString(),
-          })
-          .eq('id', row.id).select('*').single()
-        row = data || row
-      } else {
-        const { data, error: e } = await client.from('broker_referral_requests').insert({
-          token: randomBytes(20).toString('hex'),
-          broker_id: broker.id, property_id: property.id, lead_id: leadId,
-          case_number: property.case_number, property_address: property.address,
-          property_city: property.city, property_state: property.state, property_price: property.price,
-          distance_miles: Number.isFinite(Number(r.distanceMiles)) ? Number(r.distanceMiles) : null,
-          note, email, created_by: admin.id,
-          fee_percent: feePercent, payment_days: DEFAULT_PAYMENT_DAYS, prospect_aware: prospectAware,
-        }).select('*').single()
-        if (e) { results.push({ brokerId: broker.id, status: 'failed', error: e.message }); continue }
-        row = data
-      }
+      let row
+      try {
+        row = await upsertRequest(client, { property, broker, admin, email, distanceMiles: r.distanceMiles, opts })
+      } catch (e) { results.push({ brokerId: broker.id, status: 'failed', error: e.message }); continue }
       results.push(await deliver(client, m, row, broker, sender, regions))
     }
   } finally { m.close() }
@@ -512,6 +562,7 @@ async function handleResend(req, res, client, admin) {
   if (!row) return res.status(404).json({ error: 'Request not found' })
   const { data: broker } = await client.from('hud_brokers').select('*').eq('id', row.broker_id).single()
   if (broker?.status === 'do_not_contact') return res.status(400).json({ error: 'Broker asked not to be contacted' })
+  if (!EMAIL_RE.test(row.email || '')) return res.status(400).json({ error: 'No email for this broker yet — use Share link, or add an email and send.' })
   if (row.sent_at && Date.now() - new Date(row.sent_at).getTime() < 12 * 3600000) return res.status(400).json({ error: 'Sent within the last 12 hours.' })
   const m = mailer()
   try {
@@ -654,7 +705,7 @@ async function handleLookup(req, res, client) {
   if (!row) return res.status(404).json({ error: 'This referral link is not valid.' })
   if (!row.opened_at) {
     await client.from('broker_referral_requests').update({
-      opened_at: new Date().toISOString(), ...(row.status === 'sent' ? { status: 'opened' } : {}),
+      opened_at: new Date().toISOString(), ...(['pending', 'sent'].includes(row.status) ? { status: 'opened' } : {}),
     }).eq('id', row.id)
   }
   const regions = await regionNamesFor(client, row.property_state)
@@ -668,7 +719,7 @@ async function handleLookup(req, res, client) {
       agentLicense: row.receiving_agent_license, firmLicense: row.receiving_firm_license,
       agreementUrl: row.status === 'accepted' ? `/api/broker-finder?action=agreement&token=${row.token}` : null,
     },
-    broker: { company: b.company_name, contactName: b.contact_name, phone: b.phone, email: row.email, city: b.city, state: b.state, optedOut: b.status === 'do_not_contact' },
+    broker: { company: b.company_name, contactName: b.contact_name, phone: b.phone, email: row.email || b.email || '', city: b.city, state: b.state, optedOut: b.status === 'do_not_contact' },
     regions,
   })
 }
@@ -685,6 +736,15 @@ async function handleRespond(req, res, client) {
   const note = clip(req.body?.note, 1000) || null
   const status = response === 'accept' ? 'accepted' : 'declined'
   const accepted = status === 'accepted'
+  // Shared links have no email yet: the broker gives it when accepting or asking for leads
+  const givenEmail = clean(req.body?.email).toLowerCase()
+  if (givenEmail && !EMAIL_RE.test(givenEmail)) return res.status(400).json({ error: 'Check your email address.' })
+  if (accepted && !EMAIL_RE.test(givenEmail || row.email || '')) return res.status(400).json({ error: 'Add your email so we can send you the referral agreement.' })
+  if (givenEmail && givenEmail !== row.email) {
+    await client.from('broker_referral_requests').update({ email: givenEmail }).eq('id', row.id)
+    await client.from('hud_brokers').update({ email: givenEmail }).eq('id', row.broker_id).is('email', null)
+    row.email = givenEmail
+  }
   const update = { status, responded_at: now, response_note: note, wants_more_leads: wantsMoreLeads, regions_requested: regions, updated_at: now }
   if (accepted) {
     update.receiving_agent_license = clip(req.body?.agentLicense, 30) || row.receiving_agent_license || null
@@ -743,7 +803,7 @@ async function handleRespond(req, res, client) {
       const verb = response === 'accept' ? 'ACCEPTED' : response === 'optout' ? 'opted out of' : 'declined'
       const lines = [
         `${b.contact_name || ''} (${b.company_name || ''}) ${verb} the referral for ${row.property_address || ''}, ${row.property_city || ''} ${row.property_state || ''}.`,
-        `Phone: ${b.phone || '-'} · Email: ${row.email}`,
+        `Phone: ${b.phone || '-'} · Email: ${row.email || '-'}`,
         note ? `Note: ${note}` : '',
         wantsMoreLeads ? `Wants more leads in ${row.property_state}: ${regions.length ? regions.join(', ') : 'whole state'}` : '',
         agreement ? `The referral agreement (${Number(row.fee_percent ?? DEFAULT_FEE_PERCENT)}%) was emailed to the broker to sign; a copy is attached.` : '',
@@ -753,7 +813,7 @@ async function handleRespond(req, res, client) {
       const m = mailer()
       try {
         await m.send({
-          fromName: 'USAHUDhomes Broker Finder', to, replyTo: row.email,
+          fromName: 'USAHUDhomes Broker Finder', to, replyTo: row.email || undefined,
           subject: `Broker ${verb}: ${row.property_address || row.case_number || 'HUD referral'}`,
           text: lines.join('\n'), html: lines.map(l => `<p>${escapeHtml(l)}</p>`).join(''),
           ...(agreement ? { attachments: [{ filename: agreementFilename(row), content: Buffer.from(agreement), contentType: 'application/pdf' }] } : {}),
@@ -787,10 +847,11 @@ export default async function handler(req, res) {
     if (action === 'suggest') return await handleSuggest(req, res, client)
     if (action === 'send') return await handleSend(req, res, client, admin)
     if (action === 'resend') return await handleResend(req, res, client, admin)
+    if (action === 'link') return await handleLink(req, res, client, admin)
     if (action === 'scan') return await handleScan(req, res, client)
     if (action === 'geocode') return await handleGeocode(req, res, client)
     if (action === 'agreement-preview') return await handleAgreementPreview(req, res, client)
-    return res.status(400).json({ error: 'Unknown action', valid_actions: ['suggest', 'send', 'resend', 'scan', 'geocode', 'lookup', 'respond', 'agreement', 'agreement-preview'] })
+    return res.status(400).json({ error: 'Unknown action', valid_actions: ['suggest', 'send', 'resend', 'link', 'scan', 'geocode', 'lookup', 'respond', 'agreement', 'agreement-preview'] })
   } catch (e) {
     console.error(`[broker-finder/${action}]`, e)
     return res.status(500).json({ error: e.message || 'Unexpected error' })
@@ -798,4 +859,4 @@ export default async function handler(req, res) {
 }
 
 // Exposed for local checks of the HUD / geocoding steps (not routed)
-export const _internals = { nearbyCities, openHudSession, hudBrokerSearch, mapHudBroker, geocodeBroker, miles, zipPoint, buildReferralEmail, agreementPdf }
+export const _internals = { shareMessage, nearbyCities, openHudSession, hudBrokerSearch, mapHudBroker, geocodeBroker, miles, zipPoint, buildReferralEmail, agreementPdf }
