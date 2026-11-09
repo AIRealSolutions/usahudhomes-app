@@ -101,7 +101,7 @@ export default function BrokerReferralResponse() {
 
             {response === 'accept' && (
               <div className="border rounded p-3 space-y-2">
-                <p className="text-sm">We'll email you the referral agreement (NC REALTORS® Form 730) to sign. Add your license numbers to fill them in (optional).</p>
+                <p className="text-sm">Accepting makes you a USAHUDhomes.com partner agent: you'll get a login to see this buyer and future HUD buyer leads near you. We'll also email you the referral agreement (NC REALTORS® Form 730) to sign. Add your license numbers to fill them in (optional).</p>
                 <label className="block text-sm">Your email *<input type="email" required className="border rounded p-2 w-full" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@yourfirm.com" /></label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <label className="text-sm">Your license #<input className="border rounded p-2 w-full" maxLength={30} value={agentLicense} onChange={e => setAgentLicense(e.target.value)} /></label>
@@ -156,6 +156,18 @@ export default function BrokerReferralResponse() {
               {response === 'decline' && (r?.taken ? 'Thank you! We will reach out with the next buyer near you.' : 'Thanks for letting us know.')}
               {response === 'optout' && 'You will not receive more referral requests from us.'}
             </p>
+            {done.partner && (
+              <div className="border rounded p-4 bg-blue-50 space-y-2">
+                <p className="font-semibold">You're a USAHUDhomes.com partner agent.</p>
+                <p className="text-sm text-gray-700">
+                  {done.partner.invited
+                    ? 'Check your email for a link to set your password, then sign in to see this buyer'
+                    : 'Sign in to see this buyer'}
+                  {done.partner.leadAssigned ? ' — they are already in your account.' : '.'}
+                </p>
+                <Link to="/login" className="inline-block bg-blue-800 text-white rounded px-4 py-2 font-semibold">Sign in</Link>
+              </div>
+            )}
             {done.agreementUrl && done.agreementEmailed && (
               <p><a className="text-blue-700 underline" href={done.agreementUrl} target="_blank" rel="noreferrer">Download the referral agreement</a></p>
             )}

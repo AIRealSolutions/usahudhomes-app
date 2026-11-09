@@ -27,7 +27,10 @@
  *   geocode   (admin)  { limit? } — place directory brokers that have no map pin yet
  *   lookup    (public) { token } — the broker's referral page reads its request
  *   respond   (public) { token, response: 'accept'|'decline'|'optout', note?, wantsMoreLeads?, regions?,
- *                        agentLicense?, firmLicense? } — on accept, emails the filled referral agreement
+ *                        agentLicense?, firmLicense?, email? } — on accept, emails the filled referral agreement
+ *                        and onboards the broker (accepting counts as approval): an approved, active
+ *                        partner agent, the broker role, a set-your-password invite, and the linked
+ *                        lead assigned to them
  *   agreement (public, GET ?token=) — the filled referral agreement PDF, once the broker accepted
  *   agreement-preview (admin) { requestId? } — the filled PDF for a request, or with sample data
  *
@@ -53,6 +56,7 @@ import {
   fillReferralAgreement, referringFirm, FORM_BUCKET, FORM_PATH,
   DEFAULT_FEE_PERCENT, DEFAULT_TERM_MONTHS, DEFAULT_PAYMENT_DAYS,
 } from './_referral-agreement.js'
+import { assignLeadToAgent } from './notifications.js'
 
 export const config = { maxDuration: 60 }
 
@@ -765,6 +769,92 @@ async function handleAgreementPreview(req, res, client) {
   return res.status(200).send(Buffer.from(pdf))
 }
 
+// ─── Onboarding: accepting a referral counts as approval ───────────────────
+async function inviteLogin({ email, firstName, lastName, phone }) {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_KEY
+  const r = await fetch(`${url}/auth/v1/invite?redirect_to=${encodeURIComponent(`${SITE_URL}/reset-password`)}`, {
+    method: 'POST',
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, data: { first_name: firstName, last_name: lastName, full_name: `${firstName} ${lastName}`.trim(), phone } }),
+  })
+  if (r.ok) return 'invited'
+  const e = await r.json().catch(() => ({}))
+  const msg = e.msg || e.message || e.error_description || ''
+  if (r.status === 422 || /already/i.test(msg)) return 'existing' // they already have a login
+  throw new Error(msg || `invite failed (${r.status})`)
+}
+
+/**
+ * Makes the accepting broker a partner: agent (approved, active), users.role 'broker',
+ * login invite, directory link, and the referral's lead assigned to them.
+ * Returns { agentId, created, login, leadAssigned, notes[] }.
+ */
+async function onboardAcceptedBroker(client, row, regions) {
+  const notes = []
+  const b = row.broker || {}
+  const email = clean(row.email).toLowerCase()
+  const state = clean(row.property_state).toUpperCase() || clean(b.state).toUpperCase() || null
+  const [firstName = 'Broker', ...rest] = clean(b.contact_name || row.broker_contact || '').split(' ').filter(Boolean)
+  const lastName = rest.join(' ')
+  const now = new Date().toISOString()
+
+  // Agent: reuse an existing one (never overwrite a partner's profile), otherwise create it approved
+  const { data: existing } = await client.from('agents').select('id,is_active,status').ilike('email', email.replace(/[%_\\]/g, '\\$&')).limit(1)
+  let agentId = existing?.[0]?.id, created = false
+  if (agentId && !existing[0].is_active) {
+    if (existing[0].status === 'pending') {
+      await client.from('agents').update({ status: 'approved', is_active: true, onboarding_completed: true, onboarding_completed_at: now }).eq('id', agentId)
+      notes.push('Existing pending partner account approved.')
+    } else {
+      notes.push(`Existing partner account is inactive (${existing[0].status}); it was not reactivated and the buyer was not assigned.`)
+      return { agentId, created, login: null, leadAssigned: false, notes }
+    }
+  }
+  if (!agentId) {
+    const { data: agent, error } = await client.from('agents').insert({
+      first_name: firstName, last_name: lastName, email, phone: b.phone || row.broker_phone || '',
+      company: b.company_name || row.broker_company || null,
+      license_number: row.receiving_agent_license || null, license_state: state,
+      states_covered: state ? [state] : [], economic_regions: state ? regions.map(slug => `${state}:${slug}`) : [],
+      specialties: ['HUD Homes'], referral_fee_percentage: Number(row.fee_percent ?? DEFAULT_FEE_PERCENT),
+      bio: 'Joined by accepting a HUD buyer referral through USAHUDhomes.com Broker Finder.',
+      status: 'approved', is_active: true, onboarding_completed: true, onboarding_completed_at: now,
+      referral_agreement_signed: false,
+    }).select('id').single()
+    if (error) throw error
+    agentId = agent.id
+    created = true
+  }
+
+  // Broker role (never downgrade an admin); the auth trigger links the login to this row by email
+  const { data: user } = await client.from('users').select('id,role').ilike('email', email.replace(/[%_\\]/g, '\\$&')).limit(1)
+  if (!user?.length) {
+    const { error } = await client.from('users').insert({ email, name: `${firstName} ${lastName}`.trim(), first_name: firstName, last_name: lastName || null, phone: b.phone || null, role: 'broker' })
+    if (error) notes.push(`Broker role not set: ${error.message}`)
+  } else if (!['admin', 'broker'].includes(user[0].role)) {
+    await client.from('users').update({ role: 'broker' }).eq('id', user[0].id)
+  }
+
+  let login = null
+  try { login = await inviteLogin({ email, firstName, lastName, phone: b.phone }) } catch (e) { notes.push(`Login invite failed: ${e.message}`) }
+
+  await client.from('hud_brokers').update({ agent_id: agentId, status: 'registered' }).eq('id', row.broker_id)
+
+  // The buyer this referral was for, filed under the new partner as already accepted
+  let leadAssigned = false
+  if (row.lead_id) {
+    try {
+      const { data: lead } = await client.from('leads').select('*').eq('id', row.lead_id).maybeSingle()
+      if (lead) leadAssigned = !!(await assignLeadToAgent(lead, agentId, { source: 'broker_finder', referral_request_id: row.id }, { status: 'accepted' }))
+      if (lead && !leadAssigned) notes.push('The lead was already assigned to an agent, so it was not reassigned.')
+    } catch (e) { notes.push(`Lead not assigned: ${e.message}`) }
+  } else {
+    notes.push('No lead was linked to this referral, so no buyer was assigned in the system.')
+  }
+  return { agentId, created, login, leadAssigned, notes }
+}
+
 // The accepted request for a home, other than exceptId (first to accept gets the buyer)
 async function acceptedFor(client, propertyId, exceptId = null) {
   if (!propertyId) return null
@@ -866,6 +956,15 @@ async function handleRespond(req, res, client) {
     }
   }
 
+  // Accepted: onboard the broker as a partner (accepting counts as approval)
+  let onboard = null
+  if (accepted) {
+    try { onboard = await onboardAcceptedBroker(client, row, regions) } catch (e) {
+      console.error('[broker-finder] onboarding failed:', e)
+      onboard = { notes: [`Partner account could not be created: ${e.message}`] }
+    }
+  }
+
   // Accepted: fill the referral agreement and email it to the broker to sign
   let agreement = null, agreementNote = ''
   if (accepted) {
@@ -882,6 +981,12 @@ async function handleRespond(req, res, client) {
       `Hi ${clean(row.broker?.contact_name).split(' ')[0] || 'there'},`, '',
       `Thank you for taking this buyer. Attached is the referral agreement (NC REALTORS® Form 730) for ${[row.property_address, row.property_city, row.property_state].filter(Boolean).join(', ')}: ${fee}% of the buyer-side compensation, through ${row.agreement_end_date}.`, '',
       'Please sign it and reply to this email with the signed copy. I will countersign and send you the buyer\'s details if they are not already on the agreement.', '',
+      ...(onboard?.agentId ? [
+        onboard.login === 'invited'
+          ? 'You are now a USAHUDhomes.com partner agent. Watch for a separate email to set your password, then sign in at https://usahudhomes.com/login to see this buyer and future HUD buyer leads.'
+          : 'This referral is in your USAHUDhomes.com partner account: sign in at https://usahudhomes.com/login to see this buyer.',
+        '',
+      ] : []),
       `You can download it again any time: ${link}`, '',
       firm.agentName, [firm.firmName, firm.phone].filter(Boolean).join(' · '),
     ]
@@ -929,6 +1034,12 @@ async function handleRespond(req, res, client) {
         wantsMoreLeads ? `Wants more leads in ${row.property_state}: ${regions.length ? regions.join(', ') : 'whole state'}` : '',
         agreement ? `The referral agreement (${Number(row.fee_percent ?? DEFAULT_FEE_PERCENT)}%) was emailed to the broker to sign; a copy is attached.` : '',
         agreementNote,
+        ...(onboard ? [
+          onboard.agentId
+            ? `${onboard.created ? 'Partner account created and approved' : 'Existing partner account used'}${onboard.login === 'invited' ? '; set-password invite emailed' : onboard.login === 'existing' ? '; they already had a login' : ''}${onboard.leadAssigned ? '; the buyer was assigned to them' : ''}.`
+            : '',
+          ...(onboard.notes || []),
+        ].filter(Boolean) : []),
         othersOpen ? `${othersOpen} other broker${othersOpen === 1 ? '' : 's'} had this home; their link${othersOpen === 1 ? ' now shows' : 's now show'} it as already accepted. Release it in Broker Finder if this broker falls through.` : '',
         `${SITE_URL}/admin`,
       ].filter(Boolean)
@@ -944,11 +1055,13 @@ async function handleRespond(req, res, client) {
     }
   } catch (e) { console.error('[broker-finder] admin notice failed:', e.message) }
 
-  const registerUrl = wantsMoreLeads ? `/broker/register?ref=${row.token}` : null
+  // Accepted brokers are already partners; others sign up through the registration form
+  const registerUrl = wantsMoreLeads && !onboard?.agentId ? `/broker/register?ref=${row.token}` : null
   return res.status(200).json({
     ok: true, status, registerUrl,
     agreementUrl: accepted ? `/api/broker-finder?action=agreement&token=${row.token}` : null,
     agreementEmailed: !!agreement && !agreementNote,
+    partner: onboard?.agentId ? { created: !!onboard.created, invited: onboard.login === 'invited', leadAssigned: !!onboard.leadAssigned } : null,
   })
 }
 
