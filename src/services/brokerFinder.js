@@ -23,6 +23,14 @@ export const resendReferralRequest = requestId => call('resend', { requestId })
 export const createReferralLink = payload => call('link', payload)
 /** The accepted broker fell through: reopen the home to the other brokers */
 export const releaseReferral = requestId => call('release', { requestId })
+/** Do-not-contact list: keyed on phone and email so it survives changes to HUD's listing */
+export const markDoNotContact = (brokerId, reason) => call('do-not-contact', { brokerId, reason })
+export const allowContact = suppressionId => call('allow-contact', { suppressionId })
+export async function listDoNotContact() {
+  const { data, error } = await supabase.from('broker_suppressions').select('*').order('created_at', { ascending: false }).limit(500)
+  if (error) throw error
+  return data || []
+}
 
 /** sms: link that opens the phone's messaging app with the message filled in (works on iPhone and Android) */
 export const smsHref = (phone, body) => `sms:${String(phone || '').replace(/[^\d+]/g, '')}?&body=${encodeURIComponent(body)}`

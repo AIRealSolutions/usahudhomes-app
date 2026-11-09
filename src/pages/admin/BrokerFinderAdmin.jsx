@@ -14,6 +14,7 @@ import {
   BROKER_STATUS, REQUEST_STATUS, DEFAULT_FEE_PERCENT,
   agreementFormStatus, uploadAgreementForm, previewAgreement,
   createReferralLink, smsHref, mailtoHref, releaseReferral,
+  markDoNotContact, allowContact, listDoNotContact,
 } from '../../services/brokerFinder'
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -42,6 +43,28 @@ export default function BrokerFinderAdmin() {
   const [prospectAware, setProspectAware] = useState(true)
   const [form, setForm] = useState(undefined) // undefined = loading, null = not uploaded
   const [uploading, setUploading] = useState(false)
+  const [dnc, setDnc] = useState(null) // do-not-contact list, loaded on demand
+  const [showDnc, setShowDnc] = useState(false)
+  const loadDnc = () => listDoNotContact().then(setDnc).catch(e => setError(e.message))
+  useEffect(() => { loadDnc() }, [])
+
+  const doNotContact = async b => {
+    const reason = window.prompt(`Put ${b.contact_name || b.company_name} on the do-not-contact list? They won't get links, texts or emails from Broker Finder again, even if HUD lists them differently later.\n\nReason (optional, e.g. "Texted STOP"):`, '')
+    if (reason === null) return
+    try {
+      await markDoNotContact(b.id, reason)
+      setNotice(`${b.contact_name || b.company_name} is on the do-not-contact list.`)
+      setResult(res => res && ({ ...res, brokers: res.brokers.map(x => x.id === b.id ? { ...x, status: 'do_not_contact' } : x) }))
+      setSelected(sel => sel.filter(id => id !== b.id))
+      if (share?.brokerId === b.id) setShare(null)
+      loadDnc()
+    } catch (e) { setError(e.message) }
+  }
+  const undoDnc = async row => {
+    if (!window.confirm(`Take ${row.contact_name || row.company_name || 'this broker'} off the do-not-contact list? Only do this if they were added by mistake or asked to hear from you again.`)) return
+    try { await allowContact(row.id); setNotice('Removed from the do-not-contact list.'); loadDnc(); if (result) await search() } catch (e) { setError(e.message) }
+  }
+
   const [share, setShare] = useState(null) // { brokerId, url, message, subject, phone, email, busy }
   const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share
 
@@ -304,6 +327,9 @@ export default function BrokerFinderAdmin() {
                         {b.request && b.phone && <> <a className="text-teal-800 underline" href={smsHref(b.phone, takenText(b))}>Text update</a></>}
                       </span>
                     )}
+                    {b.status === 'do_not_contact'
+                      ? <span className="text-xs text-red-700">On the do-not-contact list</span>
+                      : <button type="button" className="text-xs text-red-700 underline self-start" onClick={() => doNotContact(b)}>Do not contact</button>}
                     {!blocked && (
                       <button type="button" className="text-sm border border-teal-700 text-teal-800 rounded px-2 py-1.5 disabled:opacity-50"
                         disabled={share?.brokerId === b.id && share.busy} onClick={() => openShare(b)}>
@@ -358,6 +384,35 @@ export default function BrokerFinderAdmin() {
           <p className="text-xs text-gray-500">Each broker gets a link to accept or decline, and to sign up for more HUD buyer leads in the regions of {property.state} they cover. When a broker accepts, the referral agreement is filled in and emailed to them to sign, with a copy to you.</p>
         </section>
       )}
+
+      {/* Do-not-contact list */}
+      <section className="bg-white rounded shadow p-4 sm:p-5 space-y-2">
+        <div className="flex flex-wrap justify-between items-center gap-2">
+          <h2 className="font-semibold">Do-not-contact list{dnc ? ` (${dnc.length})` : ''}</h2>
+          <button type="button" className="text-blue-700 underline text-sm" onClick={() => setShowDnc(v => !v)}>{showDnc ? 'Hide' : 'Show list'}</button>
+        </div>
+        <p className="text-xs text-gray-500">Brokers who opted out from a referral link, or that you marked. Matched by phone number and email, so they stay blocked even if HUD lists them under a new company name or office. Their company is also marked do-not-contact in Broker Leads.</p>
+        {showDnc && (
+          <div className="divide-y border rounded max-h-96 overflow-auto">
+            {(dnc || []).map(row => (
+              <div key={row.id} className="p-3 text-sm flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-medium">{row.contact_name || '—'}{row.company_name ? ` · ${row.company_name}` : ''}{row.state ? ` (${row.state})` : ''}</div>
+                  <div className="text-xs text-gray-600">
+                    {row.phone_digits ? `(${row.phone_digits.slice(0, 3)}) ${row.phone_digits.slice(3, 6)}-${row.phone_digits.slice(6)}` : ''}{row.phone_digits && row.email ? ' · ' : ''}{row.email || ''}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {row.source === 'referral_link' ? 'Opted out from their referral link' : 'Added by admin'} on {new Date(row.created_at).toLocaleDateString()}{row.reason ? ` — ${row.reason}` : ''}
+                  </div>
+                </div>
+                <button type="button" className="text-xs text-gray-600 underline self-start" onClick={() => undoDnc(row)}>Undo</button>
+              </div>
+            ))}
+            {dnc && !dnc.length && <p className="p-3 text-sm text-gray-500">Nobody on the list yet.</p>}
+            {!dnc && <p className="p-3 text-sm text-gray-500">Loading…</p>}
+          </div>
+        )}
+      </section>
 
       {/* Referral agreement form */}
       <section className="bg-white rounded shadow p-4 sm:p-5 space-y-2">
