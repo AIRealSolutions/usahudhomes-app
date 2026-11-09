@@ -488,6 +488,14 @@ export default function LeadDetailsPage() {
                           View Property →
                         </Link>
                       )}
+                      {lead.property_case_number && profile?.role === 'admin' && (
+                        <a
+                          href={`/admin?tab=broker-finder&case=${encodeURIComponent(lead.property_case_number)}&lead=${lead.id}`}
+                          className="text-teal-700 hover:underline text-sm mt-2 ml-4 inline-block"
+                        >
+                          No agent here? Find a HUD broker →
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>

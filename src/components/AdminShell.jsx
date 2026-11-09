@@ -23,7 +23,12 @@
  *   template-builder  → VideoTemplateBuilder
  *   facebook-import   → FacebookLeadsImport
  *   ai-assistant      → AIMarketingAssistant
+ *   broker-finder     → BrokerFinderAdmin (nearest HUD brokers for a property + referral requests)
+ *   broker-map        → BrokerMapAdmin
+ *   economic-regions  → EconomicRegionsAdmin
  *   database          → DatabaseReset
+ *
+ * Deep link a panel with /admin?tab=<id> (e.g. /admin?tab=broker-finder&case=387-123456).
  */
 
 import React, { useState, useEffect, lazy, Suspense } from 'react'
@@ -37,7 +42,8 @@ import {
   Film, Zap, BookOpen, Layout,
   Facebook, Bot, HardDrive, Trash2,
   LogOut, ChevronLeft, ChevronRight, Menu, X,
-  ChevronDown, ChevronUp, Bell, Shield, Briefcase, Settings, UserPlus, Handshake
+  ChevronDown, ChevronUp, Bell, Shield, Briefcase, Settings, UserPlus, Handshake,
+  MapPin, Map as MapIcon, Layers
 } from 'lucide-react'
 
 // Lazy-load all admin panels
@@ -61,6 +67,9 @@ const FacebookLeadsImport = lazy(() => import('./admin/FacebookLeadsImport'))
 const AIMarketingAssistant= lazy(() => import('./admin/AIMarketingAssistant'))
 const EmailTemplateEditor = lazy(() => import('./admin/EmailTemplateEditor'))
 const ClosingAgentsAdmin = lazy(() => import('../pages/admin/ClosingAgentsAdmin'))
+const BrokerFinderAdmin  = lazy(() => import('../pages/admin/BrokerFinderAdmin'))
+const BrokerMapAdmin     = lazy(() => import('../pages/admin/BrokerMapAdmin'))
+const EconomicRegionsAdmin = lazy(() => import('../pages/admin/EconomicRegionsAdmin'))
 const DatabaseReset        = lazy(() => import('./admin/DatabaseReset'))
 const PurgeUnderContract   = lazy(() => import('./admin/PurgeUnderContract'))
 
@@ -98,6 +107,9 @@ const NAV = [
       { id: 'agents',           label: 'Manage Agents',     icon: UserCog,       color: 'text-indigo-500' },
       { id: 'applications',     label: 'Applications',      icon: FileText,      color: 'text-yellow-600' },
       { id: 'broker-leads',     label: 'Broker Leads',      icon: Briefcase,     color: 'text-indigo-600', badge: 'NEW' },
+      { id: 'broker-finder',    label: 'Broker Finder',     icon: MapPin,        color: 'text-teal-600',   badge: 'NEW' },
+      { id: 'broker-map',       label: 'Broker Map',        icon: MapIcon,       color: 'text-emerald-600' },
+      { id: 'economic-regions', label: 'Economic Regions',  icon: Layers,        color: 'text-cyan-700' },
     ]
   },
   {
@@ -145,6 +157,9 @@ const COMPONENT_MAP = {
   'facebook-import':   FacebookLeadsImport,
   'ai-assistant':      AIMarketingAssistant,
   'closing-agents':    ClosingAgentsAdmin,
+  'broker-finder':     BrokerFinderAdmin,
+  'broker-map':        BrokerMapAdmin,
+  'economic-regions':  EconomicRegionsAdmin,
   'database':          DatabaseReset,
   'purge-contracts':   PurgeUnderContract,
 }
@@ -284,7 +299,10 @@ function Sidebar({ active, onNavigate, collapsed, onToggle, alerts }) {
 export default function AdminShell({ initialTab = 'overview' }) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab]     = useState(initialTab)
+  const [activeTab, setActiveTab]     = useState(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab')
+    return tab && COMPONENT_MAP[tab] ? tab : initialTab
+  })
   const [collapsed, setCollapsed]     = useState(false)
   const [mobileOpen, setMobileOpen]   = useState(false)
   const [roleMenuOpen, setRoleMenuOpen] = useState(false)
