@@ -765,6 +765,9 @@ async function assignLeadToAgent(lead, agentId, routing = {}, { status = 'new' }
   return consultation
 }
 
+// Broker Finder files an accepted referral's buyer under the new partner with this
+export { assignLeadToAgent }
+
 // ─── Action: lead submitted (public forms) ────────────────────────────────────
 // Public forms call this after saving a lead. Only the lead id is accepted; the
 // lead is read from the database, must be recent, and is announced once.
