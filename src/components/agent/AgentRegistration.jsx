@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,6 +10,7 @@ import BusinessInfoStep from './registration/BusinessInfoStep'
 import StatesAndSpecialtiesStep from './registration/StatesAndSpecialtiesStep'
 import ReferralAgreementStep from './registration/ReferralAgreementStep'
 import ReviewAndSubmitStep from './registration/ReviewAndSubmitStep'
+import { lookupReferral } from '../../services/brokerFinder'
 
 const STEPS = [
   { id: 1, title: 'Partner Profile', icon: Building, description: 'Basic contact information' },
@@ -39,7 +40,9 @@ const AgentRegistration = () => {
     
     // Territory & Specialties
     statesCovered: [],
+    economicRegions: [], // "NC:southeast" keys; none chosen for a state = the whole state
     specialties: [],
+    referralToken: '',   // set when the broker arrives from a Broker Finder referral email
     
     // Referral Agreement
     referralFeePercentage: 25.00,
@@ -52,6 +55,28 @@ const AgentRegistration = () => {
 
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Arriving from a referral email (/broker/register?ref=<token>): prefill what HUD lists for this broker
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get('ref')
+    if (!ref || !/^[0-9a-f]{40}$/.test(ref)) return
+    lookupReferral(ref).then(({ request, broker }) => {
+      const [first, ...rest] = String(broker.contactName || '').trim().split(/\s+/)
+      const st = request.state || broker.state
+      setFormData(prev => ({
+        ...prev,
+        referralToken: ref,
+        firstName: prev.firstName || first || '',
+        lastName: prev.lastName || rest.join(' '),
+        email: prev.email || broker.email || '',
+        phone: prev.phone || broker.phone || '',
+        company: prev.company || broker.company || '',
+        licenseState: prev.licenseState || st || '',
+        statesCovered: st && !prev.statesCovered.includes(st) ? [...prev.statesCovered, st] : prev.statesCovered,
+        economicRegions: prev.economicRegions.length ? prev.economicRegions : (request.regionsRequested || []).map(slug => `${st}:${slug}`),
+      }))
+    }).catch(() => { /* an expired or bad link just means a blank form */ })
+  }, [])
 
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))

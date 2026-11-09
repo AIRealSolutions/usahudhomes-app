@@ -1,18 +1,30 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { MapPin, Star, AlertCircle } from 'lucide-react'
 import { US_STATES, AGENT_SPECIALTIES } from '../../../data/referralAgreementTemplate'
+import { getEconomicRegions } from '../../../services/brokerFinder'
 
 const StatesAndSpecialtiesStep = ({ formData, updateFormData, errors }) => {
+  const [regions, setRegions] = useState([])
+  useEffect(() => { getEconomicRegions().then(setRegions).catch(() => setRegions([])) }, [])
+  const chosenRegions = formData.economicRegions || []
+
   const toggleState = (stateCode) => {
     const currentStates = formData.statesCovered || []
-    const newStates = currentStates.includes(stateCode)
+    const removing = currentStates.includes(stateCode)
+    const newStates = removing
       ? currentStates.filter(s => s !== stateCode)
       : [...currentStates, stateCode]
     updateFormData('statesCovered', newStates)
+    if (removing) updateFormData('economicRegions', chosenRegions.filter(k => !k.startsWith(`${stateCode}:`)))
   }
+
+  const toggleRegion = (key) => {
+    updateFormData('economicRegions', chosenRegions.includes(key) ? chosenRegions.filter(k => k !== key) : [...chosenRegions, key])
+  }
+  const statesWithRegions = (formData.statesCovered || []).filter(code => regions.some(r => r.state === code))
 
   const toggleSpecialty = (specialty) => {
     const currentSpecialties = formData.specialties || []
@@ -107,6 +119,38 @@ const StatesAndSpecialtiesStep = ({ formData, updateFormData, errors }) => {
           <span>state{formData.statesCovered.length !== 1 ? 's' : ''} selected</span>
         </div>
       </div>
+
+      {/* Economic regions within the chosen states */}
+      {statesWithRegions.length > 0 && (
+        <div className="space-y-3">
+          <Label className="flex items-center gap-2 text-lg font-semibold">
+            <MapPin className="w-5 h-5" />
+            Regions You Cover
+          </Label>
+          <p className="text-sm text-gray-600">
+            Pick the economic regions where you want leads. Leave a state's regions unchecked to receive leads statewide.
+          </p>
+          {statesWithRegions.map(code => (
+            <div key={code} className="border rounded-lg p-3">
+              <div className="font-medium text-sm mb-2">
+                {US_STATES.find(s => s.code === code)?.name || code}
+                <span className="text-gray-500 font-normal"> — {chosenRegions.some(k => k.startsWith(`${code}:`)) ? `${chosenRegions.filter(k => k.startsWith(`${code}:`)).length} selected` : 'whole state'}</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {regions.filter(r => r.state === code).map(r => {
+                  const key = `${code}:${r.slug}`
+                  return (
+                    <label key={key} className="flex items-start gap-2 text-sm cursor-pointer" title={r.counties.join(', ')}>
+                      <input type="checkbox" className="mt-0.5" checked={chosenRegions.includes(key)} onChange={() => toggleRegion(key)} />
+                      <span>{r.name}<span className="block text-xs text-gray-500">{r.counties.slice(0, 4).join(', ')}{r.counties.length > 4 ? ` +${r.counties.length - 4} more` : ''}</span></span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Specialties Selection */}
       <div className="space-y-4">

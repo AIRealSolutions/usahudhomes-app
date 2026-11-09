@@ -21,6 +21,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Unauthorized from './components/Unauthorized'
 const CustomerDetailsPage = lazy(() => import('./components/admin/CustomerDetailsPage'))
 const PropertyGallery = lazy(() => import('./components/PropertyGallery'))
+const BrokerReferralResponse = lazy(() => import('./pages/BrokerReferralResponse'))
 import ContactForm from './pages/ContactForm'
 import ContactThankYou from './pages/ContactThankYou'
 import AgentRegistration from './components/agent/AgentRegistration'
@@ -1235,6 +1236,7 @@ export default function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/join/:token" element={<JoinInvite />} />
               <Route path="/offer/:token" element={<BrokerOfferPage />} />
+              <Route path="/broker-referral/:token" element={<Suspense fallback={null}><BrokerReferralResponse /></Suspense>} />
               <Route path="/offers/:kind/:id" element={<ProtectedRoute><OfferDetailsPage /></ProtectedRoute>} />
               <Route path="/forgot-password" element={<Navigate to="/login?reset=1" replace />} />
               {/* Role-based dashboard routing */}
