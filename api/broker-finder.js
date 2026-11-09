@@ -9,6 +9,11 @@
  *   suggest   (admin)  { propertyId, maxMiles?, want? } — nearest HUD brokers to a property
  *   send      (admin)  { propertyId, leadId?, note?, recipients: [{ brokerId, email, distanceMiles }] }
  *   resend    (admin)  { requestId }
+ *   release   (admin)  { requestId } — the accepted broker fell through: reopen the home to the others
+ *
+ * First to accept gets the buyer: once one broker accepts a home, every other broker's
+ * link for that home shows it as already accepted and can no longer be accepted
+ * (brokers reached by text usually have no email, so nobody else is emailed).
  *   link      (admin)  { propertyId, brokerId, leadId?, note?, feePercent?, prospectAware?, distanceMiles? }
  *                      — creates the request without emailing and returns its link plus a short
  *                        message to text or share (HUD lists phones, not emails)
@@ -441,6 +446,7 @@ async function handleSuggest(req, res, client) {
     property: { ...property, origin },
     brokers: ranked.map(b => ({ ...b, request: byBroker.get(b.id) || null })),
     partners,
+    accepted: await acceptedFor(client, property.id),
     searched, errors,
     hudCalls: ctx.hudCalls,
     moreToSearch: unsearched > 0,
@@ -508,6 +514,8 @@ async function handleLink(req, res, client, admin) {
   const { data: broker } = await client.from('hud_brokers').select('*').eq('id', brokerId).maybeSingle()
   if (!broker) return res.status(404).json({ error: 'Broker not found' })
   if (broker.status === 'do_not_contact') return res.status(400).json({ error: 'This broker asked not to be contacted.' })
+  const taken = await acceptedFor(client, property.id)
+  if (taken && taken.broker_id !== broker.id) return res.status(400).json({ error: `${taken.broker?.company_name || 'Another broker'} already accepted this buyer. Release it in Broker Finder first if they fell through.` })
   const row = await upsertRequest(client, { property, broker, admin, email: clean(broker.email).toLowerCase(), distanceMiles: req.body?.distanceMiles, opts: requestOptions(req.body) })
   const now = new Date().toISOString()
   await client.from('hud_brokers').update({ last_contacted_at: now, ...(broker.status === 'new' ? { status: 'contacted' } : {}) }).eq('id', broker.id)
@@ -526,6 +534,7 @@ async function handleSend(req, res, client, admin) {
   const recipients = (Array.isArray(req.body?.recipients) ? req.body.recipients : []).slice(0, MAX_SEND)
   if (!recipients.length) return res.status(400).json({ error: 'Choose at least one broker.' })
   const opts = requestOptions(req.body)
+  const taken = await acceptedFor(client, property.id)
   const ids = recipients.map(r => r.brokerId).filter(id => UUID_RE.test(String(id)))
   const { data: brokers, error } = await client.from('hud_brokers').select('*').in('id', ids)
   if (error) throw error
@@ -539,6 +548,7 @@ async function handleSend(req, res, client, admin) {
       const broker = byId.get(r.brokerId)
       if (!broker) { results.push({ brokerId: r.brokerId, status: 'skipped', error: 'Broker not found' }); continue }
       if (broker.status === 'do_not_contact') { results.push({ brokerId: broker.id, status: 'skipped', error: 'Broker asked not to be contacted' }); continue }
+      if (taken && taken.broker_id !== broker.id) { results.push({ brokerId: broker.id, status: 'skipped', error: `${taken.broker?.company_name || 'Another broker'} already accepted this buyer` }); continue }
       const email = clean(r.email || broker.email).toLowerCase()
       if (!EMAIL_RE.test(email)) { results.push({ brokerId: broker.id, status: 'skipped', error: 'Add a valid email first' }); continue }
       if (email !== clean(broker.email).toLowerCase()) {
@@ -700,6 +710,33 @@ async function handleAgreementPreview(req, res, client) {
   return res.status(200).send(Buffer.from(pdf))
 }
 
+// The accepted request for a home, other than exceptId (first to accept gets the buyer)
+async function acceptedFor(client, propertyId, exceptId = null) {
+  if (!propertyId) return null
+  let q = client.from('broker_referral_requests').select('id,broker_id,responded_at,broker:hud_brokers(company_name,contact_name)')
+    .eq('property_id', propertyId).eq('status', 'accepted').order('responded_at', { ascending: true }).limit(1)
+  if (exceptId) q = q.neq('id', exceptId)
+  const { data } = await q
+  return data?.[0] || null
+}
+
+const TAKEN_MESSAGE = 'Thank you — this buyer has already been placed with another agent.'
+
+// Admin: the accepted broker fell through, so the home is open to the others again
+async function handleRelease(req, res, client) {
+  const id = String(req.body?.requestId || '')
+  if (!UUID_RE.test(id)) return res.status(400).json({ error: 'Invalid request id' })
+  const { data: row } = await client.from('broker_referral_requests').select('id,status,response_note').eq('id', id).maybeSingle()
+  if (!row) return res.status(404).json({ error: 'Request not found' })
+  if (row.status !== 'accepted') return res.status(400).json({ error: 'Only an accepted referral can be released.' })
+  const { error } = await client.from('broker_referral_requests').update({
+    status: 'declined', updated_at: new Date().toISOString(),
+    response_note: `Released by admin ${new Date().toISOString().slice(0, 10)}${row.response_note ? ` — ${row.response_note}` : ''}`,
+  }).eq('id', id)
+  if (error) throw error
+  return res.status(200).json({ ok: true })
+}
+
 async function handleLookup(req, res, client) {
   const row = await loadByToken(client, req.body?.token)
   if (!row) return res.status(404).json({ error: 'This referral link is not valid.' })
@@ -710,9 +747,10 @@ async function handleLookup(req, res, client) {
   }
   const regions = await regionNamesFor(client, row.property_state)
   const b = row.broker || {}
+  const taken = row.status !== 'accepted' && !!(await acceptedFor(client, row.property_id, row.id))
   return res.status(200).json({
     request: {
-      status: row.status, caseNumber: row.case_number, address: row.property_address, city: row.property_city,
+      status: row.status, taken, caseNumber: row.case_number, address: row.property_address, city: row.property_city,
       state: row.property_state, price: row.property_price, distanceMiles: row.distance_miles, note: row.note,
       respondedAt: row.responded_at, wantsMoreLeads: row.wants_more_leads, regionsRequested: row.regions_requested,
       feePercent: Number(row.fee_percent ?? DEFAULT_FEE_PERCENT),
@@ -736,6 +774,9 @@ async function handleRespond(req, res, client) {
   const note = clip(req.body?.note, 1000) || null
   const status = response === 'accept' ? 'accepted' : 'declined'
   const accepted = status === 'accepted'
+  if (accepted && row.status !== 'accepted' && await acceptedFor(client, row.property_id, row.id)) {
+    return res.status(409).json({ error: TAKEN_MESSAGE, taken: true })
+  }
   // Shared links have no email yet: the broker gives it when accepting or asking for leads
   const givenEmail = clean(req.body?.email).toLowerCase()
   if (givenEmail && !EMAIL_RE.test(givenEmail)) return res.status(400).json({ error: 'Check your email address.' })
@@ -751,8 +792,24 @@ async function handleRespond(req, res, client) {
     update.receiving_firm_license = clip(req.body?.firmLicense, 30) || row.receiving_firm_license || null
     update.agreement_end_date = row.agreement_end_date || addMonths(now, DEFAULT_TERM_MONTHS)
   }
+  const previous = { status: row.status, responded_at: row.responded_at }
   await client.from('broker_referral_requests').update(update).eq('id', row.id)
   Object.assign(row, update)
+
+  // Two brokers accepting at nearly the same moment: the earlier acceptance wins
+  let othersOpen = 0
+  if (accepted) {
+    const first = await acceptedFor(client, row.property_id)
+    if (first && first.id !== row.id) {
+      await client.from('broker_referral_requests').update({ ...previous, updated_at: new Date().toISOString() }).eq('id', row.id)
+      return res.status(409).json({ error: TAKEN_MESSAGE, taken: true })
+    }
+    if (row.property_id) {
+      const { count } = await client.from('broker_referral_requests').select('id', { count: 'exact', head: true })
+        .eq('property_id', row.property_id).neq('id', row.id).in('status', ['pending', 'sent', 'opened', 'failed'])
+      othersOpen = count || 0
+    }
+  }
 
   // Accepted: fill the referral agreement and email it to the broker to sign
   let agreement = null, agreementNote = ''
@@ -808,6 +865,7 @@ async function handleRespond(req, res, client) {
         wantsMoreLeads ? `Wants more leads in ${row.property_state}: ${regions.length ? regions.join(', ') : 'whole state'}` : '',
         agreement ? `The referral agreement (${Number(row.fee_percent ?? DEFAULT_FEE_PERCENT)}%) was emailed to the broker to sign; a copy is attached.` : '',
         agreementNote,
+        othersOpen ? `${othersOpen} other broker${othersOpen === 1 ? '' : 's'} had this home; their link${othersOpen === 1 ? ' now shows' : 's now show'} it as already accepted. Release it in Broker Finder if this broker falls through.` : '',
         `${SITE_URL}/admin`,
       ].filter(Boolean)
       const m = mailer()
@@ -848,10 +906,11 @@ export default async function handler(req, res) {
     if (action === 'send') return await handleSend(req, res, client, admin)
     if (action === 'resend') return await handleResend(req, res, client, admin)
     if (action === 'link') return await handleLink(req, res, client, admin)
+    if (action === 'release') return await handleRelease(req, res, client)
     if (action === 'scan') return await handleScan(req, res, client)
     if (action === 'geocode') return await handleGeocode(req, res, client)
     if (action === 'agreement-preview') return await handleAgreementPreview(req, res, client)
-    return res.status(400).json({ error: 'Unknown action', valid_actions: ['suggest', 'send', 'resend', 'link', 'scan', 'geocode', 'lookup', 'respond', 'agreement', 'agreement-preview'] })
+    return res.status(400).json({ error: 'Unknown action', valid_actions: ['suggest', 'send', 'resend', 'link', 'release', 'scan', 'geocode', 'lookup', 'respond', 'agreement', 'agreement-preview'] })
   } catch (e) {
     console.error(`[broker-finder/${action}]`, e)
     return res.status(500).json({ error: e.message || 'Unexpected error' })

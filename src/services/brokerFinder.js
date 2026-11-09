@@ -12,7 +12,7 @@ async function call(action, body, { auth = true } = {}) {
   }
   const r = await fetch(`/api/broker-finder?action=${action}`, { method: 'POST', headers, body: JSON.stringify(body || {}) })
   const data = await r.json().catch(() => ({}))
-  if (!r.ok) throw new Error(data.error || `Request failed (${r.status})`)
+  if (!r.ok) throw Object.assign(new Error(data.error || `Request failed (${r.status})`), { data, status: r.status })
   return data
 }
 
@@ -21,6 +21,8 @@ export const sendReferralRequests = payload => call('send', payload)
 export const resendReferralRequest = requestId => call('resend', { requestId })
 /** Creates (or reuses) the request without emailing; returns { url, message, subject, phone, email } */
 export const createReferralLink = payload => call('link', payload)
+/** The accepted broker fell through: reopen the home to the other brokers */
+export const releaseReferral = requestId => call('release', { requestId })
 
 /** sms: link that opens the phone's messaging app with the message filled in (works on iPhone and Android) */
 export const smsHref = (phone, body) => `sms:${String(phone || '').replace(/[^\d+]/g, '')}?&body=${encodeURIComponent(body)}`
