@@ -9,6 +9,12 @@
  *   suggest   (admin)  { propertyId, maxMiles?, want? } — nearest HUD brokers to a property
  *   send      (admin)  { propertyId, leadId?, note?, recipients: [{ brokerId, email, distanceMiles }] }
  *   resend    (admin)  { requestId }
+ *   do-not-contact (admin) { brokerId, reason? } — put a broker on the do-not-contact list
+ *   allow-contact  (admin) { suppressionId } — take them off it (mistakes only)
+ *
+ * Do-not-contact list (broker_suppressions): keyed on phone and email, not on HUD's
+ * listing, so an opted-out broker stays blocked even if HUD lists them differently later.
+ * Opting out through a referral link adds them automatically.
  *   release   (admin)  { requestId } — the accepted broker fell through: reopen the home to the others
  *
  * First to accept gets the buyer: once one broker accepts a home, every other broker's
@@ -475,7 +481,8 @@ async function upsertRequest(client, { property, broker, admin, email, distanceM
   if (row) {
     const { data, error } = await client.from('broker_referral_requests')
       .update({
-        email: email || row.email || '', note: note ?? row.note, lead_id: leadId ?? row.lead_id, fee_percent: feePercent,
+        email: email || row.email || '', note: note ?? row.note,
+        broker_company: broker.company_name, broker_contact: broker.contact_name, broker_phone: broker.phone, lead_id: leadId ?? row.lead_id, fee_percent: feePercent,
         prospect_aware: prospectAware ?? row.prospect_aware, updated_at: new Date().toISOString(),
       })
       .eq('id', row.id).select('*').single()
@@ -485,6 +492,7 @@ async function upsertRequest(client, { property, broker, admin, email, distanceM
   const { data, error } = await client.from('broker_referral_requests').insert({
     token: randomBytes(20).toString('hex'),
     broker_id: broker.id, property_id: property.id, lead_id: leadId,
+    broker_company: broker.company_name, broker_contact: broker.contact_name, broker_phone: broker.phone,
     case_number: property.case_number, property_address: property.address,
     property_city: property.city, property_state: property.state, property_price: property.price,
     distance_miles: Number.isFinite(Number(distanceMiles)) && distanceMiles !== null ? Number(distanceMiles) : null,
@@ -506,6 +514,53 @@ function shareMessage(row, broker, sender) {
     `${fee}% referral. Can you help? Details and reply: ${SITE_URL}/broker-referral/${row.token}`
 }
 
+// ─── Do-not-contact list ────────────────────────────────────────────────────
+const phoneDigits = p => String(p || '').replace(/\D/g, '').slice(-10) || null
+
+async function suppressionFor(client, { phone, email }) {
+  const digits = phoneDigits(phone), mail = clean(email).toLowerCase() || null
+  if (!digits && !mail) return null
+  const ors = [digits && `phone_digits.eq.${digits}`, mail && EMAIL_RE.test(mail) && `email.eq.${mail}`].filter(Boolean).join(',')
+  if (!ors) return null
+  const { data } = await client.from('broker_suppressions').select('id,created_at,source').or(ors).limit(1)
+  return data?.[0] || null
+}
+
+// Adds the broker (by phone and email) to the list; the database marks matching brokers and their company
+async function addSuppression(client, { broker, email, requestId, source, reason, createdBy }) {
+  const row = {
+    phone_digits: phoneDigits(broker?.phone),
+    email: EMAIL_RE.test(clean(email || broker?.email).toLowerCase()) ? clean(email || broker?.email).toLowerCase() : null,
+    company_name: broker?.company_name || null, contact_name: broker?.contact_name || null, state: broker?.state || null,
+    broker_id: broker?.id || null, request_id: requestId || null, source, reason: clip(reason, 500) || null, created_by: createdBy || null,
+  }
+  if (!row.phone_digits && !row.email) {
+    if (broker?.id) await client.from('hud_brokers').update({ status: 'do_not_contact' }).eq('id', broker.id)
+    return
+  }
+  const { error } = await client.from('broker_suppressions').insert(row)
+  if (error && error.code !== '23505') throw error
+  // Already listed by phone or email: still mark this directory row
+  if (broker?.id) await client.from('hud_brokers').update({ status: 'do_not_contact' }).eq('id', broker.id)
+}
+
+async function handleDoNotContact(req, res, client, admin) {
+  const brokerId = String(req.body?.brokerId || '')
+  if (!UUID_RE.test(brokerId)) return res.status(400).json({ error: 'Choose a broker' })
+  const { data: broker } = await client.from('hud_brokers').select('*').eq('id', brokerId).maybeSingle()
+  if (!broker) return res.status(404).json({ error: 'Broker not found' })
+  await addSuppression(client, { broker, source: 'admin', reason: req.body?.reason, createdBy: admin.id })
+  return res.status(200).json({ ok: true })
+}
+
+async function handleAllowContact(req, res, client) {
+  const id = String(req.body?.suppressionId || '')
+  if (!UUID_RE.test(id)) return res.status(400).json({ error: 'Invalid id' })
+  const { error } = await client.from('broker_suppressions').delete().eq('id', id)
+  if (error) throw error
+  return res.status(200).json({ ok: true })
+}
+
 async function handleLink(req, res, client, admin) {
   const property = await loadProperty(client, req.body?.propertyId)
   if (!property) return res.status(404).json({ error: 'Property not found' })
@@ -513,7 +568,7 @@ async function handleLink(req, res, client, admin) {
   if (!UUID_RE.test(brokerId)) return res.status(400).json({ error: 'Choose a broker' })
   const { data: broker } = await client.from('hud_brokers').select('*').eq('id', brokerId).maybeSingle()
   if (!broker) return res.status(404).json({ error: 'Broker not found' })
-  if (broker.status === 'do_not_contact') return res.status(400).json({ error: 'This broker asked not to be contacted.' })
+  if (broker.status === 'do_not_contact' || await suppressionFor(client, broker)) return res.status(400).json({ error: 'This broker is on the do-not-contact list.' })
   const taken = await acceptedFor(client, property.id)
   if (taken && taken.broker_id !== broker.id) return res.status(400).json({ error: `${taken.broker?.company_name || 'Another broker'} already accepted this buyer. Release it in Broker Finder first if they fell through.` })
   const row = await upsertRequest(client, { property, broker, admin, email: clean(broker.email).toLowerCase(), distanceMiles: req.body?.distanceMiles, opts: requestOptions(req.body) })
@@ -547,7 +602,7 @@ async function handleSend(req, res, client, admin) {
     for (const r of recipients) {
       const broker = byId.get(r.brokerId)
       if (!broker) { results.push({ brokerId: r.brokerId, status: 'skipped', error: 'Broker not found' }); continue }
-      if (broker.status === 'do_not_contact') { results.push({ brokerId: broker.id, status: 'skipped', error: 'Broker asked not to be contacted' }); continue }
+      if (broker.status === 'do_not_contact' || await suppressionFor(client, { phone: broker.phone, email: r.email || broker.email })) { results.push({ brokerId: broker.id, status: 'skipped', error: 'On the do-not-contact list' }); continue }
       if (taken && taken.broker_id !== broker.id) { results.push({ brokerId: broker.id, status: 'skipped', error: `${taken.broker?.company_name || 'Another broker'} already accepted this buyer` }); continue }
       const email = clean(r.email || broker.email).toLowerCase()
       if (!EMAIL_RE.test(email)) { results.push({ brokerId: broker.id, status: 'skipped', error: 'Add a valid email first' }); continue }
@@ -571,7 +626,7 @@ async function handleResend(req, res, client, admin) {
   const { data: row } = await client.from('broker_referral_requests').select('*').eq('id', id).maybeSingle()
   if (!row) return res.status(404).json({ error: 'Request not found' })
   const { data: broker } = await client.from('hud_brokers').select('*').eq('id', row.broker_id).single()
-  if (broker?.status === 'do_not_contact') return res.status(400).json({ error: 'Broker asked not to be contacted' })
+  if (broker?.status === 'do_not_contact' || await suppressionFor(client, { phone: broker?.phone, email: row.email })) return res.status(400).json({ error: 'This broker is on the do-not-contact list.' })
   if (!EMAIL_RE.test(row.email || '')) return res.status(400).json({ error: 'No email for this broker yet — use Share link, or add an email and send.' })
   if (row.sent_at && Date.now() - new Date(row.sent_at).getTime() < 12 * 3600000) return res.status(400).json({ error: 'Sent within the last 12 hours.' })
   const m = mailer()
@@ -847,6 +902,15 @@ async function handleRespond(req, res, client) {
     : row.broker?.status === 'registered' ? 'registered'
       : response === 'accept' || wantsMoreLeads ? 'interested' : 'declined'
   await client.from('hud_brokers').update({ status: brokerStatus }).eq('id', row.broker_id)
+  // Opted out: record them on the do-not-contact list (by phone and email) so future HUD listings stay blocked
+  if (response === 'optout') {
+    try {
+      await addSuppression(client, {
+        broker: row.broker ? { ...row.broker, id: row.broker_id } : { id: row.broker_id, phone: row.broker_phone, company_name: row.broker_company, contact_name: row.broker_contact },
+        email: givenEmail || row.email, requestId: row.id, source: 'referral_link', reason: note || 'Opted out from their referral link',
+      })
+    } catch (e) { console.error('[broker-finder] do-not-contact list:', e.message) }
+  }
 
   // Tell the admin who sent it
   try {
@@ -907,10 +971,12 @@ export default async function handler(req, res) {
     if (action === 'resend') return await handleResend(req, res, client, admin)
     if (action === 'link') return await handleLink(req, res, client, admin)
     if (action === 'release') return await handleRelease(req, res, client)
+    if (action === 'do-not-contact') return await handleDoNotContact(req, res, client, admin)
+    if (action === 'allow-contact') return await handleAllowContact(req, res, client)
     if (action === 'scan') return await handleScan(req, res, client)
     if (action === 'geocode') return await handleGeocode(req, res, client)
     if (action === 'agreement-preview') return await handleAgreementPreview(req, res, client)
-    return res.status(400).json({ error: 'Unknown action', valid_actions: ['suggest', 'send', 'resend', 'link', 'release', 'scan', 'geocode', 'lookup', 'respond', 'agreement', 'agreement-preview'] })
+    return res.status(400).json({ error: 'Unknown action', valid_actions: ['suggest', 'send', 'resend', 'link', 'release', 'do-not-contact', 'allow-contact', 'scan', 'geocode', 'lookup', 'respond', 'agreement', 'agreement-preview'] })
   } catch (e) {
     console.error(`[broker-finder/${action}]`, e)
     return res.status(500).json({ error: e.message || 'Unexpected error' })
