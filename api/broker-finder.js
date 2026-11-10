@@ -18,8 +18,10 @@
  *   license-search (admin) { kind: 'broker'|'agent', id } — state license matches (auto for NY, TX, IL)
  *                          plus where to look it up by hand (ARELLO or the state board)
  *   license-save   (admin) { kind, id, record|null } — save the license record (null clears it)
- *   license-auto   (admin) { limit? } — check unverified NY/TX/IL brokers and agents; saves exact,
+ *   license-auto   (admin) { limit? } — check unverified NY/TX/IL/FL brokers and agents; saves exact,
  *                          single matches only
+ *   license-area   (admin) { state, city?, county? } — active licensees in an area from state records
+ *                          (NY/IL by city, TX/FL by county): agents to call when a town has no HUD broker
  *   release   (admin)  { requestId } — the accepted broker fell through: reopen the home to the others
  *
  * First to accept gets the buyer: once one broker accepts a home, every other broker's
@@ -62,7 +64,7 @@ import {
   DEFAULT_FEE_PERCENT, DEFAULT_TERM_MONTHS, DEFAULT_PAYMENT_DAYS,
 } from './_referral-agreement.js'
 import { assignLeadToAgent } from './notifications.js'
-import { searchLicenses, AUTO_LICENSE_STATES } from './_license-lookup.js'
+import { searchLicenses, searchArea, AUTO_LICENSE_STATES } from './_license-lookup.js'
 import { LICENSE_SOURCES } from '../src/data/licenseLookupSources.js'
 
 export const config = { maxDuration: 60 }
@@ -537,8 +539,8 @@ async function loadLicensee(client, kind, id) {
       state: clean(data.license_state || (data.states_covered || [])[0]).toUpperCase(),
     }
   }
-  const { data } = await client.from('hud_brokers').select(`id,company_name,contact_name,city,state,phone,email,license_name,${LICENSE_COLS}`).eq('id', id).maybeSingle()
-  return data && { table: 'hud_brokers', row: data, name: clean(data.contact_name), company: data.company_name, state: clean(data.state).toUpperCase() }
+  const { data } = await client.from('hud_brokers').select(`id,company_name,contact_name,city,state,county,phone,email,license_name,${LICENSE_COLS}`).eq('id', id).maybeSingle()
+  return data && { table: 'hud_brokers', row: data, name: clean(data.contact_name), company: data.company_name, state: clean(data.state).toUpperCase(), county: data.county }
 }
 
 const licenseFields = (rec, table) => {
@@ -564,13 +566,27 @@ async function handleLicenseSearch(req, res, client) {
   const source = LICENSE_SOURCES[who.state] || null
   let found = { supported: false, results: [] }, searchError = null
   if (AUTO_LICENSE_STATES.includes(who.state)) {
-    try { found = await searchLicenses(who.state, { contactName: who.name, company: who.company }) } catch (e) { searchError = e.message }
+    try { found = await searchLicenses(who.state, { contactName: who.name, company: who.company, county: who.county }) } catch (e) { searchError = e.message }
+    if (found.needsCounty) searchError = 'Florida records are filed by county, and no county is on file for this person. Use the state lookup below.'
     await client.from(who.table).update({ license_checked_at: new Date().toISOString() }).eq('id', who.row.id)
   }
   return res.status(200).json({
     state: who.state, name: who.name, company: who.company, source, automatic: found.supported,
-    results: found.results.slice(0, 15), searchError, current: who.row,
+    results: (found.results || []).slice(0, 15), searchError, current: who.row,
   })
+}
+
+async function handleLicenseArea(req, res, client) {
+  let state = clean(req.body?.state).toUpperCase(), city = clean(req.body?.city), county = clean(req.body?.county)
+  // From a property: its city, state and county
+  if (UUID_RE.test(String(req.body?.propertyId || ''))) {
+    const p = await loadProperty(client, req.body.propertyId)
+    if (p) { state = clean(p.state).toUpperCase(); city = city || clean(p.city); county = county || clean(p.county) }
+  }
+  if (!/^[A-Z]{2}$/.test(state)) return res.status(400).json({ error: 'Choose a state' })
+  if (!AUTO_LICENSE_STATES.includes(state)) return res.status(200).json({ supported: false, state, city, county, results: [] })
+  const r = await searchArea(state, { city, county })
+  return res.status(200).json({ ...r, state, city, county })
 }
 
 async function handleLicenseSave(req, res, client) {
@@ -602,7 +618,7 @@ async function handleLicenseAuto(req, res, client) {
     if (!who) continue
     checked++
     try {
-      const { results } = await searchLicenses(who.state, { contactName: who.name, company: who.company })
+      const { results = [] } = await searchLicenses(who.state, { contactName: who.name, company: who.company, county: who.county })
       const exact = results.filter(r => r.exact)
       if (exact.length === 1) {
         await client.from(who.table).update(licenseFields({ ...exact[0], source: `auto: ${exact[0].source}` }, who.table)).eq('id', who.row.id)
@@ -1186,12 +1202,13 @@ export default async function handler(req, res) {
     if (action === 'license-search') return await handleLicenseSearch(req, res, client)
     if (action === 'license-save') return await handleLicenseSave(req, res, client)
     if (action === 'license-auto') return await handleLicenseAuto(req, res, client)
+    if (action === 'license-area') return await handleLicenseArea(req, res, client)
     if (action === 'do-not-contact') return await handleDoNotContact(req, res, client, admin)
     if (action === 'allow-contact') return await handleAllowContact(req, res, client)
     if (action === 'scan') return await handleScan(req, res, client)
     if (action === 'geocode') return await handleGeocode(req, res, client)
     if (action === 'agreement-preview') return await handleAgreementPreview(req, res, client)
-    return res.status(400).json({ error: 'Unknown action', valid_actions: ['suggest', 'send', 'resend', 'link', 'release', 'license-search', 'license-save', 'license-auto', 'do-not-contact', 'allow-contact', 'scan', 'geocode', 'lookup', 'respond', 'agreement', 'agreement-preview'] })
+    return res.status(400).json({ error: 'Unknown action', valid_actions: ['suggest', 'send', 'resend', 'link', 'release', 'license-search', 'license-save', 'license-auto', 'license-area', 'do-not-contact', 'allow-contact', 'scan', 'geocode', 'lookup', 'respond', 'agreement', 'agreement-preview'] })
   } catch (e) {
     console.error(`[broker-finder/${action}]`, e)
     return res.status(500).json({ error: e.message || 'Unexpected error' })
