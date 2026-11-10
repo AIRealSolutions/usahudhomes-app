@@ -34,7 +34,8 @@ export async function listDoNotContact() {
 
 /** sms: link that opens the phone's messaging app with the message filled in (works on iPhone and Android) */
 export const smsHref = (phone, body) => `sms:${String(phone || '').replace(/[^\d+]/g, '')}?&body=${encodeURIComponent(body)}`
-export const mailtoHref = (email, subject, body) => `mailto:${encodeURIComponent(email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+// The address stays unencoded: some phone mail apps don't decode %40 in mailto: links
+export const mailtoHref = (email, subject, body) => `mailto:${String(email || '').trim().replace(/[\s?&#,;<>"]/g, '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 export const scanStateBrokers = state => call('scan', { state })
 export const geocodeBrokers = limit => call('geocode', { limit })
 export const lookupReferral = token => call('lookup', { token }, { auth: false })
