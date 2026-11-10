@@ -26,6 +26,7 @@
  *   broker-finder     → BrokerFinderAdmin (nearest HUD brokers for a property + referral requests)
  *   broker-map        → BrokerMapAdmin
  *   economic-regions  → EconomicRegionsAdmin
+ *   license-check     → LicenseCheckAdmin (cross-reference with state license records)
  *   database          → DatabaseReset
  *
  * Deep link a panel with /admin?tab=<id> (e.g. /admin?tab=broker-finder&case=387-123456).
@@ -43,7 +44,7 @@ import {
   Facebook, Bot, HardDrive, Trash2,
   LogOut, ChevronLeft, ChevronRight, Menu, X,
   ChevronDown, ChevronUp, Bell, Shield, Briefcase, Settings, UserPlus, Handshake,
-  MapPin, Map as MapIcon, Layers
+  MapPin, Map as MapIcon, Layers, BadgeCheck
 } from 'lucide-react'
 
 // Lazy-load all admin panels
@@ -70,6 +71,7 @@ const ClosingAgentsAdmin = lazy(() => import('../pages/admin/ClosingAgentsAdmin'
 const BrokerFinderAdmin  = lazy(() => import('../pages/admin/BrokerFinderAdmin'))
 const BrokerMapAdmin     = lazy(() => import('../pages/admin/BrokerMapAdmin'))
 const EconomicRegionsAdmin = lazy(() => import('../pages/admin/EconomicRegionsAdmin'))
+const LicenseCheckAdmin  = lazy(() => import('../pages/admin/LicenseCheckAdmin'))
 const DatabaseReset        = lazy(() => import('./admin/DatabaseReset'))
 const PurgeUnderContract   = lazy(() => import('./admin/PurgeUnderContract'))
 
@@ -110,6 +112,7 @@ const NAV = [
       { id: 'broker-finder',    label: 'Broker Finder',     icon: MapPin,        color: 'text-teal-600',   badge: 'NEW' },
       { id: 'broker-map',       label: 'Broker Map',        icon: MapIcon,       color: 'text-emerald-600' },
       { id: 'economic-regions', label: 'Economic Regions',  icon: Layers,        color: 'text-cyan-700' },
+      { id: 'license-check',    label: 'License Check',     icon: BadgeCheck,    color: 'text-green-700',  badge: 'NEW' },
     ]
   },
   {
@@ -160,6 +163,7 @@ const COMPONENT_MAP = {
   'broker-finder':     BrokerFinderAdmin,
   'broker-map':        BrokerMapAdmin,
   'economic-regions':  EconomicRegionsAdmin,
+  'license-check':     LicenseCheckAdmin,
   'database':          DatabaseReset,
   'purge-contracts':   PurgeUnderContract,
 }
