@@ -15,6 +15,11 @@
  * Do-not-contact list (broker_suppressions): keyed on phone and email, not on HUD's
  * listing, so an opted-out broker stays blocked even if HUD lists them differently later.
  * Opting out through a referral link adds them automatically.
+ *   license-search (admin) { kind: 'broker'|'agent', id } — state license matches (auto for NY, TX, IL)
+ *                          plus where to look it up by hand (ARELLO or the state board)
+ *   license-save   (admin) { kind, id, record|null } — save the license record (null clears it)
+ *   license-auto   (admin) { limit? } — check unverified NY/TX/IL brokers and agents; saves exact,
+ *                          single matches only
  *   release   (admin)  { requestId } — the accepted broker fell through: reopen the home to the others
  *
  * First to accept gets the buyer: once one broker accepts a home, every other broker's
@@ -57,6 +62,8 @@ import {
   DEFAULT_FEE_PERCENT, DEFAULT_TERM_MONTHS, DEFAULT_PAYMENT_DAYS,
 } from './_referral-agreement.js'
 import { assignLeadToAgent } from './notifications.js'
+import { searchLicenses, AUTO_LICENSE_STATES } from './_license-lookup.js'
+import { LICENSE_SOURCES } from '../src/data/licenseLookupSources.js'
 
 export const config = { maxDuration: 60 }
 
@@ -516,6 +523,98 @@ function shareMessage(row, broker, sender) {
   return `Hi${first ? ` ${first}` : ''}, this is ${sender.name} with ${sender.company} / USAHUDhomes.com. ` +
     `I have a buyer who wants to bid on the HUD home at ${home}${dist}, and I don't have an agent there. ` +
     `${fee}% referral. Can you help? Details and reply: ${SITE_URL}/broker-referral/${row.token}`
+}
+
+// ─── License Check: cross-reference with state license records ──────────────
+const LICENSE_COLS = 'license_number,license_type,license_status,license_active,license_expires,license_firm,license_source,license_verified_at,license_checked_at'
+
+async function loadLicensee(client, kind, id) {
+  if (!UUID_RE.test(String(id || ''))) return null
+  if (kind === 'agent') {
+    const { data } = await client.from('agents').select(`id,first_name,last_name,company,email,phone,license_state,states_covered,${LICENSE_COLS}`).eq('id', id).maybeSingle()
+    return data && {
+      table: 'agents', row: data, name: clean(`${data.first_name || ''} ${data.last_name || ''}`), company: data.company,
+      state: clean(data.license_state || (data.states_covered || [])[0]).toUpperCase(),
+    }
+  }
+  const { data } = await client.from('hud_brokers').select(`id,company_name,contact_name,city,state,phone,email,license_name,${LICENSE_COLS}`).eq('id', id).maybeSingle()
+  return data && { table: 'hud_brokers', row: data, name: clean(data.contact_name), company: data.company_name, state: clean(data.state).toUpperCase() }
+}
+
+const licenseFields = (rec, table) => {
+  if (!rec) {
+    return {
+      license_type: null, license_status: null, license_active: null, license_expires: null, license_firm: null,
+      license_source: null, license_verified_at: null, ...(table === 'hud_brokers' ? { license_number: null, license_name: null } : {}),
+    }
+  }
+  const expires = /^\d{4}-\d{2}-\d{2}$/.test(String(rec.expires || '')) ? rec.expires : null
+  return {
+    license_number: clip(rec.license_number, 60) || null, license_type: clip(rec.license_type, 80) || null,
+    license_status: clip(rec.status, 60) || null, license_active: typeof rec.active === 'boolean' ? rec.active : null,
+    license_expires: expires, license_firm: clip(rec.firm, 200) || null, license_source: clip(rec.source, 120) || 'manual',
+    license_verified_at: new Date().toISOString(), license_checked_at: new Date().toISOString(),
+    ...(table === 'hud_brokers' ? { license_name: clip(rec.name, 160) || null } : {}),
+  }
+}
+
+async function handleLicenseSearch(req, res, client) {
+  const who = await loadLicensee(client, req.body?.kind, req.body?.id)
+  if (!who) return res.status(404).json({ error: 'Not found' })
+  const source = LICENSE_SOURCES[who.state] || null
+  let found = { supported: false, results: [] }, searchError = null
+  if (AUTO_LICENSE_STATES.includes(who.state)) {
+    try { found = await searchLicenses(who.state, { contactName: who.name, company: who.company }) } catch (e) { searchError = e.message }
+    await client.from(who.table).update({ license_checked_at: new Date().toISOString() }).eq('id', who.row.id)
+  }
+  return res.status(200).json({
+    state: who.state, name: who.name, company: who.company, source, automatic: found.supported,
+    results: found.results.slice(0, 15), searchError, current: who.row,
+  })
+}
+
+async function handleLicenseSave(req, res, client) {
+  const who = await loadLicensee(client, req.body?.kind, req.body?.id)
+  if (!who) return res.status(404).json({ error: 'Not found' })
+  const fields = licenseFields(req.body?.record || null, who.table)
+  const { data, error } = await client.from(who.table).update(fields).eq('id', who.row.id).select(LICENSE_COLS).single()
+  if (error) throw error
+  return res.status(200).json({ ok: true, license: data })
+}
+
+// Automatic pass for the open-data states: only an exact, single name match is saved
+async function handleLicenseAuto(req, res, client) {
+  const limit = Math.min(Math.max(Number(req.body?.limit) || 20, 1), 40)
+  const stale = new Date(Date.now() - 30 * 86400000).toISOString()
+  const pick = async (table, cols, stateCol) => {
+    const { data } = await client.from(table).select(cols).in(stateCol, AUTO_LICENSE_STATES).is('license_verified_at', null)
+      .or(`license_checked_at.is.null,license_checked_at.lt.${stale}`).limit(limit)
+    return data || []
+  }
+  const brokers = (await pick('hud_brokers', 'id', 'state')).map(r => ({ kind: 'broker', id: r.id }))
+  const agents = (await pick('agents', 'id', 'license_state')).map(r => ({ kind: 'agent', id: r.id }))
+  const started = Date.now()
+  let checked = 0, verified = 0, ambiguous = 0, none = 0
+  const errors = []
+  for (const item of [...agents, ...brokers].slice(0, limit)) {
+    if (Date.now() - started > 45000) break
+    const who = await loadLicensee(client, item.kind, item.id)
+    if (!who) continue
+    checked++
+    try {
+      const { results } = await searchLicenses(who.state, { contactName: who.name, company: who.company })
+      const exact = results.filter(r => r.exact)
+      if (exact.length === 1) {
+        await client.from(who.table).update(licenseFields({ ...exact[0], source: `auto: ${exact[0].source}` }, who.table)).eq('id', who.row.id)
+        verified++
+      } else {
+        await client.from(who.table).update({ license_checked_at: new Date().toISOString() }).eq('id', who.row.id)
+        if (exact.length > 1 || results.length) ambiguous++; else none++
+      }
+    } catch (e) { errors.push(`${who.name || who.company}: ${e.message}`) }
+  }
+  const remaining = (await pick('hud_brokers', 'id', 'state')).length + (await pick('agents', 'id', 'license_state')).length
+  return res.status(200).json({ checked, verified, ambiguous, none, remaining, errors: errors.slice(0, 5) })
 }
 
 // ─── Do-not-contact list ────────────────────────────────────────────────────
@@ -1084,12 +1183,15 @@ export default async function handler(req, res) {
     if (action === 'resend') return await handleResend(req, res, client, admin)
     if (action === 'link') return await handleLink(req, res, client, admin)
     if (action === 'release') return await handleRelease(req, res, client)
+    if (action === 'license-search') return await handleLicenseSearch(req, res, client)
+    if (action === 'license-save') return await handleLicenseSave(req, res, client)
+    if (action === 'license-auto') return await handleLicenseAuto(req, res, client)
     if (action === 'do-not-contact') return await handleDoNotContact(req, res, client, admin)
     if (action === 'allow-contact') return await handleAllowContact(req, res, client)
     if (action === 'scan') return await handleScan(req, res, client)
     if (action === 'geocode') return await handleGeocode(req, res, client)
     if (action === 'agreement-preview') return await handleAgreementPreview(req, res, client)
-    return res.status(400).json({ error: 'Unknown action', valid_actions: ['suggest', 'send', 'resend', 'link', 'release', 'do-not-contact', 'allow-contact', 'scan', 'geocode', 'lookup', 'respond', 'agreement', 'agreement-preview'] })
+    return res.status(400).json({ error: 'Unknown action', valid_actions: ['suggest', 'send', 'resend', 'link', 'release', 'license-search', 'license-save', 'license-auto', 'do-not-contact', 'allow-contact', 'scan', 'geocode', 'lookup', 'respond', 'agreement', 'agreement-preview'] })
   } catch (e) {
     console.error(`[broker-finder/${action}]`, e)
     return res.status(500).json({ error: e.message || 'Unexpected error' })

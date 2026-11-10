@@ -23,6 +23,10 @@ export const resendReferralRequest = requestId => call('resend', { requestId })
 export const createReferralLink = payload => call('link', payload)
 /** The accepted broker fell through: reopen the home to the other brokers */
 export const releaseReferral = requestId => call('release', { requestId })
+/** License Check: state license matches + where to look up by hand; save or clear the record */
+export const searchLicense = (kind, id) => call('license-search', { kind, id })
+export const saveLicense = (kind, id, record) => call('license-save', { kind, id, record })
+export const runLicenseAuto = limit => call('license-auto', { limit })
 /** Do-not-contact list: keyed on phone and email so it survives changes to HUD's listing */
 export const markDoNotContact = (brokerId, reason) => call('do-not-contact', { brokerId, reason })
 export const allowContact = suppressionId => call('allow-contact', { suppressionId })

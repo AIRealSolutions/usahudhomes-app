@@ -32,7 +32,7 @@ import AgentContactBar from './AgentContactBar'
 
 const ALL_STATES = [...US_STATES, { code: 'PR', name: 'Puerto Rico' }]
 
-function AgentAdmin() {
+function AgentAdmin({ onNavigate }) {
   const { profile } = useAuth()
   const senderName = profile?.name || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Marc Spencer'
   const [agents, setAgents] = useState([])
@@ -719,6 +719,19 @@ function AgentAdmin() {
                           </button>
                         )}
                       </span>
+                    </div>
+                    <div className="mt-1 text-sm flex flex-wrap items-center gap-2">
+                      <span className="text-gray-600">State license:</span>
+                      {agent.license_verified_at
+                        ? <span className={agent.license_active === false || (agent.license_expires && agent.license_expires < new Date().toISOString().slice(0, 10)) ? 'text-red-700 font-semibold' : 'text-green-700 font-semibold'}>
+                            {agent.license_status || 'Verified'} #{agent.license_number}{agent.license_expires ? ` · expires ${agent.license_expires}` : ''}
+                          </span>
+                        : <span className="text-amber-700">not verified</span>}
+                      {onNavigate && (
+                        <button type="button" className="text-blue-700 underline text-xs" onClick={() => { window.history.replaceState(null, '', `/admin?tab=license-check&agent=${agent.id}`); onNavigate('license-check') }}>
+                          {agent.license_verified_at ? 'Re-check' : 'Verify license'}
+                        </button>
+                      )}
                     </div>
                     {(referrals[agent.id] || []).length > 0 && (
                       <div className="mt-2 text-sm">
