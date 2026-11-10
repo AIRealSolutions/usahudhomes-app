@@ -3,16 +3,16 @@
  * and partner agents.
  *
  * Sources (src/data/licenseLookupSources.js):
- *   NY, TX, IL  — state open data, searched automatically
- *   39 states + DC — ARELLO national license verification (opens for a manual search)
- *   other states — the state board's own license lookup
+ *   NY, TX, IL, FL — state open data / weekly files, searched automatically
+ *   state boards   — each state's own lookup (many search by city/county/ZIP)
+ *   ARELLO         — national license verification for 39 states + DC (manual search)
  * Flags: not verified, license not active/expired, license firm differs from HUD's listing.
  *
  * Deep link: /admin?tab=license-check&agent=<id> or &broker=<id>
  */
 import React, { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../config/supabase'
-import { LICENSE_SOURCES, ARELLO_URL } from '../../data/licenseLookupSources'
+import { LICENSE_SOURCES, ARELLO_URL, SEARCH_LABELS } from '../../data/licenseLookupSources'
 import { searchLicense, saveLicense, runLicenseAuto } from '../../services/brokerFinder'
 
 const LICENSE_COLS = 'license_number,license_type,license_status,license_active,license_expires,license_firm,license_source,license_verified_at,license_checked_at'
@@ -97,7 +97,7 @@ export default function LicenseCheckAdmin() {
   })
   const states = [...new Set(people.map(p => p.state).filter(Boolean))].sort()
   const count = key => withIssues.filter(p => p.issues.some(i => i.key === key)).length
-  const autoCandidates = withIssues.filter(p => ['NY', 'TX', 'IL'].includes(p.state) && !p.license_verified_at).length
+  const autoCandidates = withIssues.filter(p => LICENSE_SOURCES[p.state]?.method === 'auto' && !p.license_verified_at).length
 
   const runAuto = async () => {
     setAutoBusy(true); setNotice('')
@@ -106,7 +106,7 @@ export default function LicenseCheckAdmin() {
       for (let i = 0; i < 25; i++) {
         const r = await runLicenseAuto(30)
         for (const k of Object.keys(tot)) tot[k] += r[k] || 0
-        setNotice(`Checked ${tot.checked} in NY/TX/IL: ${tot.verified} verified automatically, ${tot.ambiguous} need you to pick, ${tot.none} not found.`)
+        setNotice(`Checked ${tot.checked} in NY/TX/IL/FL: ${tot.verified} verified automatically, ${tot.ambiguous} need you to pick, ${tot.none} not found.`)
         if (!r.checked || !r.remaining) break
       }
       await load()
@@ -135,12 +135,12 @@ export default function LicenseCheckAdmin() {
 
       <section className="bg-white rounded shadow p-4 space-y-2">
         <div className="flex flex-wrap justify-between items-center gap-2">
-          <h2 className="font-semibold">Automatic check — New York, Texas, Illinois</h2>
+          <h2 className="font-semibold">Automatic check — New York, Texas, Illinois, Florida</h2>
           <button type="button" disabled={autoBusy || !autoCandidates} onClick={runAuto} className="bg-blue-700 text-white rounded px-4 py-2 text-sm disabled:opacity-50">
             {autoBusy ? 'Checking state records…' : `Check ${autoCandidates} unverified`}
           </button>
         </div>
-        <p className="text-xs text-gray-500">These states publish every licensee as open data. Only an exact, single name match is saved automatically; anything else waits for you under Verify. Every other state opens ARELLO's national search or the state board's lookup.</p>
+        <p className="text-xs text-gray-500">These states publish every licensee (Florida weekly, by county). Only an exact, single name match is saved automatically; anything else waits for you under Verify. Every other state opens its board's lookup or ARELLO's national search.</p>
       </section>
 
       <section className="bg-white rounded shadow p-4 space-y-3">
@@ -170,7 +170,7 @@ export default function LicenseCheckAdmin() {
                   <div className="text-xs text-gray-600">
                     {p.license_verified_at
                       ? <>License #{p.license_number || '—'} · {p.license_type || ''} · <strong>{p.license_status || (p.license_active ? 'Active' : '')}</strong>{p.license_expires ? ` · expires ${p.license_expires}` : ''}{p.license_firm ? ` · firm: ${p.license_firm}` : ''} · {p.license_source}</>
-                      : <>No license record yet · {LICENSE_SOURCES[p.state]?.method === 'auto' ? 'automatic check available' : LICENSE_SOURCES[p.state]?.method === 'arello' ? 'look up on ARELLO' : 'look up on the state board'}</>}
+                      : <>No license record yet · {LICENSE_SOURCES[p.state]?.method === 'auto' ? 'automatic check available' : LICENSE_SOURCES[p.state]?.method === 'board' ? 'look up on the state board' : 'look up on ARELLO'}</>}
                   </div>
                   <div className="flex flex-wrap gap-1 mt-1">{p.issues.map(i => <span key={i.key} className={`text-[11px] px-1.5 py-0.5 rounded ${i.cls}`}>{i.label}</span>)}</div>
                 </div>
@@ -184,7 +184,8 @@ export default function LicenseCheckAdmin() {
       </section>
 
       <section className="bg-white rounded shadow p-4 text-xs text-gray-600 space-y-1">
-        <p><strong>Where licenses are looked up:</strong> automatic for NY, TX and IL (state open data); ARELLO's national verification database for {Object.values(LICENSE_SOURCES).filter(s => s.method === 'arello').length} jurisdictions; the state board's own lookup for {Object.entries(LICENSE_SOURCES).filter(([, s]) => s.method === 'board').map(([k]) => k).join(', ')}.</p>
+        <p><strong>Where licenses are looked up:</strong> automatic for {Object.entries(LICENSE_SOURCES).filter(([, s]) => s.method === 'auto').map(([k]) => k).join(', ')} (state data); the state board's own lookup for {Object.entries(LICENSE_SOURCES).filter(([, s]) => s.method === 'board').map(([k]) => k).join(', ')}; ARELLO's national database for the rest ({Object.values(LICENSE_SOURCES).filter(s => s.arello).length} jurisdictions are in ARELLO).</p>
+        <p>Boards that search by city, county or ZIP (no CAPTCHA): {Object.entries(LICENSE_SOURCES).filter(([, s]) => s.board && !s.board.captcha && s.board.searchBy.some(f => ['city', 'county', 'zip'].includes(f))).map(([k]) => k).join(', ')}. With a CAPTCHA: {Object.entries(LICENSE_SOURCES).filter(([, s]) => s.board?.captcha && s.board.searchBy.some(f => ['city', 'county', 'zip'].includes(f))).map(([k]) => k).join(', ')}.</p>
         <p>ARELLO also offers a paid Licensee Verification Web Service (API) that would make the ARELLO states automatic too.</p>
       </section>
 
@@ -225,7 +226,7 @@ function VerifyPanel({ target, onClose, onSaved }) {
     save({
       license_number: form.license_number, license_type: form.license_type, status: form.status,
       active: /^active/i.test(form.status), expires: form.expires || null, firm: form.firm, name: form.name,
-      source: src ? (src.method === 'arello' ? 'manual: ARELLO' : `manual: ${src.board}`) : 'manual',
+      source: src ? `manual: ${src.board ? src.name : 'ARELLO'}` : 'manual',
     })
   }
   const copyName = async () => { try { await navigator.clipboard.writeText(data?.name || data?.company || ''); setCopied(true) } catch { /* copy by hand */ } }
@@ -265,19 +266,28 @@ function VerifyPanel({ target, onClose, onSaved }) {
 
         {src && (
           <div className="border rounded p-3 space-y-2 bg-gray-50">
-            <h3 className="font-semibold text-sm">{src.method === 'arello' ? 'Look up on ARELLO' : `Look up on the ${src.board}`}</h3>
-            <p className="text-xs text-gray-600">
-              {src.method === 'arello'
-                ? `${src.board} sends its licensees to ARELLO's national database. Search by last name (and first name), choose ${data.state}, then copy the license details below.`
-                : `Search the board's lookup by name, then copy the license details below.`}
-              {!src.verified && ' This link could not be checked automatically; if it has moved, search the board name online.'}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <a href={src.method === 'arello' ? ARELLO_URL : src.url} target="_blank" rel="noreferrer" onClick={copyName} className="bg-blue-700 text-white rounded px-3 py-1.5 text-sm">
-                Open {src.method === 'arello' ? 'ARELLO' : 'state lookup'} (copies the name)
-              </a>
-              <button type="button" onClick={copyName} className="border rounded px-3 py-1.5 text-sm bg-white">{copied ? 'Copied' : `Copy "${data?.name || data?.company}"`}</button>
-            </div>
+            <h3 className="font-semibold text-sm">Look it up by hand</h3>
+            {src.board && (
+              <div className="text-sm">
+                <div className="font-medium">{src.name}</div>
+                <div className="text-xs text-gray-600">
+                  Searches by {src.board.searchBy.map(f => SEARCH_LABELS[f]).join(', ')}{src.board.captcha ? ' · has a CAPTCHA' : ''}
+                  {!src.board.verified && ' · this link could not be checked; if it has moved, search the board name online'}
+                </div>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  <a href={src.board.url} target="_blank" rel="noreferrer" onClick={copyName} className="bg-blue-700 text-white rounded px-3 py-1.5 text-sm">Open state board lookup</a>
+                  {src.board.firmUrl && <a href={src.board.firmUrl} target="_blank" rel="noreferrer" className="border border-blue-700 text-blue-800 rounded px-3 py-1.5 text-sm bg-white">Firm search</a>}
+                </div>
+              </div>
+            )}
+            {src.arello && (
+              <div className="text-sm">
+                <div className="text-xs text-gray-600">{src.board ? 'Or ' : ''}ARELLO's national database: search by last name (and first name), choose {data.state}.</div>
+                <a href={ARELLO_URL} target="_blank" rel="noreferrer" onClick={copyName} className="inline-block mt-1 border border-blue-700 text-blue-800 rounded px-3 py-1.5 text-sm bg-white">Open ARELLO</a>
+              </div>
+            )}
+            <button type="button" onClick={copyName} className="border rounded px-3 py-1.5 text-sm bg-white">{copied ? 'Copied' : `Copy "${data?.name || data?.company}"`}</button>
+            <p className="text-xs text-gray-500">Opening a lookup copies the name, ready to paste. Then record what it shows below.</p>
           </div>
         )}
         {data && !src && <p className="text-sm text-amber-700">No state on file for this person; add a license state to look them up.</p>}

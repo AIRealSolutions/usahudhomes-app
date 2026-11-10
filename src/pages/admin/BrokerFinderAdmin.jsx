@@ -9,6 +9,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../config/supabase'
 import { US_STATES } from '../../utils/states'
 import LeafletMap from '../../components/maps/LeafletMap'
+import AreaLicenseesPanel from '../../components/admin/AreaLicenseesPanel'
 import {
   suggestBrokers, sendReferralRequests, resendReferralRequest, getEconomicRegions,
   BROKER_STATUS, REQUEST_STATUS, DEFAULT_FEE_PERCENT,
@@ -275,6 +276,8 @@ export default function BrokerFinderAdmin() {
           )}
         </section>
       )}
+
+      {property && <AreaLicenseesPanel key={property.id} property={property} />}
 
       {/* 3. Choose and send */}
       {result?.brokers?.length > 0 && (

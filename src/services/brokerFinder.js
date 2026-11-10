@@ -27,6 +27,8 @@ export const releaseReferral = requestId => call('release', { requestId })
 export const searchLicense = (kind, id) => call('license-search', { kind, id })
 export const saveLicense = (kind, id, record) => call('license-save', { kind, id, record })
 export const runLicenseAuto = limit => call('license-auto', { limit })
+/** Active licensees in an area from state records (NY, TX, IL, FL): { propertyId } or { state, city, county } */
+export const licenseArea = payload => call('license-area', payload)
 /** Do-not-contact list: keyed on phone and email so it survives changes to HUD's listing */
 export const markDoNotContact = (brokerId, reason) => call('do-not-contact', { brokerId, reason })
 export const allowContact = suppressionId => call('allow-contact', { suppressionId })
