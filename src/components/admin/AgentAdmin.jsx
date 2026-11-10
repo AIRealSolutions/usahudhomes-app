@@ -27,10 +27,14 @@ import { US_STATES } from '../../utils/states'
 import { agentInvitationService } from '../../services/agentInvitationService'
 import { supabase } from '../../config/supabase'
 import { getEconomicRegions, previewAgreement } from '../../services/brokerFinder'
+import { useAuth } from '../../contexts/AuthContext'
+import AgentContactBar from './AgentContactBar'
 
 const ALL_STATES = [...US_STATES, { code: 'PR', name: 'Puerto Rico' }]
 
 function AgentAdmin() {
+  const { profile } = useAuth()
+  const senderName = profile?.name || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Marc Spencer'
   const [agents, setAgents] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -635,16 +639,16 @@ function AgentAdmin() {
       <div className="grid grid-cols-1 gap-4">
         {shown.map((agent) => (
           <Card key={agent.id} className={`hover:shadow-lg transition-shadow ${agent.is_active ? '' : 'opacity-75'}`}>
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start">
-                <div className="flex gap-4 flex-1">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                <div className="flex gap-4 flex-1 min-w-0">
+                  <div className="hidden sm:flex w-16 h-16 bg-green-100 rounded-full items-center justify-center flex-shrink-0">
                     <UserCheck className="h-8 w-8 text-green-600" />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-lg font-bold">{agent.first_name} {agent.last_name}</h3>
                           {agent.is_admin && (
                             <Badge variant="destructive" className="text-xs">ADMIN</Badge>
@@ -660,15 +664,19 @@ function AgentAdmin() {
                           <Building className="h-4 w-4" />
                           {agent.company}
                         </p>
-                        <div className="flex gap-4 text-sm text-gray-600 mt-1">
-                          <div className="flex items-center gap-1">
-                            <Mail className="h-4 w-4" />
-                            {agent.email}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Phone className="h-4 w-4" />
-                            {agent.phone}
-                          </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 mt-1">
+                          {agent.email && (
+                            <a href={`mailto:${agent.email}`} className="flex items-center gap-1 hover:text-blue-700 hover:underline">
+                              <Mail className="h-4 w-4" />
+                              {agent.email}
+                            </a>
+                          )}
+                          {agent.phone && (
+                            <a href={`tel:${String(agent.phone).replace(/[^\d+]/g, '')}`} className="flex items-center gap-1 hover:text-blue-700 hover:underline">
+                              <Phone className="h-4 w-4" />
+                              {agent.phone}
+                            </a>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -737,9 +745,15 @@ function AgentAdmin() {
                     {agent.bio && (
                       <p className="text-sm text-gray-600 mt-2">{agent.bio}</p>
                     )}
+                    <AgentContactBar
+                      agent={agent}
+                      senderName={senderName}
+                      senderCompany="Lightkeeper Realty"
+                      openBuyers={(workload[agent.id]?.new || 0) + (workload[agent.id]?.accepted || 0)}
+                    />
                   </div>
                 </div>
-                <div className="flex gap-2 ml-4">
+                <div className="flex gap-2 sm:ml-4">
                   <Button 
                     variant="outline" 
                     size="sm" 

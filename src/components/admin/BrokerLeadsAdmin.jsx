@@ -10,6 +10,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Briefcase, Download, Search, X, Phone, Mail, Globe, ExternalLink, Save, CheckCircle } from 'lucide-react'
 import { supabase } from '../../config/supabase'
 import { formatMoney, formatDate, OUTCOME_LABELS } from '../../services/acceptedOffers'
+import { smsHref } from '../../services/brokerFinder'
 
 const STATUSES = [
   { value: 'new',            label: 'New',            cls: 'bg-blue-100 text-blue-800' },
@@ -327,7 +328,12 @@ function CompanyDrawer({ company, onClose, onSaved }) {
                   <li key={a.id} className="px-4 py-3 text-sm">
                     <div className="flex justify-between gap-3">
                       <span className="font-medium">{a.contact_name || '—'}</span>
-                      {a.phone && <a href={`tel:${a.phone}`} className="text-blue-600 whitespace-nowrap">{a.phone}</a>}
+                      {a.phone && (
+                        <span className="flex gap-3 whitespace-nowrap">
+                          <a href={`tel:${String(a.phone).replace(/[^\d+]/g, '')}`} className="text-blue-600">{a.phone}</a>
+                          <a href={smsHref(a.phone, `Hi${a.contact_name ? ` ${String(a.contact_name).trim().split(/\s+/)[0]}` : ''}, this is Marc Spencer with Lightkeeper Realty / USAHUDhomes.com. `)} className="text-green-700">Text</a>
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-gray-500">
                       {[a.address, a.city, [a.state, a.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
