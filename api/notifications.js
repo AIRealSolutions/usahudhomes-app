@@ -497,36 +497,45 @@ async function handleConsultationRequest(req, res) {
     : null
 
   // Requests land in leads like every other intake; an admin assigns them from the Leads Hub.
+  const fields = {
+    customer_id: customerId,
+    property_id: propertyId,
+    property_case_number: str(b.caseNumber, 40),
+    property_address: prop ? [prop.address, prop.city, prop.state].filter(Boolean).join(', ') : null,
+    property_price: prop?.price ?? null,
+    lead_type: CONSULTATION_TYPES.includes(b.consultationType) ? b.consultationType : 'agent_callback_request',
+    status: 'new_lead',
+    source: 'agent_request',
+    first_name: firstName,
+    last_name: lastName,
+    email,
+    phone,
+    state,
+    message: str(b.message, 4000),
+    financing_type: str(b.financingType, 60),
+    down_payment: str(b.downPayment, 60),
+    credit_score_range: str(b.creditScoreRange, 60),
+    pre_approved: b.preApproved === true,
+    timeline: str(b.timeline, 60),
+    buyer_type: str(b.buyerType, 60),
+    experience_level: str(b.experienceLevel, 60),
+    price_range_min: num(b.priceRangeMin),
+    price_range_max: num(b.priceRangeMax),
+    property_preferences: b.propertyPreferences && typeof b.propertyPreferences === 'object' ? b.propertyPreferences : null,
+    hear_about_us: str(b.hearAboutUs, 120),
+  }
+
+  // A buyer who already has an open lead (signed up, or asked before) gets that lead
+  // updated instead of a second one, so brokers see one record per buyer.
+  const open = (await supabaseFetch(
+    `leads?select=*&email=eq.${encodeURIComponent(email)}&status=in.(new_lead,under_review)&order=created_at.desc&limit=1`
+  ))?.[0]
+  if (open) return await mergeConsultationRequest(res, open, fields, caller, { firstName, lastName, email, phone, state })
+
   const rows = await supabaseFetch('leads', {
     method: 'POST',
     headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({
-      customer_id: customerId,
-      property_id: propertyId,
-      property_case_number: str(b.caseNumber, 40),
-      property_address: prop ? [prop.address, prop.city, prop.state].filter(Boolean).join(', ') : null,
-      property_price: prop?.price ?? null,
-      lead_type: CONSULTATION_TYPES.includes(b.consultationType) ? b.consultationType : 'agent_callback_request',
-      status: 'new_lead',
-      source: 'agent_request',
-      first_name: firstName,
-      last_name: lastName,
-      email,
-      phone,
-      state,
-      message: str(b.message, 4000),
-      financing_type: str(b.financingType, 60),
-      down_payment: str(b.downPayment, 60),
-      credit_score_range: str(b.creditScoreRange, 60),
-      pre_approved: b.preApproved === true,
-      timeline: str(b.timeline, 60),
-      buyer_type: str(b.buyerType, 60),
-      experience_level: str(b.experienceLevel, 60),
-      price_range_min: num(b.priceRangeMin),
-      price_range_max: num(b.priceRangeMax),
-      property_preferences: b.propertyPreferences && typeof b.propertyPreferences === 'object' ? b.propertyPreferences : null,
-      hear_about_us: str(b.hearAboutUs, 120),
-    }),
+    body: JSON.stringify(fields),
   })
   const lead = rows?.[0]
   if (!lead) return res.status(500).json({ success: false, error: 'Could not save your request. Please try again.' })
@@ -548,6 +557,61 @@ async function handleConsultationRequest(req, res) {
     console.error('[lead-request] admin notification failed:', e.message)
   }
   await routeLeadToBroker(lead)
+
+  return res.status(200).json({ success: true, data: { id: lead.id } })
+}
+
+// Folds a repeat agent request into the buyer's open lead: newer answers win, blanks
+// never erase what they told us before, and the broker's consultation gets the same
+// details. Admins are only re-notified when the request is about a different home.
+async function mergeConsultationRequest(res, lead, fields, caller, contact) {
+  // Keep the lead's original source and pipeline status; take everything else they answered.
+  const changes = Object.fromEntries(Object.entries(fields).filter(([k, v]) =>
+    !['status', 'source'].includes(k) && v !== null && !(k === 'pre_approved' && v === false)))
+  const now = new Date().toISOString()
+  await supabaseWrite(`leads?id=eq.${lead.id}`, 'PATCH', { ...changes, updated_at: now })
+
+  const assigned = (await supabaseFetch(
+    `lead_events?lead_id=eq.${lead.id}&event_type=eq.assigned_to_agent&select=event_data&order=created_at.desc&limit=1`
+  ))?.[0]
+  const consultationId = assigned?.event_data?.consultation_id
+  if (consultationId) {
+    // Consultations share most lead columns; these are lead-only or named differently.
+    const leadOnly = ['lead_type', 'property_case_number', 'property_address', 'property_price', 'customer_id']
+    const shared = Object.fromEntries(Object.entries(changes).filter(([k]) => !leadOnly.includes(k)))
+    await supabaseWrite(`consultations?id=eq.${consultationId}`, 'PATCH', {
+      ...shared,
+      ...(changes.lead_type ? { consultation_type: changes.lead_type } : {}),
+      ...(changes.property_case_number ? { case_number: changes.property_case_number } : {}),
+      updated_at: now,
+    })
+  }
+
+  await supabaseWrite('lead_events', 'POST', {
+    lead_id: lead.id,
+    event_type: 'lead_received',
+    event_data: {
+      source: 'agent_request',
+      form_type: fields.lead_type,
+      property_case_number: fields.property_case_number,
+      requested_by: caller.id,
+      repeat_request: true,
+    },
+  })
+
+  const newHome = fields.property_id && fields.property_id !== lead.property_id
+  if (newHome) {
+    try {
+      await notifyAdminsOfLead({
+        customer: { name: `${contact.firstName} ${contact.lastName}`, email: contact.email, phone: contact.phone },
+        property: { state: contact.state },
+      })
+    } catch (e) {
+      console.error('[lead-request] admin notification failed:', e.message)
+    }
+  }
+  // Leads that were never routed (no auto-routing rule at the time) still get a chance.
+  if (!consultationId) await routeLeadToBroker({ ...lead, ...changes })
 
   return res.status(200).json({ success: true, data: { id: lead.id } })
 }
