@@ -31,6 +31,8 @@ Configuration (hardcoded at top of this file):
     WORKER_BATCH        3   (jobs per poll cycle)
 """
 
+from __future__ import annotations  # allows `str | None` hints on Python 3.9 (Raspberry Pi)
+
 import os, sys, time, json, argparse, tempfile, shutil, traceback
 from pathlib import Path
 from datetime import datetime, timezone
@@ -50,6 +52,16 @@ except ImportError:
 SUPABASE_URL         = "https://lpqjndfjbenolhneqzec.supabase.co"
 SUPABASE_SERVICE_KEY = "PASTE_YOUR_SERVICE_ROLE_KEY_HERE"   # Supabase → Settings → API → service_role
 OPENAI_API_KEY       = "PASTE_YOUR_OPENAI_KEY_HERE"    # optional — enables AI title/description generation
+
+# Environment variables win over the values above, and the "PASTE_..."
+# placeholders count as "not set" (they used to be treated as real keys,
+# so the worker failed with a confusing auth error instead of setup help).
+def _key(env_name, value):
+    v = os.environ.get(env_name) or value or ""
+    return "" if v.startswith("PASTE_") else v.strip()
+
+SUPABASE_SERVICE_KEY = _key("SUPABASE_SERVICE_KEY", SUPABASE_SERVICE_KEY)
+OPENAI_API_KEY       = _key("OPENAI_API_KEY", OPENAI_API_KEY)
 POLL_SEC             = 30   # seconds between queue polls in --watch mode
 DEFAULT_BATCH        = 3    # number of videos to process per cycle
 BUCKET              = "USAHUDhomes"
@@ -60,7 +72,7 @@ def get_client() -> Client:
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         sys.exit(
             "\n[ERROR] SUPABASE_SERVICE_KEY is not set.\n"
-            "  Open 4_video_worker.py and paste your key on line 51:\n"
+            "  Set the SUPABASE_SERVICE_KEY environment variable, or paste it near the top of 4_video_worker.py:\n"
             "  SUPABASE_SERVICE_KEY = \"eyJ...your_key_here...\"\n"
             "  Get it from: Supabase Dashboard → Project Settings → API → service_role\n"
         )
@@ -161,12 +173,23 @@ def download_image(prop: dict, dest_dir: str) -> str | None:
     )
 
     dest_path = os.path.join(dest_dir, filename)
-    for url in urls_to_try:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (HUD Video Worker)",
+        "Accept": "image/jpeg,image/png,image/webp;q=0.9,*/*;q=0.5",
+    }
+    for url in dict.fromkeys(urls_to_try):   # de-dupe, keep order
         try:
-            r = requests.get(url, timeout=20)
+            r = requests.get(url, timeout=20, headers=headers)
             if r.status_code == 200 and len(r.content) > 5000:
                 with open(dest_path, "wb") as f:
                     f.write(r.content)
+                try:
+                    from PIL import Image
+                    with Image.open(dest_path) as im:
+                        im.verify()
+                except Exception:
+                    print(f"    ⚠ Not a readable image: {url}")
+                    continue
                 print(f"    ✓ Image downloaded: {filename} ({len(r.content)//1024} KB)")
                 return dest_path
         except Exception:
@@ -226,6 +249,9 @@ def generate_video(prop: dict, template: dict, images_dir: str, output_path: str
         prop.setdefault("_incentive2_sub",   template.get("incentive2_sub",   "Costs Paid"))
         prop.setdefault("_incentive3_title", template.get("incentive3_title", "$35K REPAIR"))
         prop.setdefault("_incentive3_sub",   template.get("incentive3_sub",   "203k Escrow"))
+        for n in (1, 2, 3):
+            if template.get(f"incentive{n}_body"):
+                prop.setdefault(f"_incentive{n}_body", template[f"incentive{n}_body"])
 
     # ── Build the video ───────────────────────────────────────────────────────
     result = vb.build_video(prop, images_dir, output_path)
@@ -271,13 +297,17 @@ def generate_ai_metadata(prop: dict) -> tuple[str, str]:
         county= prop.get("county", "")
         status= prop.get("status", "")
         bids  = prop.get("bids_open", "")
+        try:
+            price_txt = f"${int(float(price)):,}"
+        except (TypeError, ValueError):
+            price_txt = str(price)
 
         prompt = f"""You are an SEO expert for real estate YouTube Shorts/Reels.
 Generate a YouTube title and description for a HUD home listing video.
 
 Property details:
 - Location: {city}, {state} (County: {county})
-- Price: ${price:,} if isinstance(price, (int,float)) else price
+- Price: {price_txt}
 - Beds/Baths: {beds} bed / {baths} bath
 - Status: {status}
 - Bids Open: {bids}

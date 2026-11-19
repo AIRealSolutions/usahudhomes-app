@@ -135,6 +135,46 @@ def emoji_text(draw, xy, emoji, label, font, fill, emoji_size=40, gap=10, alpha=
 # Drawing primitives
 # ─────────────────────────────────────────────────────────────────────────────
 
+class BlendDraw:
+    """ImageDraw wrapper that alpha-blends translucent colours.
+
+    Pillow does NOT blend when drawing on an RGBA image — a fill of
+    (255,255,255,8) overwrites the pixel with that exact value, and once the
+    slide is flattened to RGB it becomes solid white. That turned "subtle"
+    row tints, separators and shadows into hard white/black blocks.
+
+    Opaque draws go straight to the image; translucent ones are drawn on a
+    transparent layer and alpha-composited so they actually blend.
+    """
+    _SHAPES = {"rectangle", "rounded_rectangle", "ellipse", "line", "polygon",
+               "text", "multiline_text", "pieslice", "chord", "arc", "regular_polygon"}
+
+    def __init__(self, img):
+        self._image = img
+        self._d = ImageDraw.Draw(img, "RGBA")
+
+    @staticmethod
+    def _translucent(args, kwargs):
+        for v in list(args) + list(kwargs.values()):
+            if isinstance(v, tuple) and len(v) == 4 and all(isinstance(c, int) for c in v) and v[3] < 255:
+                return True
+        return False
+
+    def __getattr__(self, name):
+        attr = getattr(self._d, name)
+        if name not in self._SHAPES:
+            return attr
+
+        def call(*args, **kwargs):
+            if not self._translucent(args, kwargs):
+                return attr(*args, **kwargs)
+            layer = Image.new("RGBA", self._image.size, (0, 0, 0, 0))
+            result = getattr(ImageDraw.Draw(layer), name)(*args, **kwargs)
+            self._image.alpha_composite(layer)
+            return result
+        return call
+
+
 def new_canvas(color=NAVY):
     img = Image.new("RGBA", (W, H), color + (255,))
     return img, ImageDraw.Draw(img)
@@ -367,7 +407,7 @@ def slide1_hero(prop, image_path):
     """Slide 1 — Full-bleed hero photo with overlay cards."""
     photo = _load_photo(image_path, W, H)
     img   = photo.copy()
-    d     = ImageDraw.Draw(img, "RGBA")
+    d     = BlendDraw(img)
 
     # Dark gradient overlay (top + bottom)
     grad_top = gradient((0,0,0), (0,0,0), w=W, h=300)
@@ -380,7 +420,7 @@ def slide1_hero(prop, image_path):
     grad_bot_arr[:,:,3] = np.linspace(0, 230, 700, dtype=np.uint8)[:,None]
     img.alpha_composite(Image.fromarray(grad_bot_arr, "RGBA"), (0, H-700))
 
-    d = ImageDraw.Draw(img, "RGBA")
+    d = BlendDraw(img)
 
     # ── TOP: site brand ───────────────────────────────────────────────────────
     brand_font = F("bold", 38)
@@ -499,7 +539,7 @@ def slide1_hero(prop, image_path):
 def slide2_details(prop):
     """Slide 2 — Listing details card."""
     img = gradient(NAVY, NAVY2).convert("RGBA")
-    d   = ImageDraw.Draw(img, "RGBA")
+    d   = BlendDraw(img)
 
     # Accent bar top
     d.rectangle([(0,0),(W,12)], fill=GOLD+(255,))
@@ -552,7 +592,7 @@ def slide2_details(prop):
         d.text((cx+30, ry), f"{label}:", font=lbl_font, fill=GOLD+(255,))
 
         # Value in white — truncate if too long
-        max_val_w = cw - 310
+        max_val_w = cw - 340
         val_str   = str(value)
         vbb = d.textbbox((0,0), val_str, font=val_font)
         if vbb[2]-vbb[0] > max_val_w:
@@ -563,7 +603,7 @@ def slide2_details(prop):
                 if vbb[2]-vbb[0] <= max_val_w:
                     val_str += "…"
                     break
-        d.text((cx+280, ry), val_str, font=val_font, fill=WHITE+(255,))
+        d.text((cx+310, ry), val_str, font=val_font, fill=WHITE+(255,))
 
         # Separator line
         d.line([(cx+20, ry+row_h-22),(cx+cw-20, ry+row_h-22)],
@@ -579,10 +619,16 @@ def slide2_details(prop):
     return img
 
 
-def slide3_incentives():
+def _tpl(prop, key, default):
+    """Template override passed in by 4_video_worker.py as prop['_<key>']."""
+    v = (prop or {}).get("_" + key)
+    return str(v).strip() if v and str(v).strip() else default
+
+
+def slide3_incentives(prop=None):
     """Slide 3 — Owner-Occupant Incentives."""
     img = gradient((15,50,15), (5,20,5)).convert("RGBA")
-    d   = ImageDraw.Draw(img, "RGBA")
+    d   = BlendDraw(img)
 
     d.rectangle([(0,0),(W,12)], fill=GOLD+(255,))
 
@@ -591,14 +637,18 @@ def slide3_incentives():
     sub_font = F("bold", 44)
     centered_text(d, 108, "INCENTIVES", sub_font, WHITE)
 
-    incentives = [
-        ("$100",   "DOWN",     "FHA Loan",
-         "Buy this HUD home with just\n$100 down using an FHA loan."),
-        ("3%",     "CLOSING",  "Costs Paid",
-         "HUD pays up to 3% of the\npurchase price toward closing."),
-        ("$35K",   "REPAIR",   "203k Escrow",
-         "Finance repairs into your\nmortgage with a 203k loan."),
+    defaults = [
+        ("$100 DOWN",   "FHA Loan",    "Buy this HUD home with just $100 down using an FHA loan."),
+        ("3% CLOSING",  "Costs Paid",  "HUD pays up to 3% of the purchase price toward closing."),
+        ("$35K REPAIR", "203k Escrow", "Finance repairs into your mortgage with a 203k loan."),
     ]
+    incentives = []
+    for n, (title, sub, body) in enumerate(defaults, start=1):
+        title = _tpl(prop, f"incentive{n}_title", title)
+        big, _, mid = title.partition(" ")      # "$100 DOWN" → "$100" + "DOWN"
+        incentives.append((big, mid,
+                           _tpl(prop, f"incentive{n}_sub", sub),
+                           _tpl(prop, f"incentive{n}_body", body)))
 
     card_h  = 440
     card_y  = 200
@@ -633,7 +683,7 @@ def slide3_incentives():
 
         # Body
         by = cy + 175
-        for line in body.split("\n"):
+        for line in wrap_text(d, body, body_font, card_w - bx - 20)[:5]:
             d.text((bx, by), line, font=body_font, fill=OFFWHITE+(220,))
             by += 44
 
@@ -646,7 +696,9 @@ def slide3_incentives():
 
     d.rectangle([(0,H-110),(W,H)], fill=NAVY+(240,))
     bar_font = F("bold", 30)
-    centered_text(d, H-82, "Lightkeeper Realty  •  910.363.6147", bar_font, GOLD, shadow=False)
+    centered_text(d, H-82,
+                  f"{_tpl(prop, 'agency_name', 'Lightkeeper Realty')}  •  {_tpl(prop, 'agency_phone', '910.363.6147')}",
+                  bar_font, GOLD, shadow=False)
 
     return img
 
@@ -654,7 +706,7 @@ def slide3_incentives():
 def slide4_lightkeeper():
     """Slide 4 — Lightkeeper Realty brand."""
     img = gradient(NAVY2, (5,10,30)).convert("RGBA")
-    d   = ImageDraw.Draw(img, "RGBA")
+    d   = BlendDraw(img)
 
     d.rectangle([(0,0),(W,12)], fill=GOLD+(255,))
 
@@ -715,10 +767,10 @@ def slide4_lightkeeper():
     return img
 
 
-def slide5_cta():
+def slide5_cta(prop=None):
     """Slide 5 — Call to Action with real QR code."""
     img = gradient((60,15,5), (20,5,5)).convert("RGBA")
-    d   = ImageDraw.Draw(img, "RGBA")
+    d   = BlendDraw(img)
 
     d.rectangle([(0,0),(W,12)], fill=GOLD+(255,))
 
@@ -739,9 +791,9 @@ def slide5_cta():
 
     # Steps
     steps = [
-        ("1", "Visit USAHUDhomes.com"),
-        ("2", "Call Marc Spencer: 910.363.6147"),
-        ("3", "Get pre-qualified & bid"),
+        ("1", _tpl(prop, "cta_line1", "Visit USAHUDhomes.com")),
+        ("2", _tpl(prop, "cta_line2", "Call Marc Spencer: 910.363.6147")),
+        ("3", _tpl(prop, "cta_line3", "Get pre-qualified & bid")),
     ]
     sy = 560
     step_font = F("bold", 38)
@@ -767,7 +819,7 @@ def slide5_cta():
         radius=18, fill=(255,255,255,240)
     )
     img.alpha_composite(qr_img, (qr_x, qr_y))
-    d = ImageDraw.Draw(img, "RGBA")   # refresh draw after composite
+    d = BlendDraw(img)   # refresh draw after composite
 
     # Label under QR
     qr_label_font = F("bold", 26)
@@ -825,9 +877,9 @@ def build_video(prop, images_dir, output_path):
     slides = [
         slide1_hero(prop, image_path),
         slide2_details(prop),
-        slide3_incentives(),
+        slide3_incentives(prop),
         slide4_lightkeeper(),
-        slide5_cta(),
+        slide5_cta(prop),
     ]
 
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
