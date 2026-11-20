@@ -260,13 +260,18 @@ Return JSON only: {"title": "...", "description": "..."}`,
       const { data, error } = await supabase.functions.invoke('upload-to-youtube', {
         body: { job_id: job.id }
       })
-      if (error) throw error
+      if (error) {
+        // Supabase wraps non-2xx replies; pull the function's own error message out
+        let msg = error.message
+        try { msg = (await error.context?.json())?.error || msg } catch { /* not JSON */ }
+        if (/not found|404/i.test(msg)) msg = 'The upload-to-youtube service is not deployed.'
+        throw new Error(msg)
+      }
       if (!data?.youtube_url) throw new Error('Unexpected response from upload service')
       setJobs(prev => prev.map(j => j.id === job.id ? { ...j, uploaded_to_youtube: true, youtube_url: data.youtube_url, youtube_video_id: data.video_id } : j))
       notify('Video uploaded to YouTube!')
     } catch (e) {
-      // No "upload-to-youtube" Edge Function / YouTube OAuth credentials are deployed for this project.
-      setError(`YouTube upload is not available from the browser (${e.message}). The upload service is not set up — download the MP4 and upload it manually, or run hud-pipeline/scripts/3_bulk_upload.py locally with your YouTube OAuth credentials.`)
+      setError(`YouTube upload failed: ${e.message}`)
     }
     setUploadingYT(null)
   }
