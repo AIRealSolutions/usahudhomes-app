@@ -60,7 +60,17 @@ async function getYouTubeAccessToken(): Promise<string> {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: CORS_HEADERS })
+    // Newer supabase-js versions send extra headers (e.g. x-supabase-client-*);
+    // echo back whatever the browser asks for so the preflight never blocks the POST.
+    return new Response('ok', {
+      headers: {
+        ...CORS_HEADERS,
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers':
+          req.headers.get('Access-Control-Request-Headers') || CORS_HEADERS['Access-Control-Allow-Headers'],
+        'Access-Control-Max-Age': '86400',
+      },
+    })
   }
 
   try {
