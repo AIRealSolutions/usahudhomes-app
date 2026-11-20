@@ -67,6 +67,16 @@ DEFAULT_BATCH        = 3    # number of videos to process per cycle
 BUCKET              = "USAHUDhomes"
 VIDEO_FOLDER        = "videos"
 
+# ── Sound ─────────────────────────────────────────────────────────────────────
+# Voiceover: an AI narrator reads the listing (needs OPENAI_API_KEY).
+# Music: drop royalty-free .mp3/.m4a/.wav files into hud-pipeline/music/ —
+#        one is picked at random per video and played quietly under the voice.
+VOICEOVER_ENABLED   = os.environ.get("VOICEOVER", "on").lower() not in ("0", "off", "false", "no")
+VOICE               = os.environ.get("VOICE", "onyx")   # alloy, ash, coral, echo, fable, nova, onyx, sage, shimmer
+MUSIC_DIR           = Path(os.environ.get("MUSIC_DIR", Path(__file__).resolve().parent.parent / "music"))
+MUSIC_VOLUME_UNDER_VOICE = 0.12   # music level while the narrator talks
+MUSIC_VOLUME_ALONE       = 0.35   # music level when there is no voiceover
+
 # ── Supabase client ───────────────────────────────────────────────────────────
 def get_client() -> Client:
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
@@ -349,6 +359,136 @@ def get_duration(path: str) -> float:
         return 0.0
 
 
+# ── Sound: voiceover + background music ──────────────────────────────────────
+_STATES = {
+    "AL":"Alabama","AK":"Alaska","AZ":"Arizona","AR":"Arkansas","CA":"California","CO":"Colorado",
+    "CT":"Connecticut","DE":"Delaware","FL":"Florida","GA":"Georgia","HI":"Hawaii","ID":"Idaho",
+    "IL":"Illinois","IN":"Indiana","IA":"Iowa","KS":"Kansas","KY":"Kentucky","LA":"Louisiana",
+    "ME":"Maine","MD":"Maryland","MA":"Massachusetts","MI":"Michigan","MN":"Minnesota",
+    "MS":"Mississippi","MO":"Missouri","MT":"Montana","NE":"Nebraska","NV":"Nevada",
+    "NH":"New Hampshire","NJ":"New Jersey","NM":"New Mexico","NY":"New York","NC":"North Carolina",
+    "ND":"North Dakota","OH":"Ohio","OK":"Oklahoma","OR":"Oregon","PA":"Pennsylvania",
+    "RI":"Rhode Island","SC":"South Carolina","SD":"South Dakota","TN":"Tennessee","TX":"Texas",
+    "UT":"Utah","VT":"Vermont","VA":"Virginia","WA":"Washington","WV":"West Virginia",
+    "WI":"Wisconsin","WY":"Wyoming","DC":"Washington D.C.","PR":"Puerto Rico",
+}
+
+
+def _num(v):
+    """4 → '4', '2.0' → '2', '2.5' → '2.5', None → ''."""
+    try:
+        f = float(v)
+        return str(int(f)) if f.is_integer() else str(f)
+    except (TypeError, ValueError):
+        return str(v or "").strip()
+
+
+def voiceover_script(prop: dict, template: dict) -> str:
+    """~45 words — fits comfortably in the ~21 s video."""
+    city  = (prop.get("city") or "").strip()
+    state = _STATES.get((prop.get("state") or "").upper(), prop.get("state") or "")
+    where = ", ".join(x for x in (city, state) if x)
+    try:
+        price = f"${int(float(prop.get('price'))):,}"
+    except (TypeError, ValueError):
+        price = ""
+    beds, baths = _num(prop.get("beds")), _num(prop.get("baths"))
+
+    parts = [f"New HUD home for sale in {where}." if where else "New HUD home for sale."]
+    if beds and baths:
+        parts.append(f"{beds} bedrooms, {baths} baths" + (f", listed at {price}." if price else "."))
+    elif price:
+        parts.append(f"Listed at {price}.")
+    parts.append("Owner-occupants can buy with just one hundred dollars down on an FHA loan, "
+                 "and HUD may pay up to three percent of closing costs.")
+    phone = (template or {}).get("agency_phone") or "910.363.6147"
+    phone_spoken = phone.replace(".", "-")
+    agency = (template or {}).get("agency_name") or "Lightkeeper Realty"
+    parts.append(f"Visit USA HUD homes dot com, or call {agency} at {phone_spoken}.")
+    return " ".join(parts)
+
+
+def make_voiceover(prop: dict, template: dict, out_path: str) -> str | None:
+    """Generate an MP3 narration with OpenAI text-to-speech. Returns path or None."""
+    if not (VOICEOVER_ENABLED and OPENAI_API_KEY):
+        return None
+    text = voiceover_script(prop, template)
+    try:
+        import openai
+        client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        try:
+            resp = client.audio.speech.create(
+                model="gpt-4o-mini-tts", voice=VOICE, input=text, response_format="mp3",
+                instructions="Friendly, upbeat real estate announcer. Clear and energetic, not rushed.",
+            )
+        except Exception:
+            # Older openai package or account without gpt-4o-mini-tts
+            resp = client.audio.speech.create(model="tts-1", voice=VOICE, input=text, response_format="mp3")
+        with open(out_path, "wb") as f:
+            f.write(resp.content)
+        print(f"    ✓ Voiceover: \"{text[:60]}…\"")
+        return out_path
+    except Exception as e:
+        print(f"    ⚠ Voiceover failed (video will have music only or be silent): {e}")
+        return None
+
+
+def pick_music() -> str | None:
+    import random
+    if not MUSIC_DIR.is_dir():
+        return None
+    tracks = [p for p in MUSIC_DIR.iterdir() if p.suffix.lower() in (".mp3", ".m4a", ".wav", ".aac", ".ogg")]
+    return str(random.choice(tracks)) if tracks else None
+
+
+def add_sound(video_path: str, voice_path: str | None, music_path: str | None) -> bool:
+    """Mux voiceover and/or music into video_path in place. Returns True if audio was added."""
+    import subprocess
+    if not voice_path and not music_path:
+        return False
+    dur = get_duration(video_path)
+    if dur <= 0:
+        return False
+
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", video_path]
+    filters, mix = [], []
+    idx = 1
+    if voice_path:
+        cmd += ["-i", voice_path]
+        vdur = get_duration(voice_path)
+        room = max(dur - 1.5, 1.0)                     # start at 0.5 s, end 1 s before the video
+        tempo = min(max(vdur / room, 1.0), 1.35) if vdur else 1.0
+        filters.append(f"[{idx}:a]atempo={tempo:.3f},adelay=500|500,apad[voice]")
+        mix.append("[voice]")
+        idx += 1
+    if music_path:
+        cmd += ["-stream_loop", "-1", "-i", music_path]
+        vol = MUSIC_VOLUME_UNDER_VOICE if voice_path else MUSIC_VOLUME_ALONE
+        filters.append(f"[{idx}:a]volume={vol}[music]")
+        mix.append("[music]")
+    if len(mix) == 2:
+        filters.append(f"{''.join(mix)}amix=inputs=2:duration=longest:normalize=0[mixed]")
+        last = "[mixed]"
+    else:
+        last = mix[0]
+    fade_start = max(dur - 1.5, 0)
+    # Cut the (looping/padded) audio to the video length *inside* the filter —
+    # relying on -t alone produces an almost empty audio track with -c:v copy.
+    filters.append(f"{last}atrim=end={dur:.2f},afade=t=out:st={fade_start:.2f}:d=1.5[aout]")
+
+    out = video_path.replace(".mp4", "_sound.mp4")
+    cmd += ["-filter_complex", ";".join(filters), "-map", "0:v", "-map", "[aout]",
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-t", f"{dur:.2f}",
+            "-movflags", "+faststart", out]
+    try:
+        subprocess.run(cmd, check=True)
+        os.replace(out, video_path)
+        return True
+    except Exception as e:
+        print(f"    ⚠ Adding sound failed, keeping silent video: {e}")
+        return False
+
+
 # ── Process a single job ──────────────────────────────────────────────────────
 def process_job(sb: Client, job: dict):
     job_id      = job["id"]
@@ -405,6 +545,15 @@ def process_job(sb: Client, job: dict):
 
             if not os.path.exists(output_path):
                 raise FileNotFoundError("Video file was not created")
+
+            # Add voiceover and/or background music
+            print("  → Adding sound…")
+            voice = make_voiceover(prop, template, os.path.join(tmpdir, "voice.mp3"))
+            music = pick_music()
+            if music:
+                print(f"    ✓ Music: {os.path.basename(music)}")
+            if not add_sound(output_path, voice, music):
+                print("    (no voiceover or music available — video stays silent)")
 
             size_kb = os.path.getsize(output_path) // 1024
             duration = get_duration(output_path)
@@ -465,6 +614,9 @@ def main():
     print(f"  Supabase: {SUPABASE_URL}")
     print(f"  Batch:    {args.batch} jobs/cycle")
     print(f"  AI:       {'enabled' if OPENAI_API_KEY else 'disabled (no OPENAI_API_KEY)'}")
+    print(f"  Voice:    {VOICE if (VOICEOVER_ENABLED and OPENAI_API_KEY) else 'off'}")
+    _m = pick_music()
+    print(f"  Music:    {MUSIC_DIR} ({'has tracks' if _m else 'empty — add .mp3 files for background music'})")
     print(f"  Mode:     {'watch (Ctrl+C to stop)' if args.watch else 'run once'}")
     print(f"{'='*60}\n")
 
