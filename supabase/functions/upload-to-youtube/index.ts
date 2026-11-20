@@ -9,9 +9,10 @@
 //   SUPABASE_URL           — (auto-set by Supabase)
 //   SUPABASE_SERVICE_ROLE_KEY — (auto-set by Supabase)
 //
-// To obtain YOUTUBE_REFRESH_TOKEN, run scripts/3_bulk_upload.py once with
-// --dry-run — it will open a browser auth flow and save token.json, then
-// copy the refresh_token value into Supabase secrets.
+// To obtain all three YOUTUBE_* values, run hud-pipeline/scripts/get_youtube_token.py
+// once with client_secrets.json beside it, then add them in Supabase → Edge Functions → Secrets.
+//
+// Callers must be signed in as an admin (public.is_admin).
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -59,7 +60,17 @@ async function getYouTubeAccessToken(): Promise<string> {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: CORS_HEADERS })
+    // Newer supabase-js versions send extra headers (e.g. x-supabase-client-*);
+    // echo back whatever the browser asks for so the preflight never blocks the POST.
+    return new Response('ok', {
+      headers: {
+        ...CORS_HEADERS,
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers':
+          req.headers.get('Access-Control-Request-Headers') || CORS_HEADERS['Access-Control-Allow-Headers'],
+        'Access-Control-Max-Age': '86400',
+      },
+    })
   }
 
   try {
@@ -72,10 +83,25 @@ serve(async (req) => {
       )
     }
 
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
+
+    // Only signed-in admins may post to the channel. The public anon key
+    // passes the gateway's JWT check, so verify the caller here.
+    const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
+    const { data: userData } = await supabase.auth.getUser(token)
+    const userId = userData?.user?.id
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'Please sign in as an admin to upload to YouTube.' }),
+        { status: 401, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } })
+    }
+    const { data: isAdmin } = await supabase.rpc('is_admin', { p_user_id: userId })
+    if (!isAdmin) {
+      return new Response(JSON.stringify({ error: 'Only admins can upload to YouTube.' }),
+        { status: 403, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } })
+    }
+
     const { job_id } = await req.json()
     if (!job_id) throw new Error('job_id is required')
-
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
 
     // Load job with property details
     const { data: job, error: jobErr } = await supabase
