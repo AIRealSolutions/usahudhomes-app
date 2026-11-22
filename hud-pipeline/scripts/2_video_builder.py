@@ -379,7 +379,8 @@ def _price(prop):
     except (TypeError, ValueError): return f"${prop.get('list_price', '')}"
 
 
-HERO_WIN  = (390, 880)     # (y, height) of the hero photo band
+HERO_WIN  = (456, 1150)    # (y, height) of the hero photo band — ends just above the caption area
+HERO_SUBSCRIBE_POPUP = False   # the CTA slide carries the Subscribe button; nothing covers the house
 PHOTO_WIN = (240, 1170)    # photo-tour band
 
 
@@ -399,39 +400,37 @@ def _band_edges(d, y, h):
     d.rectangle([(0, y + h), (W, y + h + 6)], fill=GOLD + (255,))
 
 
+def _icon_row(d, y, items, font, isz, gap=44):
+    """Draw [(icon, label, colour), ...] as one centred row."""
+    widths = [isz + 12 + (d.textbbox((0, 0), lab, font=font)[2]) for _, lab, _ in items]
+    x = (W - (sum(widths) + gap * (len(items) - 1))) // 2
+    for (icon, lab, col), w_ in zip(items, widths):
+        tb = d.textbbox((0, 0), lab, font=font)
+        draw_emoji(d, (x, y), icon, isz, color=GOLD if icon in ("🛏", "🚿") else col)
+        d.text((x + isz + 12, y + (isz - (tb[3] - tb[1])) // 2 - tb[1]), lab, font=font, fill=col + (255,))
+        x += w_ + gap
+
+
 def slide1_hero(prop, photo):
-    """Price and city above the photo, facts below — nothing sits on the house."""
+    """All the text sits above the photo, so the house gets a tall, uncovered frame."""
     bg = backdrop(photo, (12, 24, 58), (4, 10, 28), 0.86)
     img, d = new_layer()
     wy, wh = HERO_WIN
 
-    centered_text(d, 34, _tpl(prop, "agency_website", "USAHUDhomes.com"), F("bold", 38), GOLD)
-    _status_pill(d, prop, 90)
-    centered_text(d, 160, _price(prop), F("bold", 112), GOLD)
-    centered_text(d, 290, f"{prop.get('city', '')}, {prop.get('state', '')}", F("bold", 60), WHITE)
-    _band_edges(d, wy, wh)
+    centered_text(d, 30, _tpl(prop, "agency_website", "USAHUDhomes.com"), F("bold", 36), GOLD)
+    _status_pill(d, prop, 82)
+    centered_text(d, 146, _price(prop), F("bold", 104), GOLD)
+    centered_text(d, 262, f"{prop.get('city', '')}, {prop.get('state', '')}", F("bold", 54), WHITE)
 
     beds  = hud_audio.num_text(prop.get("bedrooms", "—"))
     baths = hud_audio.num_text(prop.get("bathrooms", "—"))
-    bb_font, isz, row_y = F("bold", 52), 56, wy + wh + 40
-    for label, icon, cx in ((f"{beds} BD", "🛏", W // 3), (f"{baths} BA", "🚿", 2 * W // 3)):
-        tb = d.textbbox((0, 0), label, font=bb_font)
-        total = isz + 14 + (tb[2] - tb[0])
-        x = cx - total // 2
-        draw_emoji(d, (x, row_y), icon, isz, color=GOLD)
-        d.text((x + isz + 14, row_y + (isz - (tb[3] - tb[1])) // 2 - tb[1]), label, font=bb_font, fill=WHITE + (255,))
-
-    info_font, iy = F("reg", 40), row_y + 92
-    rows = []
-    if hud_audio.area_label(prop): rows.append(("📍", hud_audio.area_label(prop), LIGHT))
-    if prop.get("bids_open"): rows.append(("📅", f"Bids Open: {prop['bids_open']}", GOLD))
-    for icon, label, col in rows:
-        tb = d.textbbox((0, 0), label, font=info_font)
-        total = 40 + 12 + (tb[2] - tb[0])
-        x = (W - total) // 2
-        draw_emoji(d, (x, iy), icon, 40, color=col)
-        d.text((x + 52, iy + (40 - (tb[3] - tb[1])) // 2 - tb[1]), label, font=info_font, fill=col + (255,))
-        iy += 62
+    row = [("🛏", f"{beds} BD", WHITE), ("🚿", f"{baths} BA", WHITE)]
+    if hud_audio.area_label(prop):
+        row.append(("📍", hud_audio.area_label(prop), LIGHT))
+    _icon_row(d, 334, row, F("bold", 40), 42)
+    if prop.get("bids_open"):
+        _icon_row(d, 392, [("📅", f"Bids Open: {prop['bids_open']}", GOLD)], F("reg", 36), 36)
+    _band_edges(d, wy, wh)
 
     brand_bar(d, f"{_tpl(prop, 'agency_name', 'Lightkeeper Realty')}  •  "
                  f"{_tpl(prop, 'agency_phone', '910.363.6147')}  •  HUD Buyer's Agency")
@@ -725,10 +724,10 @@ def _premul(rgba_img):
     return a[..., :3] * alpha * 255.0, alpha
 
 
-def _kenburns(src, s, pan, out_w, out_h):
+def _kenburns(src, s, pan, out_w, out_h, anchor_y=0.5):
     import cv2
     tx = (1 - s) * out_w / 2 * (1 + pan)
-    ty = (1 - s) * out_h / 2
+    ty = (1 - s) * out_h * anchor_y
     M = np.float32([[s, 0, tx], [0, s, ty]])
     return cv2.warpAffine(src, M, (out_w, out_h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
 
@@ -740,7 +739,7 @@ class SlideClip:
     window  optional (y, height, PIL photo): a full-width photo band with its own,
             stronger Ken Burns move — the house is never covered by text.
     """
-    def __init__(self, bg, fg, zoom=0.05, pan=0.0, animate_in=True, window=None, wzoom=0.10, wpan=0.3):
+    def __init__(self, bg, fg, zoom=0.05, pan=0.0, animate_in=True, window=None, wzoom=0.10, wpan=0.3, wanchor=0.5):
         self.bg = np.ascontiguousarray(np.asarray(bg.convert("RGB")))
         self.pm, self.a = _premul(fg)
         self.inv_a = 1.0 - self.a
@@ -749,14 +748,14 @@ class SlideClip:
         if window is not None:
             wy, wh, photo = window
             self.window = (wy, wh, np.ascontiguousarray(np.asarray(_cover(photo, W, wh).convert("RGB"))))
-        self.wzoom, self.wpan = wzoom, wpan
+        self.wzoom, self.wpan, self.wanchor = wzoom, wpan, wanchor
 
     def frame(self, t, dur):
         p = min(max(t / max(dur, 1e-3), 0.0), 1.0)
         bg = _kenburns(self.bg, 1.0 + self.zoom * p, self.pan, W, H)
         if self.window is not None:
             wy, wh, src = self.window
-            bg[wy:wy + wh] = _kenburns(src, 1.0 + self.wzoom * p, self.wpan, W, wh)
+            bg[wy:wy + wh] = _kenburns(src, 1.0 + self.wzoom * p, self.wpan, W, wh, self.wanchor)
         bg = bg.astype(np.float32)
         e = 1.0
         if self.animate_in:
@@ -858,7 +857,7 @@ def build_video(prop, images_dir, output_path, voiceover=True, captions=True):
         # ── 3. Slide plan: (segment index, builder, SlideClip options) ────────
         hero_win = (HERO_WIN[0], HERO_WIN[1], hero_img) if hero_img is not None else None
         plan = [(0, lambda: slide1_hero(prop, photo),
-                 dict(zoom=0.03, pan=0.0, animate_in=False, window=hero_win, wzoom=0.12, wpan=0.4))]
+                 dict(zoom=0.03, pan=0.0, animate_in=False, window=hero_win, wzoom=0.06, wpan=0.25, wanchor=0.7))]
         for k, (img, lab) in enumerate(tour):
             plan.append((1, (lambda img=img, lab=lab, k=k: slide_photo(prop, img, lab, k, len(tour))),
                          dict(zoom=0.03, pan=0.0, window=(PHOTO_WIN[0], PHOTO_WIN[1], img),
@@ -934,7 +933,7 @@ def build_video(prop, images_dir, output_path, voiceover=True, captions=True):
                 u = (local - holds[i]) / FADE_SEC
                 frame = clips_v[i].frame(local, holds[i]) * (1 - u) + clips_v[i + 1].frame(0.0, holds[i + 1]) * u
 
-            if i == 0 and ov_start <= T < holds[0]:
+            if HERO_SUBSCRIBE_POPUP and i == 0 and ov_start <= T < holds[0]:
                 k = min(int((T - ov_start) / (holds[0] - ov_start) * OVERLAY_FRAMES), OVERLAY_FRAMES - 1)
                 if k not in ov_cache:
                     ov_cache[k] = make_subscribe_overlay(k, OVERLAY_FRAMES)
