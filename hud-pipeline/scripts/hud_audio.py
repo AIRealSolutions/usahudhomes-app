@@ -7,7 +7,7 @@ Used by 2_video_builder.py. Every step degrades gracefully:
   Script      Claude (ANTHROPIC_API_KEY)  →  OpenAI (OPENAI_API_KEY)  →  built-in template
   Voice       ElevenLabs (ELEVENLABS_API_KEY)  →  OpenAI TTS (OPENAI_API_KEY)  →  no voice
   Music       random track from hud-pipeline/music/  →  generated royalty-free bed
-  Mix         voice ducks the music automatically, loudness normalised to -14 LUFS
+  Mix         music sits steadily under the voice (no pumping), fixed-gain normalised to -14 LUFS
               (the YouTube / Instagram / TikTok playback target)
 
 Environment variables (all optional):
@@ -19,7 +19,7 @@ Environment variables (all optional):
   ELEVENLABS_VOICE_ID   default: pNInz6obpgDQGcFmaJgB  (pick any voice in your ElevenLabs library)
   ELEVENLABS_MODEL      default: eleven_multilingual_v2
   HUD_MUSIC_DIR         default: hud-pipeline/music
-  HUD_MUSIC_VOLUME_DB   default: -17  (music level under the voice, before ducking)
+  HUD_MUSIC_VOLUME_DB   default: -18  (music level under the voice while it speaks)
 """
 
 from __future__ import annotations
@@ -62,6 +62,28 @@ def _env(name, default=""):
 def state_name(prop):
     st = str(prop.get("state", "")).strip().upper()
     return STATE_NAMES.get(st, st)
+
+
+def place_name(prop):
+    """'Sevierville, Tennessee' / 'Washington, D.C.' (never 'Washington, Washington, D.C.')."""
+    st = str(prop.get("state", "")).strip().upper()
+    city = str(prop.get("city", "")).strip()
+    if st == "DC":
+        return "Washington, D.C." if not city or city.lower().startswith("washington") else f"{city}, Washington, D.C."
+    return f"{city}, {state_name(prop)}" if city else state_name(prop)
+
+
+def area_label(prop):
+    """'Sevier County', 'Orleans Parish' (LA), 'Juneau Borough' (AK); '' for DC or when unknown."""
+    st = str(prop.get("state", "")).strip().upper()
+    county = str(prop.get("county", "") or "").strip()
+    if not county or st == "DC" or "district of columbia" in county.lower():
+        return ""
+    if re.search(r"\b(county|parish|borough|census area|municipality|city and borough)$", county, re.I):
+        return county
+    if county.lower().endswith(" city") and st in ("VA", "MD", "MO", "NV"):
+        return county                       # independent cities
+    return f"{county} {'Parish' if st == 'LA' else 'Borough' if st == 'AK' else 'County'}"
 
 
 def is_home_state(prop, home="NC"):
@@ -109,29 +131,32 @@ def spoken_date(s):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def template_script(prop, ctx):
-    city, st, county = prop.get("city", ""), state_name(prop), prop.get("county", "")
+    st, area = state_name(prop), area_label(prop)
+    where = area or place_name(prop)
     beds, baths = num_text(prop.get("bedrooms") or prop.get("beds")), num_text(prop.get("bathrooms") or prop.get("baths"))
     price = price_text(prop)
     bids = spoken_date(prop.get("bids_open"))
     agent, phone, site = ctx["agent_name"], ctx["agency_phone"], ctx["agency_website"]
 
-    hero = f"HUD home alert! A {beds}-bedroom, {baths}-bath home in {city}, {st}"
+    hero = f"HUD home alert! A {beds}-bedroom, {baths}-bath home in {place_name(prop)}"
     hero += f", listed at just {price}." if price else "."
 
     labels = [l.lower() for l in (ctx.get("tour_labels") or [])]
-    if len(labels) >= 2:
+    if len(labels) >= 3:
         tour = f"Take a look inside: the {', the '.join(labels[:-1])}, and the {labels[-1]}."
+    elif len(labels) == 2:
+        tour = f"Take a look inside: the {labels[0]} and the {labels[1]}."
     elif labels:
         tour = f"Here's a look at the {labels[0]}."
     else:
         tour = ""
 
     if is_pending(prop):
-        details = (f"This one is pending sale right now, but new HUD homes in {county} County "
+        details = (f"This one is pending sale right now, but new HUD homes in {where} "
                    f"come on the market every week.")
     else:
-        details = f"It's in {county} County"
-        details += f", and bids open {bids}." if bids else ", and it's open for bids now."
+        bid_txt = f"bids open {bids}." if bids else "it's open for bids now."
+        details = f"It's in {area}, and {bid_txt}" if area else bid_txt[0].upper() + bid_txt[1:]
 
     incentives = ("Owner-occupants may qualify for just one hundred dollars down with FHA, "
                   "up to three percent toward closing costs, and repair money with a 203k loan.")
@@ -149,9 +174,8 @@ def template_script(prop, ctx):
 
 def _script_prompt(prop, ctx):
     facts = {
-        "city": prop.get("city", ""),
-        "state": state_name(prop),
-        "county": prop.get("county", ""),
+        "location": place_name(prop),
+        "county_or_parish": area_label(prop),
         "list_price": price_text(prop),
         "bedrooms": num_text(prop.get("bedrooms") or prop.get("beds")),
         "bathrooms": num_text(prop.get("bathrooms") or prop.get("baths")),
@@ -166,9 +190,9 @@ def _script_prompt(prop, ctx):
     else:
         agency_rule = (f"Segment 5: this home is NOT in North Carolina. Do NOT say {ctx['agency_name']} bids on it. "
                        f"Say {ctx['agency_website']} connects buyers with a HUD-registered buyer's agent in "
-                       f"{facts['state']} who submits the bid.")
+                       f"{state_name(prop)} who submits the bid.")
     pending_rule = ("The status is pending/under contract: segment 3 must say it is pending and pivot to "
-                    "'more HUD homes in this county come up every week'. Do not urge bidding on this home."
+                    "'more HUD homes in this area come up every week'. Do not urge bidding on this home."
                     if is_pending(prop) else "")
     labels = ctx.get("tour_labels") or []
     tour_rule = (f"2. tour — plays over {len(labels)} photo(s) shown in this order: {', '.join(labels)}. "
@@ -181,9 +205,9 @@ Property facts (use only these; never invent features, condition, or square foot
 {json.dumps(facts, indent=2)}
 
 Write exactly six spoken segments, one per section of the video:
-1. hero — a scroll-stopping hook with price, beds/baths, city and state. 10–16 words.
+1. hero — a scroll-stopping hook with price, beds/baths and the location (say it exactly as given). 10–16 words.
 {tour_rule}
-3. details — county and bid-open date (or pending pivot). 8–16 words.
+3. details — the county_or_parish (skip it if blank) and bid-open date (or pending pivot). 8–16 words.
 4. incentives — owner-occupant incentives: {ctx['incentive1']}, {ctx['incentive2']}, {ctx['incentive3']}. Say buyers "may qualify". 14–22 words.
 5. agency — 12–20 words. {agency_rule}
 6. cta — visit {ctx['agency_website']} or call {ctx['agent_name']} at {ctx['agency_phone']}, get pre-qualified and bid, then "Follow for more HUD homes". 12–18 words.
@@ -375,7 +399,8 @@ def synthesize_segments(segments, work_dir):
             return None
         # Trim leading/trailing silence so slide timing is tight
         trim = "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.05"
-        _ffmpeg(["-i", raw, "-af", f"{trim},areverse,{trim},areverse",
+        _ffmpeg(["-i", raw, "-af", f"{trim},areverse,{trim},areverse,highpass=f=80,"
+                 "acompressor=threshold=-20dB:ratio=2.5:attack=10:release=250",
                  "-ar", str(SR), "-ac", "1", wav])
         clips.append((wav, audio_duration(wav)))
     print(f"    ✓ Voiceover: {provider}, {sum(c[1] for c in clips if c):.1f}s")
@@ -422,111 +447,85 @@ def _reverb(x, seconds=1.6, mix=0.22, seed=0):
     return (1 - mix) * x + mix * wet
 
 
+def _xfade_env(n_total, start, end, xf):
+    """Envelope that is 1 inside [start, end] with equal-power (sine/cosine) ramps over ±xf at each
+    edge, so the combined level stays constant while one chord hands over to the next."""
+    t = np.arange(n_total) / SR
+    env = np.ones(n_total)
+    rise = np.clip((t - (start - xf)) / (2 * xf), 0, 1)
+    fall = np.clip(((end + xf) - t) / (2 * xf), 0, 1)
+    return env * np.sin(rise * np.pi / 2) * np.sin(fall * np.pi / 2)
+
+
 def generate_music(duration, out_wav, seed_text="hud"):
     """
-    Royalty-free, generated-on-the-fly background bed: warm, optimistic pop pad
-    with a soft pluck arpeggio, sub bass and light percussion. ~100 BPM.
+    Royalty-free, generated background bed: a warm, steady pad with sustained bass and a
+    soft, even arpeggio. No drums, no pulsing, no detuned voices, no volume wobble —
+    the level stays constant so it sits calmly under the voiceover.
     Each property gets a different key / tempo / pattern (seeded by case number).
     """
     rng = np.random.default_rng(int(hashlib.md5(seed_text.encode()).hexdigest()[:8], 16))
-    bpm = float(rng.choice([96, 100, 104]))
+    bpm = float(rng.choice([84, 88, 92]))
     beat = 60.0 / bpm
     bar = beat * 4
     key = int(rng.choice([0, 2, 5, 7, 9]))  # C D F G A
-    # I–V–vi–IV  or  vi–IV–I–V
-    progs = [[(0, "M"), (7, "M"), (9, "m"), (5, "M")], [(9, "m"), (5, "M"), (0, "M"), (7, "M")]]
+    progs = [[(0, "M"), (7, "M"), (9, "m"), (5, "M")], [(0, "M"), (5, "M"), (9, "m"), (7, "M")],
+             [(9, "m"), (5, "M"), (0, "M"), (7, "M")]]
     prog = progs[int(rng.integers(len(progs)))]
-    n = int((duration + 0.5) * SR)
+    n = int((duration + 1.0) * SR)
     t = np.arange(n) / SR
-    pad = np.zeros(n); pluck = np.zeros(n); bass = np.zeros(n); drums = np.zeros(n)
+    pad = np.zeros(n); bass = np.zeros(n); arp = np.zeros(n)
 
-    def chord_at(time_s):
-        root, q = prog[int(time_s // bar) % len(prog)]
-        third = 3 if q == "m" else 4
-        base = 57 + key + root  # around A3
-        return [base, base + third, base + 7, base + 12]
+    def chord(b):
+        root, q = prog[b % len(prog)]
+        base = 57 + key + root
+        return [base, base + (3 if q == "m" else 4), base + 7, base + 12]
 
-    # Pad: detuned saw-ish stack per bar with soft attack/release
-    nbars = int(np.ceil(duration / bar)) + 1
+    # One continuous, phase-locked tone per pitch. A note shared by two neighbouring chords just keeps
+    # sounding (no cancellation dip); other notes hand over with equal-power fades.
+    nbars = int(np.ceil((duration + 1.0) / bar)) + 1
+    envs = [_xfade_env(n, b * bar if b else -1.0, (b + 1) * bar, 0.9) for b in range(nbars)]
+    pad_amp, bass_amp = {}, {}
     for b in range(nbars):
-        s, e = int(b * bar * SR), min(n, int((b + 1) * bar * SR + 0.3 * SR))
-        if s >= n:
-            break
-        tt = t[s:e] - b * bar
-        env = np.minimum(1, tt / 0.35) * np.minimum(1, np.maximum(0, (bar + 0.3 - tt) / 0.5))
-        seg = np.zeros(e - s)
-        for note in chord_at(b * bar + 0.01):
-            for det in (-0.08, 0.0, 0.08):
-                f = _midi(note + det)
-                for k in range(1, 6):
-                    seg += np.sin(2 * np.pi * f * k * tt + rng.random() * 6.28) / (k * 1.6)
-        pad[s:e] += seg * env
-        # Bass: root, pulsing on beats 1 and 3
-        root = chord_at(b * bar + 0.01)[0] - 24
-        for bt in (0, 2, 2.5):
-            bs = s + int(bt * beat * SR)
-            be = min(n, bs + int(beat * 1.2 * SR))
-            if bs >= n:
-                continue
-            bt_t = np.arange(be - bs) / SR
-            benv = np.minimum(1, bt_t / 0.01) * np.exp(-bt_t * 2.5)
-            f = _midi(root)
-            bass[bs:be] += (np.sin(2 * np.pi * f * bt_t) + 0.3 * np.sin(4 * np.pi * f * bt_t)) * benv
+        notes = chord(b)
+        for note in notes:
+            pad_amp[note] = pad_amp.get(note, 0) + envs[b]
+        bass_amp[notes[0] - 12] = bass_amp.get(notes[0] - 12, 0) + envs[b]   # ~65–110 Hz: audible on phones
+    for note, amp in pad_amp.items():
+        f = _midi(note)
+        pad += np.clip(amp, 0, 1) * (np.sin(2 * np.pi * f * t) + 0.35 * np.sin(4 * np.pi * f * t)
+                                     + 0.12 * np.sin(6 * np.pi * f * t))
+    for note, amp in bass_amp.items():
+        f = _midi(note)
+        bass += np.clip(amp, 0, 1) * (np.sin(2 * np.pi * f * t) + 0.2 * np.sin(4 * np.pi * f * t))
 
-    # Pluck arpeggio on 8th notes
-    pattern = [0, 2, 1, 3, 2, 1, 3, 2] if rng.random() < 0.5 else [0, 1, 2, 3, 2, 1, 2, 3]
-    eighth = beat / 2
-    for i in range(int(duration / eighth) + 1):
-        s = int(i * eighth * SR)
-        if s >= n:
-            break
-        notes = chord_at(i * eighth + 0.001)
-        f = _midi(notes[pattern[i % 8]] + 12)
-        e = min(n, s + int(0.6 * SR))
-        tt = np.arange(e - s) / SR
-        env = np.minimum(1, tt / 0.004) * np.exp(-tt * 7)
-        vel = 0.8 if i % 2 == 0 else 0.55
-        pluck[s:e] += vel * env * (np.sin(2 * np.pi * f * tt) + 0.25 * np.sin(4 * np.pi * f * tt)
-                                   + 0.08 * np.sin(6 * np.pi * f * tt))
-
-    # Light percussion: soft kick on 1 & 3, shaker on off-beats (enters after first bar)
-    noise = rng.standard_normal(n)
-    hat_src = noise - _lowpass(noise, 7000)
-    for i in range(int(duration / beat) + 1):
+    # Gentle arpeggio: quarter notes, equal velocity, long soft decay (a sparkle, not a beat)
+    pattern = [0, 2, 1, 3] if rng.random() < 0.5 else [0, 1, 2, 3]
+    for i in range(int((duration + 1.0) / beat) + 1):
         s = int(i * beat * SR)
-        if s >= n or i < 4:
-            continue
-        if i % 2 == 0:
-            e = min(n, s + int(0.25 * SR))
-            tt = np.arange(e - s) / SR
-            f = 50 + 70 * np.exp(-tt * 30)
-            drums[s:e] += 0.9 * np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-tt * 14)
-        hs = s + int(beat / 2 * SR)
-        he = min(n, hs + int(0.07 * SR))
-        if hs < n:
-            tt = np.arange(he - hs) / SR
-            drums[hs:he] += 0.18 * hat_src[hs:he] * np.exp(-tt * 60)
+        if s >= n:
+            break
+        f = _midi(chord(int(i * beat // bar))[pattern[i % 4]] + 12)
+        e_ = min(n, s + int(3.5 * SR))
+        tt = np.arange(e_ - s) / SR
+        env = np.minimum(1, tt / 0.08) * np.exp(-tt * 0.9)
+        arp[s:e_] += env * (np.sin(2 * np.pi * f * tt) + 0.15 * np.sin(4 * np.pi * f * tt))
 
-    pad = _lowpass(pad, 1400) * (0.5 + 0.08 * np.sin(2 * np.pi * t / (bar * 2)))
-    pluck = _lowpass(pluck, 3500)
-    bass = _lowpass(bass, 300)
+    pad, bass, arp = _lowpass(pad, 1800), _lowpass(bass, 400), _lowpass(arp, 3000)
 
-    def norm(x):
-        m = np.max(np.abs(x)) or 1
-        return x / m
+    def rms_norm(x):
+        r = np.sqrt(np.mean(x ** 2)) or 1
+        return x / r
 
-    mono = 0.38 * norm(pad) + 0.30 * norm(pluck) + 0.42 * norm(bass) + 0.28 * norm(drums)
-    wet = _reverb(mono, seed=int(rng.integers(1 << 30)))
-    # Stereo width: Haas-delayed pluck/pad on the right channel
-    d = int(0.012 * SR)
-    left = wet
-    right = np.concatenate([np.zeros(d), wet[:-d]]) * 0.92 + wet * 0.08
-    st = np.stack([left, right], axis=1)
-    fade_in, fade_out = int(0.8 * SR), int(2.0 * SR)
-    st[:fade_in] *= np.linspace(0, 1, fade_in)[:, None]
-    st[-fade_out:] *= np.linspace(1, 0, fade_out)[:, None]
-    st = st[: int(duration * SR)]
-    st = 0.8 * st / (np.max(np.abs(st)) or 1)
+    mono = 0.60 * rms_norm(pad) + 0.35 * rms_norm(bass) + 0.14 * rms_norm(arp)
+    # Stereo width from two different reverb tails (dry signal identical in both channels), so the
+    # mix sums to mono cleanly on phone speakers — a delay-based widener would cancel bass notes.
+    dry_bass = _lowpass(mono, 200)
+    seed = int(rng.integers(1 << 30))
+    left = _reverb(mono - dry_bass, seconds=2.2, mix=0.30, seed=seed) + dry_bass
+    right = _reverb(mono - dry_bass, seconds=2.2, mix=0.30, seed=seed + 1) + dry_bass
+    st = np.stack([left, right], axis=1)[: int(duration * SR)]
+    st = 0.7 * st / (np.max(np.abs(st)) or 1)
     _write_wav(out_wav, st)
     return out_wav
 
@@ -541,56 +540,105 @@ def _write_wav(path, data):
         w.writeframes(pcm.tobytes())
 
 
+def _read_wav(path):
+    """16-bit PCM WAV → float array (samples, channels)."""
+    import wave
+    with wave.open(str(path), "rb") as w:
+        ch, sr = w.getnchannels(), w.getframerate()
+        data = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2").astype(np.float32) / 32768
+    if sr != SR:
+        raise ValueError(f"{path}: expected {SR} Hz, got {sr}")
+    return data.reshape(-1, ch)
+
+
+def _loudness(path):
+    """Integrated loudness (LUFS) via ffmpeg's EBU R128 meter."""
+    out = subprocess.run(["ffmpeg", "-nostats", "-i", str(path), "-af", "ebur128", "-f", "null", "-"],
+                         capture_output=True, text=True).stderr
+    m = re.findall(r"I:\s+(-?[\d.]+) LUFS", out)
+    return float(m[-1]) if m else None
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. Mix
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _speech_envelope(n, intervals, gap=1.5, attack=0.35, release=0.8):
+    """0..1 envelope that is 1 while the voice speaks. Pauses shorter than `gap` stay
+    ducked, so the music never swells between sentences (that swelling is the "throb")."""
+    merged = []
+    for a, b in sorted(intervals):
+        if merged and a - merged[-1][1] < gap:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    t = np.arange(n) / SR
+    env = np.zeros(n)
+    for a, b in merged:
+        rise = np.clip((t - (a - attack)) / attack, 0, 1)
+        fall = np.clip(((b + release) - t) / release, 0, 1)
+        e = np.minimum(rise, fall)
+        env = np.maximum(env, 0.5 - 0.5 * np.cos(np.pi * e))   # smooth S-curves
+    return env
+
+
 def mix_audio(total_sec, out_path, work_dir, voice_clips=None, seed_text="hud"):
     """
-    voice_clips: list of (wav_path, start_sec). Music ducks ~10 dB under the voice.
-    Writes an AAC .m4a, loudness-normalised to -14 LUFS.
+    voice_clips: list of (wav_path, start_sec).
+    The music sits HUD_MUSIC_VOLUME_DB (default -18) below the voice while it speaks and
+    eases up ~8 dB only before the first line and after the last. One fixed gain then brings
+    the whole mix to -14 LUFS — no compressor pumping, no automatic gain riding.
     """
+    n = int(round(total_sec * SR))
     music_file = pick_music_file(seed_text)
+    music_wav = os.path.join(work_dir, "music.wav")
     if music_file:
         print(f"    ✓ Music: {os.path.basename(music_file)}")
-        music_in = ["-stream_loop", "-1", "-i", music_file]
+        _ffmpeg(["-stream_loop", "-1", "-i", music_file, "-t", f"{total_sec + 0.5:.3f}",
+                 "-ar", str(SR), "-ac", "2", music_wav])
     else:
-        gen = os.path.join(work_dir, "music_gen.wav")
-        generate_music(total_sec + 0.5, gen, seed_text)
+        generate_music(total_sec + 0.5, music_wav, seed_text)
         print("    ✓ Music: generated bed")
-        music_in = ["-i", gen]
+    music = _read_wav(music_wav)[:n]
+    if len(music) < n:
+        music = np.pad(music, ((0, n - len(music)), (0, 0)))
+    t = np.arange(n) / SR
+    fades = np.clip(t / 0.8, 0, 1) * np.clip((total_sec - t) / 2.5, 0, 1)
+    music = music * fades[:, None]
 
-    vol = _env("HUD_MUSIC_VOLUME_DB", "-17")
-    fade_out_start = max(0, total_sec - 2.0)
-    music_chain = (f"[0:a]aformat=sample_rates={SR}:channel_layouts=stereo,atrim=0:{total_sec:.3f},"
-                   f"volume={vol}dB,afade=t=in:d=0.6,afade=t=out:st={fade_out_start:.3f}:d=2[mus]")
+    def rms(x):
+        return float(np.sqrt(np.mean(x ** 2))) or 1e-6
 
-    if not voice_clips:
-        # Music only — bring it up since there's nothing to sit under
-        fc = (music_chain.replace(f"volume={vol}dB", "volume=-6dB") +
-              ";[mus]loudnorm=I=-16:TP=-1.5:LRA=11[out]")
-        args = [*music_in, "-filter_complex", fc]
+    if voice_clips:
+        voice = np.zeros(n)
+        spans = []
+        for wav, start in voice_clips:
+            v = _read_wav(wav).mean(axis=1)
+            s = int(start * SR)
+            e = min(n, s + len(v))
+            if s < n:
+                voice[s:e] += v[: e - s]
+                spans.append((start, start + len(v) / SR))
+        speech = _speech_envelope(n, spans)
+        active = voice[speech > 0.99]
+        voice_rms = rms(active) if len(active) else rms(voice)
+        under_db = float(_env("HUD_MUSIC_VOLUME_DB", "-18"))
+        music = music / rms(music) * voice_rms * 10 ** (under_db / 20)      # level during speech
+        lift = 10 ** (8 / 20)                                               # +8 dB when nobody talks
+        music = music * (lift + (1 - lift) * speech)[:, None]
+        mix = music + voice[:, None]
     else:
-        args = list(music_in)
-        parts = [music_chain]
-        for i, (wav, start) in enumerate(voice_clips, start=1):
-            args += ["-i", wav]
-            ms = int(start * 1000)
-            parts.append(f"[{i}:a]aformat=sample_rates={SR}:channel_layouts=stereo,"
-                         f"adelay={ms}|{ms},apad[v{i}]")
-        vin = "".join(f"[v{i}]" for i in range(1, len(voice_clips) + 1))
-        parts.append(f"{vin}amix=inputs={len(voice_clips)}:normalize=0:duration=longest,"
-                     f"atrim=0:{total_sec:.3f},"
-                     f"highpass=f=80,acompressor=threshold=-20dB:ratio=3:attack=5:release=80,"
-                     f"asplit=2[voice][key]")
-        parts.append("[mus][key]sidechaincompress=threshold=0.03:ratio=8:attack=40:release=400[duck]")
-        parts.append("[voice][duck]amix=inputs=2:normalize=0:duration=first,"
-                     "loudnorm=I=-14:TP=-1.5:LRA=11[out]")
-        args += ["-filter_complex", ";".join(parts)]
+        mix = music
+    mix = 0.5 * mix / (np.max(np.abs(mix)) or 1)                            # headroom for the measurement
 
-    args += ["-map", "[out]", "-t", f"{total_sec:.3f}", "-ar", str(SR),
-             "-c:a", "aac", "-b:a", "192k", out_path]
-    _ffmpeg(args)
+    pre = os.path.join(work_dir, "premix.wav")
+    _write_wav(pre, mix)
+    target = -14.0 if voice_clips else -16.0
+    lufs = _loudness(pre)
+    gain = (target - lufs) if lufs is not None else 0.0
+    # Fixed gain + a transparent peak limiter (rarely touched, slow release so it can't pump)
+    _ffmpeg(["-i", pre, "-af", f"volume={gain:.2f}dB,alimiter=limit=0.89:attack=5:release=200:level=disabled",
+             "-ar", str(SR), "-c:a", "aac", "-b:a", "192k", out_path])
     return out_path
 
 

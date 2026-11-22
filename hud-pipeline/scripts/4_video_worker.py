@@ -17,8 +17,9 @@ Usage:
     # Run continuously, polling every 30 seconds
     python3 4_video_worker.py --watch
 
-    # Hands-off: also queue up to 3 new listings per cycle (NC only), skipping pending/sold
-    python3 4_video_worker.py --watch --auto-queue 3 --states NC
+    # Hands-off: also queue up to 3 new listings per cycle — every state + DC — skipping pending/sold
+    python3 4_video_worker.py --watch --auto-queue 3
+    # (optional) limit to certain states:  --states NC,SC
 
     # Process only a specific job ID
     python3 4_video_worker.py --job-id <uuid>
@@ -541,7 +542,7 @@ def main():
     ap.add_argument("--poll",    type=int, default=POLL_SEC,      help="Poll interval (sec)")
     ap.add_argument("--auto-queue", type=int, default=0, metavar="N",
                     help="Each cycle, queue up to N listings that have no video yet (skips pending/sold)")
-    ap.add_argument("--states", default="", help="With --auto-queue: only these states, e.g. NC,SC")
+    ap.add_argument("--states", default="", help="With --auto-queue: only these states, e.g. NC,SC (default: all states + DC)")
     args = ap.parse_args()
 
     if not SUPABASE_SERVICE_KEY:

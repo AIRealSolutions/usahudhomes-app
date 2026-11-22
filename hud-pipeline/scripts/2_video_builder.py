@@ -423,7 +423,7 @@ def slide1_hero(prop, photo):
 
     info_font, iy = F("reg", 40), row_y + 92
     rows = []
-    if prop.get("county"):    rows.append(("📍", f"{prop['county']} County", LIGHT))
+    if hud_audio.area_label(prop): rows.append(("📍", hud_audio.area_label(prop), LIGHT))
     if prop.get("bids_open"): rows.append(("📅", f"Bids Open: {prop['bids_open']}", GOLD))
     for icon, label, col in rows:
         tb = d.textbbox((0, 0), label, font=info_font)
@@ -469,7 +469,8 @@ def slide2_details(prop, photo):
     rows = [
         ("Case #",         safe("case_number")),
         ("Location",       f"{safe('city')}, {safe('state')}"),
-        ("County",         safe("county")),
+        ({"LA": "Parish", "AK": "Borough"}.get(str(prop.get("state", "")).upper(), "County"),
+                           hud_audio.area_label(prop).rsplit(" ", 1)[0] if hud_audio.area_label(prop) else "—"),
         ("List Price",     _price(prop)),
         ("Beds / Baths",   f"{hud_audio.num_text(safe('bedrooms'))} bd  /  {hud_audio.num_text(safe('bathrooms'))} ba"),
         ("Status",         safe("status", "Available")),
@@ -821,7 +822,7 @@ def build_video(prop, images_dir, output_path, voiceover=True, captions=True):
     image_path = os.path.join(images_dir, image_file) if image_file else None
     print(f"  Building reel: {case_num}")
     if hud_audio.is_pending(prop):
-        print("    ⚠ Status is pending — script will pivot to 'more HUD homes in this county'")
+        print("    ⚠ Status is pending — script will pivot to 'more HUD homes in this area'")
 
     work = tempfile.mkdtemp(prefix="hud_av_")
     try:

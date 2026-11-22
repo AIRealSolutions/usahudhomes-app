@@ -108,7 +108,7 @@ Reads the CSV and images from Script 1 (or a queued job via Script 4). Generates
 | 2–4 | Photo tour: up to 3 more photos (kitchen, living area, bath…) with room labels |
 | 5 | Listing details card + property photo |
 | 6 | Owner-Occupant Incentives ($100 Down FHA, 3% Closing Costs, 203k) |
-| 7 | NC listings: Lightkeeper Realty. Other states: USAHUDhomes.com connects you with a HUD-registered agent there |
+| 7 | NC listings: Lightkeeper Realty. Every other state + DC: USAHUDhomes.com connects you with a HUD-registered agent there (Louisiana parishes, Alaska boroughs and DC are worded correctly) |
 | 8 | Call to Action — USAHUDhomes.com, phone, QR code, Subscribe |
 
 ### Photo agent (`scripts/hud_photos.py`)
@@ -126,9 +126,12 @@ and picks the best front exterior plus 3 photos of different spaces, labelling e
 ### Hands-off mode
 
 ```bash
-# Poll the queue, and each cycle also queue up to 3 NC listings that have no video yet
-# (pending/sold listings are skipped). Uses the default template.
-python3 scripts/4_video_worker.py --watch --auto-queue 3 --states NC
+# Poll the queue, and each cycle also queue up to 3 listings (all states + DC) that have no
+# video yet. Pending/sold listings are skipped. Uses the default template.
+python3 scripts/4_video_worker.py --watch --auto-queue 3
+
+# Optional: only certain states
+python3 scripts/4_video_worker.py --watch --auto-queue 3 --states NC,SC
 ```
 
 ### Audio, voiceover & captions (`scripts/hud_audio.py`)
@@ -142,7 +145,7 @@ Every step falls back automatically, so a video is always produced:
 | Music | Your tracks in `hud-pipeline/music/` | — | Generated royalty-free bed |
 
 - Slide length follows the narration. Captions are burned in, which matters because most viewers watch muted.
-- Music ducks about 10 dB under the voice. The final mix is normalised to -14 LUFS (the YouTube/Instagram playback level).
+- Music sits steadily ~18 dB under the voice and doesn't swell between sentences. It plays back cleanly on mono phone speakers. One fixed gain brings the mix to -14 LUFS (the YouTube/Instagram playback level), so nothing pumps or throbs.
 - Pending listings get a script that pivots to "more HUD homes in this county come up every week".
 - The script prompt follows Fair Housing rules: it describes the property, never the people.
 
