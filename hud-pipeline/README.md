@@ -99,19 +99,43 @@ Images are saved as `###_######.jpg` where `###_######` is the case number with 
 
 ## Script 2 — Video Builder
 
-Reads the CSV and images from Script 1. Generates one **1280×720 MP4** per property with **5 slides**:
+Reads the CSV and images from Script 1 (or a queued job via Script 4). Generates one
+**1080×1920 vertical MP4** (Shorts / Reels / TikTok) per property with **5 slides**:
 
 | Slide | Content |
 |---|---|
-| 1 | Main property photo + price, address, beds/baths, bids open |
-| 2 | Full listing details (case #, county, listing period, etc.) |
+| 1 | Hero photo (slow Ken Burns zoom) + price, city, beds/baths, county, bids open |
+| 2 | Listing details card + property photo |
 | 3 | Owner-Occupant Incentives ($100 Down FHA, 3% Closing Costs, 203k) |
-| 4 | About Lightkeeper Realty — Registered HUD Buyer's Agency |
-| 5 | Call to Action — USAHUDhomes.com, phone, blinking Subscribe prompt |
+| 4 | NC listings: Lightkeeper Realty. Other states: USAHUDhomes.com connects you with a HUD-registered agent there |
+| 5 | Call to Action — USAHUDhomes.com, phone, QR code, Subscribe |
 
-Each slide is 4 seconds with a 0.5-second cross-fade transition.
+### Audio, voiceover & captions (`scripts/hud_audio.py`)
+
+Every step falls back automatically, so a video is always produced:
+
+| Step | 1st choice | Fallback | Last resort |
+|---|---|---|---|
+| Script | Claude (`ANTHROPIC_API_KEY`) | OpenAI (`OPENAI_API_KEY`) | Built-in template |
+| Voice | ElevenLabs (`ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`) | OpenAI TTS (`OPENAI_API_KEY`, `OPENAI_TTS_VOICE`) | No voice (music only) |
+| Music | Your tracks in `hud-pipeline/music/` | — | Generated royalty-free bed |
+
+- Slide length follows the narration. Captions are burned in, which matters because most viewers watch muted.
+- Music ducks about 10 dB under the voice. The final mix is normalised to -14 LUFS (the YouTube/Instagram playback level).
+- Pending listings get a script that pivots to "more HUD homes in this county come up every week".
+- The script prompt follows Fair Housing rules: it describes the property, never the people.
+
+Keys can be pasted at the top of `4_video_worker.py` or exported as environment variables.
+
+**Music:** put licensed `.mp3`/`.wav` tracks in `hud-pipeline/music/`. Each property is assigned a
+track, and the same property always gets the same one. Good sources that allow commercial use:
+YouTube Audio Library, Pixabay Music, Uppbeat, or a paid Epidemic Sound / Artlist plan (whitelist your
+channel to avoid Content ID claims). Look for "upbeat corporate", "inspiring acoustic" or "lo-fi house",
+90–110 BPM, with no vocals.
 
 ```bash
+export ANTHROPIC_API_KEY=...      # optional
+export ELEVENLABS_API_KEY=...     # optional
 python3 scripts/2_video_builder.py --csv output/NC/hud_homes_NC.csv
 python3 scripts/2_video_builder.py --csv output/NC/hud_homes_NC.csv --limit 5
 python3 scripts/2_video_builder.py --csv output/NC/hud_homes_NC.csv --output /custom/videos

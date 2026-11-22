@@ -26,7 +26,10 @@ Usage:
 Configuration (hardcoded at top of this file):
     SUPABASE_URL        https://lpqjndfjbenolhneqzec.supabase.co
     SUPABASE_SERVICE_KEY  <your service_role key from Supabase dashboard>
-    OPENAI_API_KEY      <optional — enables AI title/description generation>
+    OPENAI_API_KEY      <optional — AI title/description; script + voice fallback>
+    ANTHROPIC_API_KEY   <optional — Claude writes the voiceover script>
+    ELEVENLABS_API_KEY  <optional — ElevenLabs voiceover (best quality)>
+    Music: drop licensed .mp3/.wav files in hud-pipeline/music/ (else a bed is generated)
     WORKER_POLL_SEC     30  (seconds between polls in --watch mode)
     WORKER_BATCH        3   (jobs per poll cycle)
 """
@@ -51,7 +54,10 @@ except ImportError:
 # ── Config — paste your keys here ────────────────────────────────────────────
 SUPABASE_URL         = "https://lpqjndfjbenolhneqzec.supabase.co"
 SUPABASE_SERVICE_KEY = "PASTE_YOUR_SERVICE_ROLE_KEY_HERE"   # Supabase → Settings → API → service_role
-OPENAI_API_KEY       = "PASTE_YOUR_OPENAI_KEY_HERE"    # optional — enables AI title/description generation
+OPENAI_API_KEY       = "PASTE_YOUR_OPENAI_KEY_HERE"    # optional — AI title/description, plus script + voice fallback
+ANTHROPIC_API_KEY    = "PASTE_YOUR_ANTHROPIC_KEY_HERE" # optional — Claude writes the voiceover script
+ELEVENLABS_API_KEY   = "PASTE_YOUR_ELEVENLABS_KEY_HERE"# optional — best-sounding voiceover
+ELEVENLABS_VOICE_ID  = ""                              # optional — any voice ID from your ElevenLabs library
 
 # Environment variables win over the values above, and the "PASTE_..."
 # placeholders count as "not set" (they used to be treated as real keys,
@@ -62,6 +68,14 @@ def _key(env_name, value):
 
 SUPABASE_SERVICE_KEY = _key("SUPABASE_SERVICE_KEY", SUPABASE_SERVICE_KEY)
 OPENAI_API_KEY       = _key("OPENAI_API_KEY", OPENAI_API_KEY)
+ANTHROPIC_API_KEY    = _key("ANTHROPIC_API_KEY", ANTHROPIC_API_KEY)
+ELEVENLABS_API_KEY   = _key("ELEVENLABS_API_KEY", ELEVENLABS_API_KEY)
+ELEVENLABS_VOICE_ID  = _key("ELEVENLABS_VOICE_ID", ELEVENLABS_VOICE_ID)
+# hud_audio.py (used by the video builder) reads these from the environment
+for _n, _v in (("OPENAI_API_KEY", OPENAI_API_KEY), ("ANTHROPIC_API_KEY", ANTHROPIC_API_KEY),
+               ("ELEVENLABS_API_KEY", ELEVENLABS_API_KEY), ("ELEVENLABS_VOICE_ID", ELEVENLABS_VOICE_ID)):
+    if _v:
+        os.environ[_n] = _v
 POLL_SEC             = 30   # seconds between queue polls in --watch mode
 DEFAULT_BATCH        = 3    # number of videos to process per cycle
 BUCKET              = "USAHUDhomes"
@@ -465,6 +479,8 @@ def main():
     print(f"  Supabase: {SUPABASE_URL}")
     print(f"  Batch:    {args.batch} jobs/cycle")
     print(f"  AI:       {'enabled' if OPENAI_API_KEY else 'disabled (no OPENAI_API_KEY)'}")
+    print(f"  Script:   {'Claude' if ANTHROPIC_API_KEY else 'OpenAI' if OPENAI_API_KEY else 'built-in template'}")
+    print(f"  Voice:    {'ElevenLabs' if ELEVENLABS_API_KEY else 'OpenAI TTS' if OPENAI_API_KEY else 'none (music only)'}")
     print(f"  Mode:     {'watch (Ctrl+C to stop)' if args.watch else 'run once'}")
     print(f"{'='*60}\n")
 
