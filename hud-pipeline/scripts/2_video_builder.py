@@ -36,7 +36,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import qrcode
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import hud_audio  # noqa: E402
+import hud_audio   # noqa: E402
+import hud_photos  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Canvas / timing constants
@@ -235,6 +236,8 @@ def backdrop(photo, top, bottom, strength=0.80):
     base = gradient(top, bottom)
     if photo is None:
         return base
+    if photo.size != (W, H):
+        photo = _cover(photo, W, H)
     blur = photo.convert("RGB").filter(ImageFilter.GaussianBlur(28)).convert("RGBA")
     return Image.blend(blur, base, strength)
 
@@ -288,7 +291,7 @@ def _tpl(prop, key, default):
 # Animated Subscribe / Like pop-up (hero slide only)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def make_subscribe_overlay(frame_idx, total_frames, w=W, h=H, btn_cy=H - 900):
+def make_subscribe_overlay(frame_idx, total_frames, w=W, h=H, btn_cy=H - 330, show_like=False):
     t = frame_idx / max(total_frames - 1, 1)
 
     def ease_out(x): return 1 - (1 - x) ** 3
@@ -324,6 +327,8 @@ def make_subscribe_overlay(frame_idx, total_frames, w=W, h=H, btn_cy=H - 900):
     d.text((bell_cx + bell_r + 18, btn_cy - (bb[3] - bb[1]) // 2 - bb[1]), "SUBSCRIBE",
            font=sub_font, fill=WHITE + (alpha,))
 
+    if not show_like:
+        return overlay
     lk_w, lk_h = int(200 * scale), int(72 * scale)
     lk_cx = w - 50 - lk_w // 2 + x_off
     lk_cy = btn_cy - btn_h - 24
@@ -374,60 +379,80 @@ def _price(prop):
     except (TypeError, ValueError): return f"${prop.get('list_price', '')}"
 
 
-def slide1_hero(prop, photo):
-    bg = photo if photo is not None else gradient((40, 50, 80), (10, 15, 35))
-    img, d = new_layer()
+HERO_WIN  = (390, 880)     # (y, height) of the hero photo band
+PHOTO_WIN = (240, 1170)    # photo-tour band
 
-    top = np.zeros((360, W, 4), np.uint8); top[..., 3] = np.linspace(190, 0, 360, dtype=np.uint8)[:, None]
-    img.alpha_composite(Image.fromarray(top, "RGBA"), (0, 0))
-    bot = np.zeros((1000, W, 4), np.uint8); bot[..., 3] = np.linspace(0, 235, 1000, dtype=np.uint8)[:, None]
-    img.alpha_composite(Image.fromarray(bot, "RGBA"), (0, H - 1000))
-    d = BlendDraw(img)
 
-    centered_text(d, 50, _tpl(prop, "agency_website", "USAHUDhomes.com"), F("bold", 40), GOLD)
-
+def _status_pill(d, prop, y):
     status = (prop.get("status") or "Available").strip()
     sc = STATUS_COLORS.get(status.lower(), (60, 60, 60))
-    s_font = F("bold", 34)
+    s_font = F("bold", 32)
     bb = d.textbbox((0, 0), status.upper(), font=s_font)
-    sw, sh = bb[2] - bb[0] + 48, 58
+    sw, sh = bb[2] - bb[0] + 48, 54
     sx = (W - sw) // 2
-    d.rounded_rectangle([(sx, 112), (sx + sw, 112 + sh)], radius=sh // 2, fill=sc + (235,))
-    d.text((sx + 24, 112 + (sh - (bb[3] - bb[1])) // 2 - bb[1]), status.upper(), font=s_font, fill=WHITE + (255,))
+    d.rounded_rectangle([(sx, y), (sx + sw, y + sh)], radius=sh // 2, fill=sc + (240,))
+    d.text((sx + 24, y + (sh - (bb[3] - bb[1])) // 2 - bb[1]), status.upper(), font=s_font, fill=WHITE + (255,))
 
-    card_y, card_b, pad = H - 820, H - 320, 40
-    d.rounded_rectangle([(pad, card_y), (W - pad, card_b)], radius=30, fill=DARK_CARD + (215,),
-                        outline=GOLD + (90,), width=2)
 
-    centered_text(d, card_y + 26, _price(prop), F("bold", 100), GOLD)
-    centered_text(d, card_y + 146, f"{prop.get('city', '')}, {prop.get('state', '')}", F("bold", 56), WHITE)
+def _band_edges(d, y, h):
+    d.rectangle([(0, y - 6), (W, y)], fill=GOLD + (255,))
+    d.rectangle([(0, y + h), (W, y + h + 6)], fill=GOLD + (255,))
+
+
+def slide1_hero(prop, photo):
+    """Price and city above the photo, facts below — nothing sits on the house."""
+    bg = backdrop(photo, (12, 24, 58), (4, 10, 28), 0.86)
+    img, d = new_layer()
+    wy, wh = HERO_WIN
+
+    centered_text(d, 34, _tpl(prop, "agency_website", "USAHUDhomes.com"), F("bold", 38), GOLD)
+    _status_pill(d, prop, 90)
+    centered_text(d, 160, _price(prop), F("bold", 112), GOLD)
+    centered_text(d, 290, f"{prop.get('city', '')}, {prop.get('state', '')}", F("bold", 60), WHITE)
+    _band_edges(d, wy, wh)
 
     beds  = hud_audio.num_text(prop.get("bedrooms", "—"))
     baths = hud_audio.num_text(prop.get("bathrooms", "—"))
-    bb_font, isz, row_y = F("bold", 46), 50, card_y + 236
+    bb_font, isz, row_y = F("bold", 52), 56, wy + wh + 40
     for label, icon, cx in ((f"{beds} BD", "🛏", W // 3), (f"{baths} BA", "🚿", 2 * W // 3)):
         tb = d.textbbox((0, 0), label, font=bb_font)
         total = isz + 14 + (tb[2] - tb[0])
         x = cx - total // 2
         draw_emoji(d, (x, row_y), icon, isz, color=GOLD)
-        d.text((x + isz + 14, row_y + (isz - (tb[3] - tb[1])) // 2 - tb[1]), label, font=bb_font, fill=OFFWHITE + (255,))
+        d.text((x + isz + 14, row_y + (isz - (tb[3] - tb[1])) // 2 - tb[1]), label, font=bb_font, fill=WHITE + (255,))
 
-    d.line([(pad + 40, card_y + 316), (W - pad - 40, card_y + 316)], fill=GOLD + (120,), width=2)
-
-    info_font, iy = F("reg", 38), card_y + 340
+    info_font, iy = F("reg", 40), row_y + 92
     rows = []
     if prop.get("county"):    rows.append(("📍", f"{prop['county']} County", LIGHT))
     if prop.get("bids_open"): rows.append(("📅", f"Bids Open: {prop['bids_open']}", GOLD))
     for icon, label, col in rows:
         tb = d.textbbox((0, 0), label, font=info_font)
-        total = 38 + 12 + (tb[2] - tb[0])
+        total = 40 + 12 + (tb[2] - tb[0])
         x = (W - total) // 2
-        draw_emoji(d, (x, iy), icon, 38, color=col)
-        d.text((x + 50, iy + (38 - (tb[3] - tb[1])) // 2 - tb[1]), label, font=info_font, fill=col + (255,))
-        iy += 60
+        draw_emoji(d, (x, iy), icon, 40, color=col)
+        d.text((x + 52, iy + (40 - (tb[3] - tb[1])) // 2 - tb[1]), label, font=info_font, fill=col + (255,))
+        iy += 62
 
     brand_bar(d, f"{_tpl(prop, 'agency_name', 'Lightkeeper Realty')}  •  "
                  f"{_tpl(prop, 'agency_phone', '910.363.6147')}  •  HUD Buyer's Agency")
+    return bg, img
+
+
+def slide_photo(prop, photo, label, n, total):
+    """Photo-tour slide: room label on top, a large moving photo, progress dots below."""
+    bg = backdrop(photo, (12, 24, 58), (4, 10, 28), 0.86)
+    img, d = new_layer()
+    wy, wh = PHOTO_WIN
+    centered_text(d, 50, label.upper(), F("bold", 72), GOLD)
+    centered_text(d, 148, f"{prop.get('city', '')}, {prop.get('state', '')}  •  {_price(prop)}", F("bold", 40), OFFWHITE)
+    _band_edges(d, wy, wh)
+    r, gap = 11, 34
+    x0 = W // 2 - (total - 1) * gap // 2
+    for k in range(total):
+        cx, cy = x0 + k * gap, wy + wh + 46
+        fill = GOLD + (255,) if k == n else (255, 255, 255, 110)
+        d.ellipse([(cx - r, cy - r), (cx + r, cy + r)], fill=fill)
+    brand_bar(d, f"{_tpl(prop, 'agency_website', 'USAHUDhomes.com')}  •  {_tpl(prop, 'agency_phone', '910.363.6147')}")
     return bg, img
 
 
@@ -487,6 +512,10 @@ def slide2_details(prop, photo):
 
     brand_bar(d, "USAHUDhomes.com  •  Lightkeeper Realty", NAVY2)
     return bg, img
+
+
+def _cover(photo, w, h):
+    return _load_photo_from_img(photo, w, h)
 
 
 def _load_photo_from_img(photo, w, h):
@@ -695,22 +724,39 @@ def _premul(rgba_img):
     return a[..., :3] * alpha * 255.0, alpha
 
 
+def _kenburns(src, s, pan, out_w, out_h):
+    import cv2
+    tx = (1 - s) * out_w / 2 * (1 + pan)
+    ty = (1 - s) * out_h / 2
+    M = np.float32([[s, 0, tx], [0, s, ty]])
+    return cv2.warpAffine(src, M, (out_w, out_h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+
+
 class SlideClip:
-    def __init__(self, bg, fg, zoom=0.05, pan=0.0, animate_in=True):
+    """
+    bg      full-frame backdrop (slow zoom)
+    fg      content layer (slides in)
+    window  optional (y, height, PIL photo): a full-width photo band with its own,
+            stronger Ken Burns move — the house is never covered by text.
+    """
+    def __init__(self, bg, fg, zoom=0.05, pan=0.0, animate_in=True, window=None, wzoom=0.10, wpan=0.3):
         self.bg = np.ascontiguousarray(np.asarray(bg.convert("RGB")))
         self.pm, self.a = _premul(fg)
         self.inv_a = 1.0 - self.a
         self.zoom, self.pan, self.animate_in = zoom, pan, animate_in
+        self.window = None
+        if window is not None:
+            wy, wh, photo = window
+            self.window = (wy, wh, np.ascontiguousarray(np.asarray(_cover(photo, W, wh).convert("RGB"))))
+        self.wzoom, self.wpan = wzoom, wpan
 
     def frame(self, t, dur):
-        import cv2
         p = min(max(t / max(dur, 1e-3), 0.0), 1.0)
-        s = 1.0 + self.zoom * p
-        tx = (1 - s) * W / 2 * (1 + self.pan)
-        ty = (1 - s) * H / 2
-        M = np.float32([[s, 0, tx], [0, s, ty]])
-        bg = cv2.warpAffine(self.bg, M, (W, H), flags=cv2.INTER_LINEAR,
-                            borderMode=cv2.BORDER_REFLECT).astype(np.float32)
+        bg = _kenburns(self.bg, 1.0 + self.zoom * p, self.pan, W, H)
+        if self.window is not None:
+            wy, wh, src = self.window
+            bg[wy:wy + wh] = _kenburns(src, 1.0 + self.wzoom * p, self.wpan, W, wh)
+        bg = bg.astype(np.float32)
         e = 1.0
         if self.animate_in:
             x = min(max(t / ENTER_SEC, 0.0), 1.0)
@@ -756,7 +802,20 @@ def _ctx(prop):
     }
 
 
+def _open(path):
+    try:
+        with Image.open(path) as im:
+            return im.convert("RGB")
+    except Exception:
+        return None
+
+
 def build_video(prop, images_dir, output_path, voiceover=True, captions=True):
+    """
+    prop["_photo_files"] (optional): every downloaded photo of the listing. The photo
+    agent (hud_photos.py) picks the hero shot and up to 3 photo-tour shots from them.
+    Without it, the single main_image is used.
+    """
     case_num   = prop.get("case_number", "unknown")
     image_file = prop.get("main_image", "")
     image_path = os.path.join(images_dir, image_file) if image_file else None
@@ -766,52 +825,91 @@ def build_video(prop, images_dir, output_path, voiceover=True, captions=True):
 
     work = tempfile.mkdtemp(prefix="hud_av_")
     try:
-        photo = _load_photo(image_path, W, H)
+        # ── 1. Photos ──────────────────────────────────────────────────────────
+        files = [p for p in (prop.get("_photo_files") or []) if os.path.exists(p)]
+        if not files and image_path and os.path.exists(image_path):
+            files = [image_path]
+        pick = hud_photos.choose_photos(files, prop) if files else None
+        hero_img = _open(pick["hero"]) if pick else None
+        tour = [(img, lab) for img, lab in ((_open(p), lab) for p, lab in (pick["tour"] if pick else []))
+                if img is not None]
+        if pick:
+            print(f"    ✓ Photos ({pick['source']}): hero + {len(tour)} tour "
+                  f"[{', '.join(lab for _, lab in tour) or '—'}]")
+        else:
+            print("    ⚠ No usable photo — slides will use plain backgrounds")
+        photo = _cover(hero_img, W, H) if hero_img is not None else None   # blurred backdrops
 
-        # ── 1. Script + voice ──────────────────────────────────────────────────
-        segments, src = hud_audio.build_script(prop, _ctx(prop))
+        # ── 2. Script + voice ──────────────────────────────────────────────────
+        ctx = _ctx(prop)
+        ctx["tour_labels"] = [lab for _, lab in tour]
+        segments, src = hud_audio.build_script(prop, ctx)
+        if not tour:
+            segments[1] = ""
         print(f"    ✓ Script ({src}):")
         for s in segments:
-            print(f"        “{s}”")
+            if s:
+                print(f"        “{s}”")
         clips = hud_audio.synthesize_segments(segments, work) if voiceover else None
         if not clips:
             print("    · No voice key configured — music-only video (add ELEVENLABS_API_KEY or OPENAI_API_KEY)")
 
-        # ── 2. Timeline ────────────────────────────────────────────────────────
-        n = 5
-        holds = []
-        for i in range(n):
-            h = SLIDE_SEC if not clips else max(3.0, VOICE_LEAD + clips[i][1] + VOICE_TAIL)
-            holds.append(h)
+        # ── 3. Slide plan: (segment index, builder, SlideClip options) ────────
+        hero_win = (HERO_WIN[0], HERO_WIN[1], hero_img) if hero_img is not None else None
+        plan = [(0, lambda: slide1_hero(prop, photo),
+                 dict(zoom=0.03, pan=0.0, animate_in=False, window=hero_win, wzoom=0.12, wpan=0.4))]
+        for k, (img, lab) in enumerate(tour):
+            plan.append((1, (lambda img=img, lab=lab, k=k: slide_photo(prop, img, lab, k, len(tour))),
+                         dict(zoom=0.03, pan=0.0, window=(PHOTO_WIN[0], PHOTO_WIN[1], img),
+                              wzoom=0.14, wpan=(0.5 if k % 2 == 0 else -0.5))))
+        for seg, fn in ((2, slide2_details), (3, slide3_incentives), (4, slide4_lightkeeper), (5, slide5_cta)):
+            plan.append((seg, (lambda fn=fn: fn(prop, photo)), dict(zoom=0.06, pan=0.2 if seg % 2 else -0.2)))
+        n = len(plan)
+
+        # ── 4. Timeline: each spoken segment covers its group of slides ────────
+        holds = [0.0] * n
+        for seg in range(len(hud_audio.SEGMENTS)):
+            idx = [i for i, p in enumerate(plan) if p[0] == seg]
+            if not idx:
+                continue
+            k = len(idx)
+            min_each = 2.4 if seg == 1 else (3.0 if clips else SLIDE_SEC)
+            clip = clips[seg] if clips else None
+            need = (VOICE_LEAD + clip[1] + VOICE_TAIL) if clip else 0.0
+            each = max(min_each, (need - (k - 1) * FADE_SEC) / k)
+            for i in idx:
+                holds[i] = each
         holds[-1] += 1.2                      # let the CTA + music land
         starts, t = [], 0.0
         for i in range(n):
             starts.append(t)
             t += holds[i] + (FADE_SEC if i < n - 1 else 0)
         total = t
+        seg_start = {}
+        for i, p in enumerate(plan):
+            seg_start.setdefault(p[0], starts[i])
 
-        cap_events = []
-        if clips and captions:
-            for i, text in enumerate(segments):
-                for (a, b, txt) in hud_audio.caption_chunks(text, starts[i] + VOICE_LEAD, clips[i][1]):
-                    cap_events.append((a, b, render_caption(txt)))
+        voice_at, cap_events = [], []
+        if clips:
+            for seg, clip in enumerate(clips):
+                if clip and seg in seg_start:
+                    at = seg_start[seg] + VOICE_LEAD
+                    voice_at.append((clip[0], at))
+                    if captions:
+                        for (a, b, txt) in hud_audio.caption_chunks(segments[seg], at, clip[1]):
+                            cap_events.append((a, b, render_caption(txt)))
 
-        # ── 3. Audio mix ───────────────────────────────────────────────────────
+        # ── 5. Audio mix ───────────────────────────────────────────────────────
         audio_path = os.path.join(work, "mix.m4a")
-        voice_at = [(clips[i][0], starts[i] + VOICE_LEAD) for i in range(n)] if clips else None
-        hud_audio.mix_audio(total, audio_path, work, voice_at, seed_text=str(case_num))
+        hud_audio.mix_audio(total, audio_path, work, voice_at or None, seed_text=str(case_num))
 
-        # ── 4. Slides ──────────────────────────────────────────────────────────
-        builders = [slide1_hero, slide2_details, slide3_incentives, slide4_lightkeeper, slide5_cta]
+        # ── 6. Slides ──────────────────────────────────────────────────────────
         clips_v = []
-        for i, fn in enumerate(builders):
-            bg, fg = fn(prop, photo)
-            clips_v.append(SlideClip(bg, fg,
-                                     zoom=0.12 if i == 0 else 0.06,
-                                     pan=0.35 if i == 0 else (0.2 if i % 2 else -0.2),
-                                     animate_in=(i != 0)))   # first frame = full hero (thumbnail)
+        for seg, fn, opts in plan:
+            bg, fg = fn()
+            clips_v.append(SlideClip(bg, fg, **opts))
 
-        # ── 5. Render → ffmpeg (H.264 + AAC, one encode) ───────────────────────
+        # ── 7. Render → ffmpeg (H.264 + AAC, one encode) ───────────────────────
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         cmd = ["ffmpeg", "-y", "-loglevel", "error",
                "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
@@ -823,7 +921,7 @@ def build_video(prop, images_dir, output_path, voiceover=True, captions=True):
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
         total_frames = int(round(total * FPS))
-        ov_start = holds[0] - OVERLAY_SEC
+        ov_start = max(0.5, holds[0] - OVERLAY_SEC)
         ov_cache = {}
         for f in range(total_frames):
             T = f / FPS
@@ -833,12 +931,10 @@ def build_video(prop, images_dir, output_path, voiceover=True, captions=True):
                 frame = clips_v[i].frame(local, holds[i])
             else:   # cross-fade into the next slide
                 u = (local - holds[i]) / FADE_SEC
-                a_ = clips_v[i].frame(local, holds[i])
-                b_ = clips_v[i + 1].frame(0.0, holds[i + 1])
-                frame = a_ * (1 - u) + b_ * u
+                frame = clips_v[i].frame(local, holds[i]) * (1 - u) + clips_v[i + 1].frame(0.0, holds[i + 1]) * u
 
             if i == 0 and ov_start <= T < holds[0]:
-                k = int((T - ov_start) * FPS)
+                k = min(int((T - ov_start) / (holds[0] - ov_start) * OVERLAY_FRAMES), OVERLAY_FRAMES - 1)
                 if k not in ov_cache:
                     ov_cache[k] = make_subscribe_overlay(k, OVERLAY_FRAMES)
                 _paste(frame, ov_cache[k], 0, 0)

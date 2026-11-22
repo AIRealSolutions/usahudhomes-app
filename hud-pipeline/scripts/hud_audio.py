@@ -32,7 +32,7 @@ import numpy as np
 SR = 44100
 
 # Segment order matches the slide order in 2_video_builder.py
-SEGMENTS = ["hero", "details", "incentives", "agency", "cta"]
+SEGMENTS = ["hero", "tour", "details", "incentives", "agency", "cta"]
 
 STATE_NAMES = {
     "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas", "CA": "California",
@@ -118,6 +118,14 @@ def template_script(prop, ctx):
     hero = f"HUD home alert! A {beds}-bedroom, {baths}-bath home in {city}, {st}"
     hero += f", listed at just {price}." if price else "."
 
+    labels = [l.lower() for l in (ctx.get("tour_labels") or [])]
+    if len(labels) >= 2:
+        tour = f"Take a look inside: the {', the '.join(labels[:-1])}, and the {labels[-1]}."
+    elif labels:
+        tour = f"Here's a look at the {labels[0]}."
+    else:
+        tour = ""
+
     if is_pending(prop):
         details = (f"This one is pending sale right now, but new HUD homes in {county} County "
                    f"come on the market every week.")
@@ -136,7 +144,7 @@ def template_script(prop, ctx):
                   f"who can submit your bid and guide you to closing.")
 
     cta = f"Visit {site} or call {agent} at {phone} to get pre-qualified and bid. Follow for more HUD homes!"
-    return [hero, details, incentives, agency, cta]
+    return [hero, tour, details, incentives, agency, cta]
 
 
 def _script_prompt(prop, ctx):
@@ -153,26 +161,32 @@ def _script_prompt(prop, ctx):
         "listing_period": prop.get("listing_period", ""),
     }
     if is_home_state(prop):
-        agency_rule = (f"Segment 4: {ctx['agency_name']} is the HUD-registered buyer's agency that submits "
+        agency_rule = (f"Segment 5: {ctx['agency_name']} is the HUD-registered buyer's agency that submits "
                        f"bids for buyers in North Carolina, 25 years of experience.")
     else:
-        agency_rule = (f"Segment 4: this home is NOT in North Carolina. Do NOT say {ctx['agency_name']} bids on it. "
+        agency_rule = (f"Segment 5: this home is NOT in North Carolina. Do NOT say {ctx['agency_name']} bids on it. "
                        f"Say {ctx['agency_website']} connects buyers with a HUD-registered buyer's agent in "
                        f"{facts['state']} who submits the bid.")
-    pending_rule = ("The status is pending/under contract: segment 2 must say it is pending and pivot to "
+    pending_rule = ("The status is pending/under contract: segment 3 must say it is pending and pivot to "
                     "'more HUD homes in this county come up every week'. Do not urge bidding on this home."
                     if is_pending(prop) else "")
-    return f"""Write the voiceover for a 30–40 second vertical HUD-home video (YouTube Shorts / Reels).
+    labels = ctx.get("tour_labels") or []
+    tour_rule = (f"2. tour — plays over {len(labels)} photo(s) shown in this order: {', '.join(labels)}. "
+                 f"Invite the viewer to look around, naming those spaces in that order. Describe only what the "
+                 f"label says; no claims about condition, updates or size. 8–16 words."
+                 if labels else '2. tour — return an empty string "".')
+    return f"""Write the voiceover for a 35–45 second vertical HUD-home video (YouTube Shorts / Reels).
 
 Property facts (use only these; never invent features, condition, or square footage that is blank):
 {json.dumps(facts, indent=2)}
 
-The video has 5 slides; write exactly one spoken segment per slide:
-1. hero — a scroll-stopping hook with price, beds/baths, city and state. 12–20 words.
-2. details — county and bid-open date (or pending pivot). 10–20 words.
-3. incentives — owner-occupant incentives: ${ctx['incentive1']}, {ctx['incentive2']}, {ctx['incentive3']}. Say buyers "may qualify". 16–26 words.
-4. agency — 14–24 words. {agency_rule}
-5. cta — visit {ctx['agency_website']} or call {ctx['agent_name']} at {ctx['agency_phone']}, get pre-qualified and bid, then "Follow for more HUD homes". 14–22 words.
+Write exactly six spoken segments, one per section of the video:
+1. hero — a scroll-stopping hook with price, beds/baths, city and state. 10–16 words.
+{tour_rule}
+3. details — county and bid-open date (or pending pivot). 8–16 words.
+4. incentives — owner-occupant incentives: {ctx['incentive1']}, {ctx['incentive2']}, {ctx['incentive3']}. Say buyers "may qualify". 14–22 words.
+5. agency — 12–20 words. {agency_rule}
+6. cta — visit {ctx['agency_website']} or call {ctx['agent_name']} at {ctx['agency_phone']}, get pre-qualified and bid, then "Follow for more HUD homes". 12–18 words.
 
 Rules:
 - Conversational, warm, confident; short sentences that sound natural read aloud.
@@ -181,7 +195,7 @@ Rules:
 - Write numbers the way they should be spoken where it helps (e.g. "one hundred dollars down"); keep prices as $176,000 and the phone number as {ctx['agency_phone']}.
 {pending_rule}
 
-Return only JSON: {{"segments": ["...", "...", "...", "...", "..."]}}"""
+Return only JSON: {{"segments": ["...", "...", "...", "...", "...", "..."]}}"""
 
 
 def _parse_segments(text):
@@ -192,9 +206,12 @@ def _parse_segments(text):
         segs = json.loads(m.group(0)).get("segments")
     except (json.JSONDecodeError, AttributeError):
         return None
-    if isinstance(segs, list) and len(segs) == 5 and all(isinstance(s, str) and s.strip() for s in segs):
-        return [s.strip() for s in segs]
-    return None
+    if not (isinstance(segs, list) and len(segs) == len(SEGMENTS) and all(isinstance(s, str) for s in segs)):
+        return None
+    segs = [s.strip() for s in segs]
+    if not all(s for i, s in enumerate(segs) if SEGMENTS[i] != "tour"):
+        return None
+    return segs
 
 
 def _claude_script(prompt):
@@ -341,6 +358,9 @@ def synthesize_segments(segments, work_dir):
         return None
     clips = []
     for i, text in enumerate(segments):
+        if not text.strip():
+            clips.append(None)
+            continue
         raw = os.path.join(work_dir, f"vo_{i}.mp3")
         wav = os.path.join(work_dir, f"vo_{i}.wav")
         try:
@@ -358,7 +378,7 @@ def synthesize_segments(segments, work_dir):
         _ffmpeg(["-i", raw, "-af", f"{trim},areverse,{trim},areverse",
                  "-ar", str(SR), "-ac", "1", wav])
         clips.append((wav, audio_duration(wav)))
-    print(f"    ✓ Voiceover: {provider}, {sum(d for _, d in clips):.1f}s")
+    print(f"    ✓ Voiceover: {provider}, {sum(c[1] for c in clips if c):.1f}s")
     return clips
 
 

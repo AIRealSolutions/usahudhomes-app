@@ -17,6 +17,9 @@ Usage:
     # Run continuously, polling every 30 seconds
     python3 4_video_worker.py --watch
 
+    # Hands-off: also queue up to 3 new listings per cycle (NC only), skipping pending/sold
+    python3 4_video_worker.py --watch --auto-queue 3 --states NC
+
     # Process only a specific job ID
     python3 4_video_worker.py --job-id <uuid>
 
@@ -36,7 +39,7 @@ Configuration (hardcoded at top of this file):
 
 from __future__ import annotations  # allows `str | None` hints on Python 3.9 (Raspberry Pi)
 
-import os, sys, time, json, argparse, tempfile, shutil, traceback
+import os, re, sys, time, json, argparse, tempfile, shutil, traceback
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -109,7 +112,7 @@ def fetch_queued_jobs(sb: Client, batch: int, job_id: str = None):
 def fetch_property(sb: Client, property_id: str) -> dict:
     res = sb.table("properties").select(
         "id, case_number, address, city, state, county, price, beds, baths, "
-        "status, main_image, image_url, bids_open, listing_period, sq_ft"
+        "status, main_image, image_url, images, bids_open, listing_period, sq_ft"
     ).eq("id", property_id).single().execute()
     return res.data or {}
 
@@ -211,6 +214,49 @@ def download_image(prop: dict, dest_dir: str) -> str | None:
 
     print(f"    ⚠ No image found for {case_num} — using placeholder")
     return None
+
+
+# ── All listing photos (for the photo agent) ─────────────────────────────────
+SITE_URL = os.environ.get("HUD_SITE_URL", "https://www.usahudhomes.com")
+MAX_PHOTOS = 12
+
+
+def listing_photo_urls(prop: dict) -> list:
+    """Every photo URL of the listing: properties.images, else the site's gallery endpoint."""
+    urls = [u for u in (prop.get("images") or []) if isinstance(u, str) and u.startswith("http")]
+    if len(urls) < 2 and prop.get("case_number"):
+        try:
+            r = requests.get(f"{SITE_URL}/api/hud", params={"action": "gallery", "caseNumber": prop["case_number"]},
+                             timeout=45)
+            if r.ok:
+                urls = [u for u in (r.json().get("images") or []) if isinstance(u, str) and u.startswith("http")] or urls
+        except Exception as e:
+            print(f"    ⚠ Gallery lookup failed: {e}")
+    return list(dict.fromkeys(urls))[:MAX_PHOTOS]
+
+
+def download_all_photos(prop: dict, dest_dir: str) -> list:
+    """Download the listing's photos. File names keep HUD's room names (Front_, Kitchen_…)."""
+    headers = {"User-Agent": "Mozilla/5.0 (HUD Video Worker)",
+               "Accept": "image/jpeg,image/png,image/webp;q=0.9,*/*;q=0.5"}
+    paths = []
+    for i, url in enumerate(listing_photo_urls(prop)):
+        stem = re.sub(r"[^A-Za-z0-9_-]", "_", url.split("?")[0].rsplit("/", 1)[-1].rsplit(".", 1)[0])[:60]
+        dest = os.path.join(dest_dir, f"{i:02d}_{stem}.img")
+        try:
+            r = requests.get(url, timeout=25, headers=headers)
+            if r.status_code != 200 or len(r.content) < 5000:
+                continue
+            with open(dest, "wb") as f:
+                f.write(r.content)
+            from PIL import Image
+            with Image.open(dest) as im:
+                im.verify()
+            paths.append(dest)
+        except Exception:
+            continue
+    print(f"    ✓ Photos downloaded: {len(paths)}")
+    return paths
 
 
 # ── Video generation ──────────────────────────────────────────────────────────
@@ -402,6 +448,10 @@ def process_job(sb: Client, job: dict):
                 prop["main_image"] = os.path.basename(img_path)
             else:
                 prop["main_image"] = ""
+            # All photos → the photo agent picks the hero shot + 3 photo-tour shots
+            photos_dir = os.path.join(tmpdir, "photos")
+            os.makedirs(photos_dir)
+            prop["_photo_files"] = download_all_photos(prop, photos_dir) or ([img_path] if img_path else [])
             update_progress(sb, job_id, 25)
 
             # 5. Remap Supabase column names → video builder expected keys
@@ -447,6 +497,41 @@ def process_job(sb: Client, job: dict):
         mark_error(sb, job_id, str(e))
 
 
+# ── Auto-queue (hands-off mode) ──────────────────────────────────────────────
+SKIP_STATUSES = ("pending", "sold", "under contract", "closed")
+
+
+def auto_queue(sb: Client, limit: int, states: list) -> int:
+    """Queue videos for active listings that have never had a video job."""
+    if limit <= 0:
+        return 0
+    tmpl = sb.table("video_templates").select("id").order("is_default", desc=True).limit(1).execute().data
+    if not tmpl:
+        print("  ⚠ Auto-queue: no video template exists yet — create one in Video Studio")
+        return 0
+    done = set()
+    start = 0
+    while True:   # page through existing jobs
+        rows = sb.table("video_jobs").select("property_id").range(start, start + 999).execute().data or []
+        done.update(r["property_id"] for r in rows)
+        if len(rows) < 1000:
+            break
+        start += 1000
+    q = sb.table("properties").select("id, case_number, state, status").eq("is_active", True)
+    if states:
+        q = q.in_("state", states)
+    props = q.order("created_at", desc=True).limit(500).execute().data or []
+    new = [p for p in props if p["id"] not in done
+           and not any(s in str(p.get("status", "")).lower() for s in SKIP_STATUSES)][:limit]
+    if not new:
+        return 0
+    sb.table("video_jobs").insert([{
+        "property_id": p["id"], "template_id": tmpl[0]["id"], "case_number": p["case_number"],
+        "status": "queued", "progress": 0} for p in new]).execute()
+    print(f"  ✓ Auto-queued {len(new)} new listing(s): {', '.join(p['case_number'] for p in new)}")
+    return len(new)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser(description="HUD Video Studio — Local Worker")
@@ -454,6 +539,9 @@ def main():
     ap.add_argument("--job-id",  default=None,        help="Process a specific job ID")
     ap.add_argument("--batch",   type=int, default=DEFAULT_BATCH, help="Jobs per cycle")
     ap.add_argument("--poll",    type=int, default=POLL_SEC,      help="Poll interval (sec)")
+    ap.add_argument("--auto-queue", type=int, default=0, metavar="N",
+                    help="Each cycle, queue up to N listings that have no video yet (skips pending/sold)")
+    ap.add_argument("--states", default="", help="With --auto-queue: only these states, e.g. NC,SC")
     args = ap.parse_args()
 
     if not SUPABASE_SERVICE_KEY:
@@ -484,7 +572,11 @@ def main():
     print(f"  Mode:     {'watch (Ctrl+C to stop)' if args.watch else 'run once'}")
     print(f"{'='*60}\n")
 
+    states = [s.strip().upper() for s in args.states.split(",") if s.strip()]
+
     def run_cycle():
+        if args.auto_queue and not args.job_id:
+            auto_queue(sb, args.auto_queue, states)
         jobs = fetch_queued_jobs(sb, args.batch, args.job_id)
         if not jobs:
             print(f"  No queued jobs found.  [{datetime.now().strftime('%H:%M:%S')}]")

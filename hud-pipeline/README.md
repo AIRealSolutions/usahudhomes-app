@@ -104,11 +104,32 @@ Reads the CSV and images from Script 1 (or a queued job via Script 4). Generates
 
 | Slide | Content |
 |---|---|
-| 1 | Hero photo (slow Ken Burns zoom) + price, city, beds/baths, county, bids open |
-| 2 | Listing details card + property photo |
-| 3 | Owner-Occupant Incentives ($100 Down FHA, 3% Closing Costs, 203k) |
-| 4 | NC listings: Lightkeeper Realty. Other states: USAHUDhomes.com connects you with a HUD-registered agent there |
-| 5 | Call to Action — USAHUDhomes.com, phone, QR code, Subscribe |
+| 1 | Hero: price and city above a moving front-exterior photo, beds/baths/county below. Nothing covers the house |
+| 2–4 | Photo tour: up to 3 more photos (kitchen, living area, bath…) with room labels |
+| 5 | Listing details card + property photo |
+| 6 | Owner-Occupant Incentives ($100 Down FHA, 3% Closing Costs, 203k) |
+| 7 | NC listings: Lightkeeper Realty. Other states: USAHUDhomes.com connects you with a HUD-registered agent there |
+| 8 | Call to Action — USAHUDhomes.com, phone, QR code, Subscribe |
+
+### Photo agent (`scripts/hud_photos.py`)
+
+The worker downloads the listing's whole photo set (`properties.images`, or the site's gallery
+endpoint when that's empty). The agent then drops unreadable, tiny, dark, blurry and duplicate photos,
+and picks the best front exterior plus 3 photos of different spaces, labelling each one.
+
+| Reviewer | Key |
+|---|---|
+| OpenAI vision (`OPENAI_VISION_MODEL`, default `gpt-4o-mini`) | `OPENAI_API_KEY` |
+| Claude | `ANTHROPIC_API_KEY` |
+| Built-in rules (HUD filenames name the room: `Front_`, `Kitchen_`, `Bath_`…) | none |
+
+### Hands-off mode
+
+```bash
+# Poll the queue, and each cycle also queue up to 3 NC listings that have no video yet
+# (pending/sold listings are skipped). Uses the default template.
+python3 scripts/4_video_worker.py --watch --auto-queue 3 --states NC
+```
 
 ### Audio, voiceover & captions (`scripts/hud_audio.py`)
 
