@@ -63,6 +63,19 @@ ANTHROPIC_API_KEY    = "PASTE_YOUR_ANTHROPIC_KEY_HERE" # optional — Claude wri
 ELEVENLABS_API_KEY   = "PASTE_YOUR_ELEVENLABS_KEY_HERE"# optional — best-sounding voiceover
 ELEVENLABS_VOICE_ID  = ""                              # optional — any voice ID from your ElevenLabs library
 
+# Keys can also live in hud-pipeline/hud.env (KEY=value per line). Updates never touch that file,
+# so this is the recommended place on the Raspberry Pi.
+def _load_env_file():
+    for path in (Path(__file__).resolve().parent.parent / "hud.env", Path.home() / "hud-pipeline" / "hud.env"):
+        if path.is_file():
+            for line in path.read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+            break
+_load_env_file()
+
 # Environment variables win over the values above, and the "PASTE_..."
 # placeholders count as "not set" (they used to be treated as real keys,
 # so the worker failed with a confusing auth error instead of setup help).

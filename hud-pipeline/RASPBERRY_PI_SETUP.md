@@ -1,193 +1,121 @@
-# HUD Video Pipeline — Raspberry Pi 4 Setup Guide
+# HUD Video Pipeline — Raspberry Pi Setup Guide
 
-This guide walks you through setting up the HUD video worker on a **Raspberry Pi 4**
-(2 GB RAM or higher recommended; 4 GB ideal for 1080×1920 video generation).
+This guide sets up the HUD video worker on a **Raspberry Pi 4 or 5**
+(4 GB RAM or more recommended; 2 GB works but is slower). Use the **64-bit** OS.
 
 ---
 
 ## What the Pi does
 
-The Pi runs `4_video_worker.py` in the background. It watches your Supabase
-`video_jobs` table, generates MP4 Reels for each queued property, uploads them
-to Supabase Storage, and marks each job done — all without touching your Windows
-machine.
+The Pi runs `4_video_worker.py` in the background, around the clock. It:
+
+1. Watches the Supabase `video_jobs` table, and with `--auto-queue`, queues new listings itself (all states + DC).
+2. Downloads every photo of the listing. The photo agent picks the best front exterior plus 3 tour photos.
+3. Writes the voiceover script, records the voice, adds background music and captions.
+4. Renders a 1080×1920 Short/Reel, uploads it to Supabase Storage, and marks the job done.
 
 ---
 
-## Step 1 — Flash Raspberry Pi OS
+## Already set up? Update in one command
+
+```bash
+bash ~/usahudhomes-app/hud-pipeline/update_pi.sh
+```
+
+This pulls the latest code, copies the scripts, updates Python packages and restarts the worker service.
+Your keys (`~/hud-pipeline/hud.env`) and music (`~/hud-pipeline/music/`) are kept. If your keys are
+still pasted inside the old `4_video_worker.py`, the script moves them into `hud.env` first.
+
+The first time, also install the extra system packages the new version needs:
+
+```bash
+sudo apt install -y ffmpeg fonts-liberation fonts-dejavu
+```
+
+---
+
+## New Pi: Step 1 — Flash Raspberry Pi OS
 
 1. Download **Raspberry Pi Imager** from https://www.raspberrypi.com/software/
-2. Flash **Raspberry Pi OS Lite (64-bit)** or **Raspberry Pi OS (64-bit Desktop)**
-   to your microSD card (16 GB minimum, 32 GB recommended).
-3. In the Imager settings (gear icon), enable SSH and set a username/password
-   before flashing so you can connect headlessly.
-
----
+2. Flash **Raspberry Pi OS (64-bit)** — Lite or Desktop — to a microSD card (32 GB recommended).
+3. In the Imager settings, enable SSH and set a username/password so you can connect headlessly.
 
 ## Step 2 — First boot and update
 
-Connect the Pi to your network (Ethernet recommended for stability), then SSH in
-or open a terminal and run:
+Ethernet is recommended for stability.
 
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo reboot
 ```
 
----
+## Step 3 — Install system packages
 
-## Step 3 — Install system dependencies
+Required for the video worker:
 
 ```bash
-sudo apt install -y \
-    python3 python3-pip python3-venv git \
-    ffmpeg \
-    libatlas-base-dev \
-    libopenjp2-7 libtiff5 libjpeg-dev \
-    libhdf5-dev libhdf5-serial-dev \
-    fonts-liberation \
-    fonts-noto-color-emoji \
-    chromium-browser chromium-chromedriver
+sudo apt install -y python3 python3-venv python3-pip git ffmpeg fonts-liberation fonts-dejavu
 ```
-**What each package does:**
 
-| Package | Purpose |
-|---|---|
-| `ffmpeg` | H.264 video encoding (required) |
-| `libatlas-base-dev` | Optimised BLAS for NumPy on ARM |
-| `libopenjp2-7 libtiff5 libjpeg-dev` | Pillow image format support |
-| `fonts-liberation` | LiberationSans fonts used for all text in videos |
-| `fonts-noto-color-emoji` | Full-colour emoji rendering (beds 🛏, baths 🚿, phone 📞, etc.) |
-| `chromium-browser chromium-chromedriver` | Headless Chrome for the HUD scraper (Script 1) ||
+Optional, only if this Pi also runs the HUD scraper (Script 1):
 
----
+```bash
+sudo apt install -y chromium-browser chromium-chromedriver
+# on newer Pi OS releases the names are:  chromium chromium-driver
+```
 
-## Step 4 — Clone the repository from GitHub
+## Step 4 — Get the code
 
 ```bash
 cd ~
 git clone https://github.com/AIRealSolutions/usahudhomes-app.git
+bash ~/usahudhomes-app/hud-pipeline/update_pi.sh
 ```
 
-The pipeline scripts are inside the repo under `hud-pipeline/`:
+`update_pi.sh` creates `~/hud-pipeline/` (scripts, music, venv) and installs the Python packages.
+The repo is private, so GitHub asks you to sign in when you clone. Use a personal access token as the password.
+
+## Step 5 — Add your keys
 
 ```bash
-ls ~/usahudhomes-app/hud-pipeline/scripts/
-# 1_hud_scraper.py
-# 2_video_builder.py
-# 3_bulk_upload.py
-# 4_video_worker.py
+cp ~/hud-pipeline/hud.env.example ~/hud-pipeline/hud.env
+nano ~/hud-pipeline/hud.env
+chmod 600 ~/hud-pipeline/hud.env
 ```
 
-Copy the scripts to your working directory:
+Fill in the values (save with `Ctrl+O`, `Enter`, `Ctrl+X`):
+
+| Key | What it does | Where to get it |
+|---|---|---|
+| `SUPABASE_SERVICE_KEY` | **Required.** Reads the queue, uploads videos | Supabase Dashboard → Project Settings → API → **service_role** key |
+| `OPENAI_API_KEY` | Photo agent, script and voice | platform.openai.com → API Keys |
+| `ELEVENLABS_API_KEY` + `ELEVENLABS_VOICE_ID` | Optional — best-sounding voice | elevenlabs.io → Profile → API Keys; voice ID from your Voice Library |
+| `ANTHROPIC_API_KEY` | Optional — Claude writes the script | console.anthropic.com → API Keys |
+
+Without OpenAI or ElevenLabs keys the videos still render, with music only and no voice.
+`hud.env` is never overwritten by updates and never committed to GitHub.
+
+## Step 6 — Optional: your own music
+
+Copy licensed `.mp3`/`.wav` tracks into `~/hud-pipeline/music/`. Each listing always gets the same track.
+With the folder empty, the worker generates its own royalty-free music.
+
+## Step 7 — Test one pass
 
 ```bash
-mkdir -p ~/hud-pipeline/output ~/hud-pipeline/videos ~/hud-pipeline/uploads
-cp -r ~/usahudhomes-app/hud-pipeline/scripts ~/hud-pipeline/
-cp ~/usahudhomes-app/hud-pipeline/requirements.txt ~/hud-pipeline/
+~/hud-pipeline/venv/bin/python3 ~/hud-pipeline/scripts/4_video_worker.py
 ```
 
-To pull the latest updates in the future:
+This processes up to 3 queued jobs, then exits. The log shows the photos it picked, the script it wrote,
+and the video length. Check the result in Video Studio → Video Library.
 
-```bash
-cd ~/usahudhomes-app && git pull
-cp -r ~/usahudhomes-app/hud-pipeline/scripts ~/hud-pipeline/
-```
-
----
-
-## Step 5 — Install Python packages
-
-```bash
-cd ~/hud-pipeline
-python3 -m venv venv
-source venv/bin/activate
-
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-This installs all required packages:
-
-| Package | Used by |
-|---|---|
-| `pillow` | Video builder — image rendering |
-| `numpy` | Video builder — gradients, cross-fades |
-| `opencv-python-headless` | Video builder — MP4 encoding (headless = no GUI) |
-| `qrcode[pil]` | Video builder — real QR code on slide 5 |
-| `supabase` | Worker — queue polling and job updates |
-| `requests` | Worker — downloading property images |
-| `openai` | Worker — AI title/description generation (optional) |
-| `selenium` | Scraper — headless Chrome automation |
-| `google-auth google-auth-oauthlib google-api-python-client` | YouTube uploader |
-
-> **Note:** `opencv-python-headless` is used (not `opencv-python`) — it skips
-> GUI dependencies not available on a headless Pi.
-
----
-
-## Step 6 — Configure your credentials
-
-Open the worker script in a text editor:
-
-```bash
-nano ~/hud-pipeline/scripts/4_video_worker.py
-```
-
-Find lines 50–52 near the top and paste your keys:
-
-```python
-SUPABASE_URL         = "https://lpqjndfjbenolhneqzec.supabase.co"
-SUPABASE_SERVICE_KEY = "eyJ...your_service_role_key..."   # ← paste here
-OPENAI_API_KEY       = "sk-...your_openai_key..."         # ← optional
-```
-
-Save with `Ctrl+O`, `Enter`, then `Ctrl+X`.
-
-**Where to get your keys:**
-
-| Key | Location |
-|---|---|
-| `SUPABASE_SERVICE_KEY` | Supabase Dashboard → Project Settings → API → **service_role** key (the long `eyJ...` one — not the anon key) |
-| `OPENAI_API_KEY` | platform.openai.com → API Keys → Create new key |
-
-> The `OPENAI_API_KEY` is optional. If left blank the worker still builds videos
-> — it just skips generating AI YouTube titles and descriptions.
-
----
-
-## Step 7 — Test a single run
-
-```bash
-source ~/hud-pipeline/venv/bin/activate
-python3 ~/hud-pipeline/scripts/4_video_worker.py --once
-```
-
-This processes up to 3 queued jobs and exits. Check the output for any errors.
-
----
-
-## Step 8 — Run in watch mode (continuous)
-
-```bash
-source ~/hud-pipeline/venv/bin/activate
-python3 ~/hud-pipeline/scripts/4_video_worker.py --watch
-```
-
-The worker will poll Supabase every 30 seconds and process new jobs as they arrive.
-Press `Ctrl+C` to stop.
-
----
-
-## Step 9 — Run automatically on boot (optional)
-
-To have the worker start automatically when the Pi boots, create a systemd service:
+## Step 8 — Run automatically, forever (systemd)
 
 ```bash
 sudo nano /etc/systemd/system/hud-worker.service
 ```
 
-Paste the following (replace `pi` with your actual username if different):
+Paste this. Replace **both** `pi` entries with your username if it isn't `pi` (check with `whoami`):
 
 ```ini
 [Unit]
@@ -199,97 +127,59 @@ Wants=network-online.target
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/hud-pipeline
-ExecStart=/home/pi/hud-pipeline/venv/bin/python3 /home/pi/hud-pipeline/scripts/4_video_worker.py --watch
-Restart=on-failure
+ExecStart=/home/pi/hud-pipeline/venv/bin/python3 -u /home/pi/hud-pipeline/scripts/4_video_worker.py --watch --auto-queue 3
+Restart=always
 RestartSec=30
-StandardOutput=journal
-StandardError=journal
+Nice=5
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Save, then enable and start the service:
+`--auto-queue 3` queues up to 3 new listings per cycle from every state and DC.
+To limit it to some states, add `--states NC,SC`. To only process what you queue yourself, remove `--auto-queue 3`.
+
+Enable and start it:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable hud-worker
-sudo systemctl start hud-worker
+sudo systemctl enable --now hud-worker
 ```
 
-Check status at any time:
+Check on it any time:
 
 ```bash
-sudo systemctl status hud-worker
-journalctl -u hud-worker -f    # live log tail
+systemctl status hud-worker          # running?
+journalctl -u hud-worker -f          # live log (Ctrl+C to stop watching)
+sudo systemctl restart hud-worker    # after changing hud.env
 ```
+
+The worker starts on boot, restarts itself after errors, and survives power cuts.
 
 ---
 
-## Performance expectations on Pi 4
+## Performance
 
-| Pi RAM | Video generation time per property |
+A Pi renders each video frame by frame, so expect roughly:
+
+| Board | Time per ~45-second video |
 |---|---|
-| 2 GB | ~3–5 minutes per video |
-| 4 GB | ~2–3 minutes per video |
-| 8 GB | ~1.5–2 minutes per video |
+| Pi 4 (4–8 GB) | about 5–8 minutes |
+| Pi 5 | about 2–4 minutes |
 
-The `ultrafast` H.264 preset is already set in the video builder to minimise
-CPU time on ARM. Processing 3 videos per batch (the default) takes approximately
-6–15 minutes on a Pi 4 depending on RAM.
+That's 8–20 videos an hour, plenty for a nightly batch. Use a heatsink or fan: a hot Pi slows itself down.
 
 ---
 
 ## Troubleshooting
 
-| Error | Fix |
+| Symptom | Fix |
 |---|---|
-| `No module named 'PIL'` | `pip install pillow` inside the venv |
-| `No module named 'cv2'` | `pip install opencv-python-headless` |
-| `No module named 'qrcode'` | `pip install qrcode[pil]` |
-| `No module named 'supabase'` | `pip install supabase` |
-| `No module named 'selenium'` | `pip install selenium` |
-| `ffmpeg: command not found` | `sudo apt install ffmpeg -y` |
-| Emoji renders as □ (broken glyph) | `sudo apt install fonts-noto-color-emoji -y` then rerun |
-| Font fallback (plain text) | `sudo apt install fonts-liberation -y` then rerun |
-| Scraper fails (ChromeDriver error) | `sudo apt install chromium-browser chromium-chromedriver -y` |
-| Video file not created | Run `ffmpeg -version` to confirm FFmpeg is installed |
-| Slow performance | Ensure 64-bit OS and adequate cooling (heatsink recommended) |
-
----
-
-## Quick reference — all commands in order
-
-```bash
-# 1. Update system
-sudo apt update && sudo apt upgrade -y
-
-# 2. Install system dependencies
-sudo apt install -y python3 python3-pip python3-venv git ffmpeg \
-    libatlas-base-dev libopenjp2-7 libtiff5 libjpeg-dev \
-    fonts-liberation fonts-noto-color-emoji \
-    chromium-browser chromium-chromedriver
-
-# 3. Clone repo and set up pipeline folder
-cd ~
-git clone https://github.com/AIRealSolutions/usahudhomes-app.git
-mkdir -p ~/hud-pipeline/output ~/hud-pipeline/videos ~/hud-pipeline/uploads
-cp -r ~/usahudhomes-app/hud-pipeline/scripts ~/hud-pipeline/
-cp ~/usahudhomes-app/hud-pipeline/requirements.txt ~/hud-pipeline/
-
-# 4. Create virtual environment and install all packages
-cd ~/hud-pipeline
-python3 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-
-# 5. Add your credentials (lines 50-52)
-nano scripts/4_video_worker.py
-
-# 6. Test
-python3 scripts/4_video_worker.py --once
-
-# 7. Run continuously
-python3 scripts/4_video_worker.py --watch
-```
+| `SUPABASE_SERVICE_KEY is not set` | Check `~/hud-pipeline/hud.env`, then `sudo systemctl restart hud-worker` |
+| `ffmpeg: command not found` / encode failed | `sudo apt install -y ffmpeg` |
+| `No module named ...` | `bash ~/usahudhomes-app/hud-pipeline/update_pi.sh` |
+| "No voice key configured — music-only video" | Add `OPENAI_API_KEY` or `ELEVENLABS_API_KEY` to `hud.env` |
+| "Photos (rules)" in the log instead of "(openai)" | OpenAI key missing or rejected. Photos are then picked from HUD's filenames |
+| Plain-looking text | `sudo apt install -y fonts-liberation fonts-dejavu` |
+| Very slow renders | Check the 64-bit OS (`uname -m` should print `aarch64`) and the cooling |
+| Scraper ChromeDriver error | Install the optional Chromium packages from Step 3 |

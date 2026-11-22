@@ -6,3 +6,7 @@ node_modules/
 *.log
 test-og-gen.mjs
 # # dist/assets/ - now tracked for Vercel static deploy is now committed to force Vercel to serve correct build
+
+# HUD video worker keys (Raspberry Pi)
+hud-pipeline/hud.env
+hud.env
