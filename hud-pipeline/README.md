@@ -146,8 +146,11 @@ Every step falls back automatically, so a video is always produced:
 
 - Slide length follows the narration. Captions are burned in, which matters because most viewers watch muted.
 - Music sits steadily ~18 dB under the voice and doesn't swell between sentences. It plays back cleanly on mono phone speakers. One fixed gain brings the mix to -14 LUFS (the YouTube/Instagram playback level), so nothing pumps or throbs.
-- Pending listings get a script that pivots to "more HUD homes in this county come up every week".
 - The script prompt follows Fair Housing rules: it describes the property, never the people.
+- Videos stay online for weeks, so they never show or say the listing status, bid dates or deadlines.
+  Instead, the hero and details slides carry "Price & availability as of <date> — subject to change", the
+  voiceover says HUD homes sell fast, the QR code opens the home's own page on USAHUDhomes.com (always current),
+  and the YouTube description ends with the same dated note.
 
 Keys can be pasted at the top of `4_video_worker.py` or exported as environment variables.
 

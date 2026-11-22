@@ -379,7 +379,7 @@ def _price(prop):
     except (TypeError, ValueError): return f"${prop.get('list_price', '')}"
 
 
-HERO_WIN  = (456, 1150)    # (y, height) of the hero photo band — ends just above the caption area
+HERO_WIN  = (384, 1222)    # (y, height) of the hero photo band — ends just above the caption area
 HERO_SUBSCRIBE_POPUP = False   # the CTA slide carries the Subscribe button; nothing covers the house
 PHOTO_WIN = (240, 1170)    # photo-tour band
 
@@ -400,6 +400,13 @@ def _band_edges(d, y, h):
     d.rectangle([(0, y + h), (W, y + h + 6)], fill=GOLD + (255,))
 
 
+def as_of_text():
+    """Videos stay online for weeks, so every price shown is dated."""
+    import datetime
+    d = datetime.date.today()
+    return f"Price & availability as of {d.strftime('%B')} {d.day}, {d.year} — subject to change"
+
+
 def _icon_row(d, y, items, font, isz, gap=44):
     """Draw [(icon, label, colour), ...] as one centred row."""
     widths = [isz + 12 + (d.textbbox((0, 0), lab, font=font)[2]) for _, lab, _ in items]
@@ -418,18 +425,16 @@ def slide1_hero(prop, photo):
     wy, wh = HERO_WIN
 
     centered_text(d, 30, _tpl(prop, "agency_website", "USAHUDhomes.com"), F("bold", 36), GOLD)
-    _status_pill(d, prop, 82)
-    centered_text(d, 146, _price(prop), F("bold", 104), GOLD)
-    centered_text(d, 262, f"{prop.get('city', '')}, {prop.get('state', '')}", F("bold", 54), WHITE)
+    centered_text(d, 84, _price(prop), F("bold", 104), GOLD)
+    centered_text(d, 200, f"{prop.get('city', '')}, {prop.get('state', '')}", F("bold", 54), WHITE)
 
     beds  = hud_audio.num_text(prop.get("bedrooms", "—"))
     baths = hud_audio.num_text(prop.get("bathrooms", "—"))
     row = [("🛏", f"{beds} BD", WHITE), ("🚿", f"{baths} BA", WHITE)]
     if hud_audio.area_label(prop):
         row.append(("📍", hud_audio.area_label(prop), LIGHT))
-    _icon_row(d, 334, row, F("bold", 40), 42)
-    if prop.get("bids_open"):
-        _icon_row(d, 392, [("📅", f"Bids Open: {prop['bids_open']}", GOLD)], F("reg", 36), 36)
+    _icon_row(d, 272, row, F("bold", 40), 42)
+    centered_text(d, 330, as_of_text(), F("italic", 28), LIGHT, shadow=False)
     _band_edges(d, wy, wh)
 
     brand_bar(d, f"{_tpl(prop, 'agency_name', 'Lightkeeper Realty')}  •  "
@@ -472,9 +477,6 @@ def slide2_details(prop, photo):
                            hud_audio.area_label(prop).rsplit(" ", 1)[0] if hud_audio.area_label(prop) else "—"),
         ("List Price",     _price(prop)),
         ("Beds / Baths",   f"{hud_audio.num_text(safe('bedrooms'))} bd  /  {hud_audio.num_text(safe('bathrooms'))} ba"),
-        ("Status",         safe("status", "Available")),
-        ("Bids Open",      safe("bids_open")),
-        ("Listing Period", safe("listing_period")),
     ]
     if str(prop.get("square_feet") or "").strip():
         rows.insert(5, ("Sq Ft", f"{prop['square_feet']}"))
@@ -497,8 +499,10 @@ def slide2_details(prop, photo):
         d.text((cx + 340, ry + 6), val, font=val_font, fill=WHITE + (255,))
         ry += row_h
 
+    centered_text(d, cy + ch + 16, as_of_text(), F("italic", 28), LIGHT, shadow=False)
+
     # Photo card fills the lower half
-    py0 = cy + ch + 40
+    py0 = cy + ch + 76
     py1 = H - 330
     if photo is not None and py1 - py0 > 200:
         pw, ph = W - 100, py1 - py0
@@ -677,9 +681,12 @@ def slide5_cta(prop, photo):
     qr_x, qr_y = (W - qr_size) // 2, sy + 30
     d.rounded_rectangle([(qr_x - fp, qr_y - fp), (qr_x + qr_size + fp, qr_y + qr_size + fp)],
                         radius=20, fill=(255, 255, 255, 255))
-    img.alpha_composite(make_qr_image(f"https://{site.lower()}", size=qr_size), (qr_x, qr_y))
+    # QR opens this home's own page, where price and availability are always current
+    cn = str(prop.get("case_number") or "").strip()
+    qr_url = f"https://www.usahudhomes.com/property/{cn}" if cn else f"https://{site.lower()}"
+    img.alpha_composite(make_qr_image(qr_url, size=qr_size), (qr_x, qr_y))
     d = BlendDraw(img)
-    centered_text(d, qr_y + qr_size + fp + 14, "Scan to browse HUD homes", F("bold", 30), LIGHT, shadow=False)
+    centered_text(d, qr_y + qr_size + fp + 14, "Scan for current price & availability", F("bold", 30), LIGHT, shadow=False)
 
     sub_y = qr_y + qr_size + fp + 70
     d.rounded_rectangle([(80, sub_y), (W - 80, sub_y + 84)], radius=42, fill=RED_YT + (235,))
@@ -820,8 +827,6 @@ def build_video(prop, images_dir, output_path, voiceover=True, captions=True):
     image_file = prop.get("main_image", "")
     image_path = os.path.join(images_dir, image_file) if image_file else None
     print(f"  Building reel: {case_num}")
-    if hud_audio.is_pending(prop):
-        print("    ⚠ Status is pending — script will pivot to 'more HUD homes in this area'")
 
     work = tempfile.mkdtemp(prefix="hud_av_")
     try:

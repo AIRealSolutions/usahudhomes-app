@@ -356,8 +356,6 @@ def generate_ai_metadata(prop: dict) -> tuple[str, str]:
         beds  = prop.get("beds", "")
         baths = prop.get("baths", "")
         county= prop.get("county", "")
-        status= prop.get("status", "")
-        bids  = prop.get("bids_open", "")
         try:
             price_txt = f"${int(float(price)):,}"
         except (TypeError, ValueError):
@@ -370,11 +368,12 @@ Property details:
 - Location: {city}, {state} (County: {county})
 - Price: {price_txt}
 - Beds/Baths: {beds} bed / {baths} bath
-- Status: {status}
-- Bids Open: {bids}
 
 RULES:
 - Do NOT include the street address in title or description
+- This video stays online for weeks: NEVER mention listing status (new, pending, available, sold),
+  bid dates, deadlines, or words like "now", "today", "just listed"
+- Make clear it's time-sensitive: HUD homes sell fast, check current price and availability at USAHUDhomes.com
 - Highlight owner-occupant incentives ($100 down FHA, 3% closing costs, $35K 203k)
 - Include location (city, state, county) and price
 - Title: max 70 characters, punchy, include price and location
@@ -391,7 +390,12 @@ Return JSON only:
             max_tokens=400,
         )
         data = json.loads(resp.choices[0].message.content)
-        return data.get("title"), data.get("description")
+        d = datetime.now().date()
+        desc = (data.get("description") or "").strip()
+        if desc:
+            desc += (f"\n\nPrice and availability as of {d.strftime('%B')} {d.day}, {d.year} and subject to change. "
+                     f"HUD homes sell fast — check current status at https://www.usahudhomes.com")
+        return data.get("title"), desc or None
     except Exception as e:
         print(f"    ⚠ AI metadata failed: {e}")
         return None, None

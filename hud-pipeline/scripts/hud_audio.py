@@ -135,7 +135,6 @@ def template_script(prop, ctx):
     where = area or place_name(prop)
     beds, baths = num_text(prop.get("bedrooms") or prop.get("beds")), num_text(prop.get("bathrooms") or prop.get("baths"))
     price = price_text(prop)
-    bids = spoken_date(prop.get("bids_open"))
     agent, phone, site = ctx["agent_name"], ctx["agency_phone"], ctx["agency_website"]
 
     hero = f"HUD home alert! A {beds}-bedroom, {baths}-bath home in {place_name(prop)}"
@@ -151,12 +150,9 @@ def template_script(prop, ctx):
     else:
         tour = ""
 
-    if is_pending(prop):
-        details = (f"This one is pending sale right now, but new HUD homes in {where} "
-                   f"come on the market every week.")
-    else:
-        bid_txt = f"bids open {bids}." if bids else "it's open for bids now."
-        details = f"It's in {area}, and {bid_txt}" if area else bid_txt[0].upper() + bid_txt[1:]
+    # No status or bid dates — the video stays online for a while; send viewers to live info instead
+    details = (f"It's in {area}. HUD homes sell fast, so check current price and availability."
+               if area else "HUD homes sell fast, so check current price and availability.")
 
     incentives = ("Owner-occupants may qualify for just one hundred dollars down with FHA, "
                   "up to three percent toward closing costs, and repair money with a 203k loan.")
@@ -180,9 +176,6 @@ def _script_prompt(prop, ctx):
         "bedrooms": num_text(prop.get("bedrooms") or prop.get("beds")),
         "bathrooms": num_text(prop.get("bathrooms") or prop.get("baths")),
         "square_feet": prop.get("square_feet") or prop.get("sq_ft") or "",
-        "status": prop.get("status", ""),
-        "bids_open": spoken_date(prop.get("bids_open")) or prop.get("bids_open", ""),
-        "listing_period": prop.get("listing_period", ""),
     }
     if is_home_state(prop):
         agency_rule = (f"Segment 5: {ctx['agency_name']} is the HUD-registered buyer's agency that submits "
@@ -191,9 +184,6 @@ def _script_prompt(prop, ctx):
         agency_rule = (f"Segment 5: this home is NOT in North Carolina. Do NOT say {ctx['agency_name']} bids on it. "
                        f"Say {ctx['agency_website']} connects buyers with a HUD-registered buyer's agent in "
                        f"{state_name(prop)} who submits the bid.")
-    pending_rule = ("The status is pending/under contract: segment 3 must say it is pending and pivot to "
-                    "'more HUD homes in this area come up every week'. Do not urge bidding on this home."
-                    if is_pending(prop) else "")
     labels = ctx.get("tour_labels") or []
     tour_rule = (f"2. tour — plays over {len(labels)} photo(s) shown in this order: {', '.join(labels)}. "
                  f"Invite the viewer to look around, naming those spaces in that order. Describe only what the "
@@ -207,7 +197,7 @@ Property facts (use only these; never invent features, condition, or square foot
 Write exactly six spoken segments, one per section of the video:
 1. hero — a scroll-stopping hook with price, beds/baths and the location (say it exactly as given). 10–16 words.
 {tour_rule}
-3. details — the county_or_parish (skip it if blank) and bid-open date (or pending pivot). 8–16 words.
+3. details — the county_or_parish (skip it if blank), then make clear this is time-sensitive: HUD homes sell fast, so viewers should check current price and availability. 10–18 words.
 4. incentives — owner-occupant incentives: {ctx['incentive1']}, {ctx['incentive2']}, {ctx['incentive3']}. Say buyers "may qualify". 14–22 words.
 5. agency — 12–20 words. {agency_rule}
 6. cta — visit {ctx['agency_website']} or call {ctx['agent_name']} at {ctx['agency_phone']}, get pre-qualified and bid, then "Follow for more HUD homes". 12–18 words.
@@ -217,7 +207,7 @@ Rules:
 - Never include the street address.
 - Fair Housing: describe the property, never the people (no "perfect for families", "ideal for retirees", neighborhood demographics, schools, churches, "safe").
 - Write numbers the way they should be spoken where it helps (e.g. "one hundred dollars down"); keep prices as $176,000 and the phone number as {ctx['agency_phone']}.
-{pending_rule}
+- This video stays online for weeks. NEVER mention listing status (new, pending, available, sold), bid dates, deadlines or how long it has been listed, and never say "now" or "today" about availability.
 
 Return only JSON: {{"segments": ["...", "...", "...", "...", "...", "..."]}}"""
 
