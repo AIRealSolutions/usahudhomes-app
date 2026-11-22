@@ -9,6 +9,7 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
 import { Card, CardContent } from '../ui/card'
+import { videoDownloadUrl } from '../VideoPlayerModal'
 
 const STATUS_COLORS = {
   queued: 'bg-gray-100 text-gray-700',
@@ -63,7 +64,7 @@ function JobRow({ job, property, onDelete }) {
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         {isDone && job.s3_url && (
-          <a href={job.s3_url} target="_blank" rel="noopener noreferrer" download
+          <a href={videoDownloadUrl(job.s3_url, job.case_number)} download
             className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700 transition-colors"
             onClick={e => e.stopPropagation()}>
             <Download className="w-3 h-3" /> Download

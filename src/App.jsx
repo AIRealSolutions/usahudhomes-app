@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async'
 import { BrowserRouter as Router, Routes, Route, Link, useParams, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import { supabase } from './config/supabase'
-import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User, Menu, Calculator } from 'lucide-react'
+import { Search, Home as HomeIcon, Phone, Mail, MapPin, DollarSign, Key, CheckCircle, X, LogOut, User, Menu, Calculator, Play } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
@@ -21,6 +21,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Unauthorized from './components/Unauthorized'
 const CustomerDetailsPage = lazy(() => import('./components/admin/CustomerDetailsPage'))
 const PropertyGallery = lazy(() => import('./components/PropertyGallery'))
+const VideoPlayerModal = lazy(() => import('./components/VideoPlayerModal'))
 const BrokerReferralResponse = lazy(() => import('./pages/BrokerReferralResponse'))
 import ContactForm from './pages/ContactForm'
 import ContactThankYou from './pages/ContactThankYou'
@@ -806,6 +807,22 @@ function PropertyDetailPage() {
   // The offer being prepared drives the payment breakdown; its financing estimate is saved with the offer
   const [offerTerms, setOfferTerms] = useState(null)
   const [financingEstimate, setFinancingEstimate] = useState(null)
+  const [listingVideo, setListingVideo] = useState(null)
+  const [showVideo, setShowVideo] = useState(false)
+
+  // Newest finished video made for this listing
+  useEffect(() => {
+    setListingVideo(null)
+    supabase
+      .from('video_jobs')
+      .select('s3_url, youtube_title, case_number')
+      .eq('case_number', caseNumber)
+      .eq('status', 'done')
+      .not('s3_url', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .then(({ data }) => setListingVideo(data?.[0] || null))
+  }, [caseNumber])
 
   useEffect(() => {
     async function loadProperty() {
@@ -930,7 +947,28 @@ function PropertyDetailPage() {
             >
               <Search className="h-4 w-4" /> {photoSet.length > 1 ? `See all ${photoSet.length} photos` : 'See all photos'}
             </button>
+            {listingVideo && (
+              <button
+                type="button"
+                onClick={() => setShowVideo(true)}
+                className="absolute bottom-3 left-3 flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow"
+              >
+                <Play className="h-4 w-4" fill="white" /> Watch Video Tour
+              </button>
+            )}
           </div>
+
+          {showVideo && listingVideo && (
+            <Suspense fallback={null}>
+              <VideoPlayerModal
+                url={listingVideo.s3_url}
+                caseNumber={property.case_number}
+                title={`Video Tour · ${property.city}, ${property.state}`}
+                showListingLink={false}
+                onClose={() => setShowVideo(false)}
+              />
+            </Suspense>
+          )}
 
           {/* Saved photo set, visible to everyone */}
           {photoSet.length > 1 && (

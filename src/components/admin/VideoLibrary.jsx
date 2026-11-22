@@ -4,8 +4,9 @@ import { getAIClient } from '../../services/openai/proxyClient'
 import {
   Download, Youtube, Sparkles, RefreshCw, Film, CheckCircle2,
   XCircle, Clock, Loader2, ExternalLink, Trash2, AlertCircle,
-  Search, RotateCcw
+  Search, RotateCcw, Play, Home as HomeIcon
 } from 'lucide-react'
+import VideoPlayerModal, { videoDownloadUrl } from '../VideoPlayerModal'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Card, CardContent } from '../ui/card'
@@ -19,6 +20,8 @@ const STATUS_CONFIG = {
 
 function VideoCard({ job, onDelete, onRetry, onGenerateMeta, onUploadYouTube }) {
   const [expanded, setExpanded] = useState(false)
+  const [playing, setPlaying] = useState(false)
+  const canPlay = job.status === 'done' && !!job.s3_url
   const cfg = STATUS_CONFIG[job.status] || STATUS_CONFIG.queued
   const Icon = cfg.icon
   const prop = job.properties
@@ -38,11 +41,25 @@ function VideoCard({ job, onDelete, onRetry, onGenerateMeta, onUploadYouTube }) 
     <Card className={`overflow-hidden transition-shadow hover:shadow-md ${job.status === 'done' ? 'border-green-200' : job.status === 'error' ? 'border-red-200' : ''}`}>
       <CardContent className="p-0">
         {/* Thumbnail / status area */}
-        <div className="relative bg-gray-900 h-36 flex items-center justify-center overflow-hidden">
+        <div
+          className={`relative bg-gray-900 h-36 flex items-center justify-center overflow-hidden ${canPlay ? 'cursor-pointer group' : ''}`}
+          onClick={canPlay ? () => setPlaying(true) : undefined}
+          title={canPlay ? 'Play video' : undefined}
+        >
           {job.thumbnail_url ? (
             <img src={job.thumbnail_url} alt="" className="w-full h-full object-cover opacity-80" />
+          ) : canPlay ? (
+            // First frame of the video as a preview
+            <video src={`${job.s3_url}#t=1`} preload="metadata" muted playsInline className="w-full h-full object-cover opacity-80 pointer-events-none" />
           ) : (
             <Film className="w-10 h-10 text-gray-600" />
+          )}
+          {canPlay && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-black/60 group-hover:bg-black/80 flex items-center justify-center transition-colors">
+                <Play className="w-6 h-6 text-white ml-0.5" fill="white" />
+              </div>
+            </div>
           )}
           {/* Status badge */}
           <div className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${cfg.color}`}>
@@ -69,7 +86,12 @@ function VideoCard({ job, onDelete, onRetry, onGenerateMeta, onUploadYouTube }) 
             <div className="text-sm font-semibold text-gray-800 truncate">
               {prop?.city || '—'}, {prop?.state || '—'}
             </div>
-            <div className="text-xs text-gray-500">{job.case_number}</div>
+            {job.case_number && (
+              <a href={`/property/${job.case_number}`} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
+                <HomeIcon className="w-3 h-3" /> {job.case_number} — View Listing <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
           </div>
 
           {/* Stats row */}
@@ -127,11 +149,16 @@ function VideoCard({ job, onDelete, onRetry, onGenerateMeta, onUploadYouTube }) 
           {job.status === 'done' && (
             <div className="flex flex-wrap gap-1.5 pt-1">
               {job.s3_url && (
-                <a href={job.s3_url} target="_blank" rel="noopener noreferrer" download>
-                  <Button size="sm" variant="outline" className="h-7 text-xs">
-                    <Download className="w-3 h-3 mr-1" /> Download
+                <>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPlaying(true)}>
+                    <Play className="w-3 h-3 mr-1" /> Play
                   </Button>
-                </a>
+                  <a href={videoDownloadUrl(job.s3_url, job.case_number)} download>
+                    <Button size="sm" variant="outline" className="h-7 text-xs">
+                      <Download className="w-3 h-3 mr-1" /> Download
+                    </Button>
+                  </a>
+                </>
               )}
               {!job.youtube_title && (
                 <Button size="sm" variant="outline" className="h-7 text-xs"
@@ -153,6 +180,15 @@ function VideoCard({ job, onDelete, onRetry, onGenerateMeta, onUploadYouTube }) 
           )}
         </div>
       </CardContent>
+      {playing && (
+        <VideoPlayerModal
+          url={job.s3_url}
+          caseNumber={job.case_number}
+          title={job.youtube_title || `${prop?.city || ''}, ${prop?.state || ''} — ${job.case_number}`}
+          listingNewTab
+          onClose={() => setPlaying(false)}
+        />
+      )}
     </Card>
   )
 }
