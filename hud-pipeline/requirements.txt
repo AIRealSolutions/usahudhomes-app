@@ -6,6 +6,8 @@ pillow                       # Image rendering (slides, overlays)
 numpy                        # Array operations for gradients and cross-fades
 opencv-python-headless       # Video encoding (headless = no GUI, works on Pi)
 qrcode[pil]                  # Real QR code generation for slide 5
+anthropic                    # Claude voiceover script writing (optional)
+# ffmpeg is also required:  sudo apt install ffmpeg
 
 # ── Supabase worker (Script 4) ────────────────────────────────────────────────
 supabase                     # Supabase client (queue polling, job status updates)

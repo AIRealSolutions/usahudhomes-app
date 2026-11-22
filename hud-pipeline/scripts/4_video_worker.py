@@ -17,6 +17,10 @@ Usage:
     # Run continuously, polling every 30 seconds
     python3 4_video_worker.py --watch
 
+    # Hands-off: also queue up to 3 new listings per cycle — every state + DC — skipping pending/sold
+    python3 4_video_worker.py --watch --auto-queue 3
+    # (optional) limit to certain states:  --states NC,SC
+
     # Process only a specific job ID
     python3 4_video_worker.py --job-id <uuid>
 
@@ -26,14 +30,17 @@ Usage:
 Configuration (hardcoded at top of this file):
     SUPABASE_URL        https://lpqjndfjbenolhneqzec.supabase.co
     SUPABASE_SERVICE_KEY  <your service_role key from Supabase dashboard>
-    OPENAI_API_KEY      <optional — enables AI title/description generation>
+    OPENAI_API_KEY      <optional — AI title/description; script + voice fallback>
+    ANTHROPIC_API_KEY   <optional — Claude writes the voiceover script>
+    ELEVENLABS_API_KEY  <optional — ElevenLabs voiceover (best quality)>
+    Music: drop licensed .mp3/.wav files in hud-pipeline/music/ (else a bed is generated)
     WORKER_POLL_SEC     30  (seconds between polls in --watch mode)
     WORKER_BATCH        3   (jobs per poll cycle)
 """
 
 from __future__ import annotations  # allows `str | None` hints on Python 3.9 (Raspberry Pi)
 
-import os, sys, time, json, argparse, tempfile, shutil, traceback
+import os, re, sys, time, json, argparse, tempfile, shutil, traceback
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -51,7 +58,10 @@ except ImportError:
 # ── Config — paste your keys here ────────────────────────────────────────────
 SUPABASE_URL         = "https://lpqjndfjbenolhneqzec.supabase.co"
 SUPABASE_SERVICE_KEY = "PASTE_YOUR_SERVICE_ROLE_KEY_HERE"   # Supabase → Settings → API → service_role
-OPENAI_API_KEY       = "PASTE_YOUR_OPENAI_KEY_HERE"    # optional — enables AI title/description generation
+OPENAI_API_KEY       = "PASTE_YOUR_OPENAI_KEY_HERE"    # optional — AI title/description, plus script + voice fallback
+ANTHROPIC_API_KEY    = "PASTE_YOUR_ANTHROPIC_KEY_HERE" # optional — Claude writes the voiceover script
+ELEVENLABS_API_KEY   = "PASTE_YOUR_ELEVENLABS_KEY_HERE"# optional — best-sounding voiceover
+ELEVENLABS_VOICE_ID  = ""                              # optional — any voice ID from your ElevenLabs library
 
 # Environment variables win over the values above, and the "PASTE_..."
 # placeholders count as "not set" (they used to be treated as real keys,
@@ -62,6 +72,14 @@ def _key(env_name, value):
 
 SUPABASE_SERVICE_KEY = _key("SUPABASE_SERVICE_KEY", SUPABASE_SERVICE_KEY)
 OPENAI_API_KEY       = _key("OPENAI_API_KEY", OPENAI_API_KEY)
+ANTHROPIC_API_KEY    = _key("ANTHROPIC_API_KEY", ANTHROPIC_API_KEY)
+ELEVENLABS_API_KEY   = _key("ELEVENLABS_API_KEY", ELEVENLABS_API_KEY)
+ELEVENLABS_VOICE_ID  = _key("ELEVENLABS_VOICE_ID", ELEVENLABS_VOICE_ID)
+# hud_audio.py (used by the video builder) reads these from the environment
+for _n, _v in (("OPENAI_API_KEY", OPENAI_API_KEY), ("ANTHROPIC_API_KEY", ANTHROPIC_API_KEY),
+               ("ELEVENLABS_API_KEY", ELEVENLABS_API_KEY), ("ELEVENLABS_VOICE_ID", ELEVENLABS_VOICE_ID)):
+    if _v:
+        os.environ[_n] = _v
 POLL_SEC             = 30   # seconds between queue polls in --watch mode
 DEFAULT_BATCH        = 3    # number of videos to process per cycle
 BUCKET              = "USAHUDhomes"
@@ -95,7 +113,7 @@ def fetch_queued_jobs(sb: Client, batch: int, job_id: str = None):
 def fetch_property(sb: Client, property_id: str) -> dict:
     res = sb.table("properties").select(
         "id, case_number, address, city, state, county, price, beds, baths, "
-        "status, main_image, image_url, bids_open, listing_period, sq_ft"
+        "status, main_image, image_url, images, bids_open, listing_period, sq_ft"
     ).eq("id", property_id).single().execute()
     return res.data or {}
 
@@ -199,6 +217,49 @@ def download_image(prop: dict, dest_dir: str) -> str | None:
     return None
 
 
+# ── All listing photos (for the photo agent) ─────────────────────────────────
+SITE_URL = os.environ.get("HUD_SITE_URL", "https://www.usahudhomes.com")
+MAX_PHOTOS = 12
+
+
+def listing_photo_urls(prop: dict) -> list:
+    """Every photo URL of the listing: properties.images, else the site's gallery endpoint."""
+    urls = [u for u in (prop.get("images") or []) if isinstance(u, str) and u.startswith("http")]
+    if len(urls) < 2 and prop.get("case_number"):
+        try:
+            r = requests.get(f"{SITE_URL}/api/hud", params={"action": "gallery", "caseNumber": prop["case_number"]},
+                             timeout=45)
+            if r.ok:
+                urls = [u for u in (r.json().get("images") or []) if isinstance(u, str) and u.startswith("http")] or urls
+        except Exception as e:
+            print(f"    ⚠ Gallery lookup failed: {e}")
+    return list(dict.fromkeys(urls))[:MAX_PHOTOS]
+
+
+def download_all_photos(prop: dict, dest_dir: str) -> list:
+    """Download the listing's photos. File names keep HUD's room names (Front_, Kitchen_…)."""
+    headers = {"User-Agent": "Mozilla/5.0 (HUD Video Worker)",
+               "Accept": "image/jpeg,image/png,image/webp;q=0.9,*/*;q=0.5"}
+    paths = []
+    for i, url in enumerate(listing_photo_urls(prop)):
+        stem = re.sub(r"[^A-Za-z0-9_-]", "_", url.split("?")[0].rsplit("/", 1)[-1].rsplit(".", 1)[0])[:60]
+        dest = os.path.join(dest_dir, f"{i:02d}_{stem}.img")
+        try:
+            r = requests.get(url, timeout=25, headers=headers)
+            if r.status_code != 200 or len(r.content) < 5000:
+                continue
+            with open(dest, "wb") as f:
+                f.write(r.content)
+            from PIL import Image
+            with Image.open(dest) as im:
+                im.verify()
+            paths.append(dest)
+        except Exception:
+            continue
+    print(f"    ✓ Photos downloaded: {len(paths)}")
+    return paths
+
+
 # ── Video generation ──────────────────────────────────────────────────────────
 def generate_video(prop: dict, template: dict, images_dir: str, output_path: str) -> str:
     """
@@ -295,8 +356,6 @@ def generate_ai_metadata(prop: dict) -> tuple[str, str]:
         beds  = prop.get("beds", "")
         baths = prop.get("baths", "")
         county= prop.get("county", "")
-        status= prop.get("status", "")
-        bids  = prop.get("bids_open", "")
         try:
             price_txt = f"${int(float(price)):,}"
         except (TypeError, ValueError):
@@ -309,11 +368,12 @@ Property details:
 - Location: {city}, {state} (County: {county})
 - Price: {price_txt}
 - Beds/Baths: {beds} bed / {baths} bath
-- Status: {status}
-- Bids Open: {bids}
 
 RULES:
 - Do NOT include the street address in title or description
+- This video stays online for weeks: NEVER mention listing status (new, pending, available, sold),
+  bid dates, deadlines, or words like "now", "today", "just listed"
+- Make clear it's time-sensitive: HUD homes sell fast, check current price and availability at USAHUDhomes.com
 - Highlight owner-occupant incentives ($100 down FHA, 3% closing costs, $35K 203k)
 - Include location (city, state, county) and price
 - Title: max 70 characters, punchy, include price and location
@@ -330,7 +390,12 @@ Return JSON only:
             max_tokens=400,
         )
         data = json.loads(resp.choices[0].message.content)
-        return data.get("title"), data.get("description")
+        d = datetime.now().date()
+        desc = (data.get("description") or "").strip()
+        if desc:
+            desc += (f"\n\nPrice and availability as of {d.strftime('%B')} {d.day}, {d.year} and subject to change. "
+                     f"HUD homes sell fast — check current status at https://www.usahudhomes.com")
+        return data.get("title"), desc or None
     except Exception as e:
         print(f"    ⚠ AI metadata failed: {e}")
         return None, None
@@ -388,6 +453,10 @@ def process_job(sb: Client, job: dict):
                 prop["main_image"] = os.path.basename(img_path)
             else:
                 prop["main_image"] = ""
+            # All photos → the photo agent picks the hero shot + 3 photo-tour shots
+            photos_dir = os.path.join(tmpdir, "photos")
+            os.makedirs(photos_dir)
+            prop["_photo_files"] = download_all_photos(prop, photos_dir) or ([img_path] if img_path else [])
             update_progress(sb, job_id, 25)
 
             # 5. Remap Supabase column names → video builder expected keys
@@ -433,6 +502,41 @@ def process_job(sb: Client, job: dict):
         mark_error(sb, job_id, str(e))
 
 
+# ── Auto-queue (hands-off mode) ──────────────────────────────────────────────
+SKIP_STATUSES = ("pending", "sold", "under contract", "closed")
+
+
+def auto_queue(sb: Client, limit: int, states: list) -> int:
+    """Queue videos for active listings that have never had a video job."""
+    if limit <= 0:
+        return 0
+    tmpl = sb.table("video_templates").select("id").order("is_default", desc=True).limit(1).execute().data
+    if not tmpl:
+        print("  ⚠ Auto-queue: no video template exists yet — create one in Video Studio")
+        return 0
+    done = set()
+    start = 0
+    while True:   # page through existing jobs
+        rows = sb.table("video_jobs").select("property_id").range(start, start + 999).execute().data or []
+        done.update(r["property_id"] for r in rows)
+        if len(rows) < 1000:
+            break
+        start += 1000
+    q = sb.table("properties").select("id, case_number, state, status").eq("is_active", True)
+    if states:
+        q = q.in_("state", states)
+    props = q.order("created_at", desc=True).limit(500).execute().data or []
+    new = [p for p in props if p["id"] not in done
+           and not any(s in str(p.get("status", "")).lower() for s in SKIP_STATUSES)][:limit]
+    if not new:
+        return 0
+    sb.table("video_jobs").insert([{
+        "property_id": p["id"], "template_id": tmpl[0]["id"], "case_number": p["case_number"],
+        "status": "queued", "progress": 0} for p in new]).execute()
+    print(f"  ✓ Auto-queued {len(new)} new listing(s): {', '.join(p['case_number'] for p in new)}")
+    return len(new)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser(description="HUD Video Studio — Local Worker")
@@ -440,6 +544,9 @@ def main():
     ap.add_argument("--job-id",  default=None,        help="Process a specific job ID")
     ap.add_argument("--batch",   type=int, default=DEFAULT_BATCH, help="Jobs per cycle")
     ap.add_argument("--poll",    type=int, default=POLL_SEC,      help="Poll interval (sec)")
+    ap.add_argument("--auto-queue", type=int, default=0, metavar="N",
+                    help="Each cycle, queue up to N listings that have no video yet (skips pending/sold)")
+    ap.add_argument("--states", default="", help="With --auto-queue: only these states, e.g. NC,SC (default: all states + DC)")
     args = ap.parse_args()
 
     if not SUPABASE_SERVICE_KEY:
@@ -465,10 +572,16 @@ def main():
     print(f"  Supabase: {SUPABASE_URL}")
     print(f"  Batch:    {args.batch} jobs/cycle")
     print(f"  AI:       {'enabled' if OPENAI_API_KEY else 'disabled (no OPENAI_API_KEY)'}")
+    print(f"  Script:   {'Claude' if ANTHROPIC_API_KEY else 'OpenAI' if OPENAI_API_KEY else 'built-in template'}")
+    print(f"  Voice:    {'ElevenLabs' if ELEVENLABS_API_KEY else 'OpenAI TTS' if OPENAI_API_KEY else 'none (music only)'}")
     print(f"  Mode:     {'watch (Ctrl+C to stop)' if args.watch else 'run once'}")
     print(f"{'='*60}\n")
 
+    states = [s.strip().upper() for s in args.states.split(",") if s.strip()]
+
     def run_cycle():
+        if args.auto_queue and not args.job_id:
+            auto_queue(sb, args.auto_queue, states)
         jobs = fetch_queued_jobs(sb, args.batch, args.job_id)
         if not jobs:
             print(f"  No queued jobs found.  [{datetime.now().strftime('%H:%M:%S')}]")

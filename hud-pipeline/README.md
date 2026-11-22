@@ -99,19 +99,70 @@ Images are saved as `###_######.jpg` where `###_######` is the case number with 
 
 ## Script 2 — Video Builder
 
-Reads the CSV and images from Script 1. Generates one **1280×720 MP4** per property with **5 slides**:
+Reads the CSV and images from Script 1 (or a queued job via Script 4). Generates one
+**1080×1920 vertical MP4** (Shorts / Reels / TikTok) per property with **5 slides**:
 
 | Slide | Content |
 |---|---|
-| 1 | Main property photo + price, address, beds/baths, bids open |
-| 2 | Full listing details (case #, county, listing period, etc.) |
-| 3 | Owner-Occupant Incentives ($100 Down FHA, 3% Closing Costs, 203k) |
-| 4 | About Lightkeeper Realty — Registered HUD Buyer's Agency |
-| 5 | Call to Action — USAHUDhomes.com, phone, blinking Subscribe prompt |
+| 1 | Hero: price and city above a moving front-exterior photo, beds/baths/county below. Nothing covers the house |
+| 2–4 | Photo tour: up to 3 more photos (kitchen, living area, bath…) with room labels |
+| 5 | Listing details card + property photo |
+| 6 | Owner-Occupant Incentives ($100 Down FHA, 3% Closing Costs, 203k) |
+| 7 | NC listings: Lightkeeper Realty. Every other state + DC: USAHUDhomes.com connects you with a HUD-registered agent there (Louisiana parishes, Alaska boroughs and DC are worded correctly) |
+| 8 | Call to Action — USAHUDhomes.com, phone, QR code, Subscribe |
 
-Each slide is 4 seconds with a 0.5-second cross-fade transition.
+### Photo agent (`scripts/hud_photos.py`)
+
+The worker downloads the listing's whole photo set (`properties.images`, or the site's gallery
+endpoint when that's empty). The agent then drops unreadable, tiny, dark, blurry and duplicate photos,
+and picks the best front exterior plus 3 photos of different spaces, labelling each one.
+
+| Reviewer | Key |
+|---|---|
+| OpenAI vision (`OPENAI_VISION_MODEL`, default `gpt-4o-mini`) | `OPENAI_API_KEY` |
+| Claude | `ANTHROPIC_API_KEY` |
+| Built-in rules (HUD filenames name the room: `Front_`, `Kitchen_`, `Bath_`…) | none |
+
+### Hands-off mode
 
 ```bash
+# Poll the queue, and each cycle also queue up to 3 listings (all states + DC) that have no
+# video yet. Pending/sold listings are skipped. Uses the default template.
+python3 scripts/4_video_worker.py --watch --auto-queue 3
+
+# Optional: only certain states
+python3 scripts/4_video_worker.py --watch --auto-queue 3 --states NC,SC
+```
+
+### Audio, voiceover & captions (`scripts/hud_audio.py`)
+
+Every step falls back automatically, so a video is always produced:
+
+| Step | 1st choice | Fallback | Last resort |
+|---|---|---|---|
+| Script | Claude (`ANTHROPIC_API_KEY`) | OpenAI (`OPENAI_API_KEY`) | Built-in template |
+| Voice | ElevenLabs (`ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`) | OpenAI TTS (`OPENAI_API_KEY`, `OPENAI_TTS_VOICE`) | No voice (music only) |
+| Music | Your tracks in `hud-pipeline/music/` | — | Generated royalty-free bed |
+
+- Slide length follows the narration. Captions are burned in, which matters because most viewers watch muted.
+- Music sits steadily ~18 dB under the voice and doesn't swell between sentences. It plays back cleanly on mono phone speakers. One fixed gain brings the mix to -14 LUFS (the YouTube/Instagram playback level), so nothing pumps or throbs.
+- The script prompt follows Fair Housing rules: it describes the property, never the people.
+- Videos stay online for weeks, so they never show or say the listing status, bid dates or deadlines.
+  Instead, the hero and details slides carry "Price & availability as of <date> — subject to change", the
+  voiceover says HUD homes sell fast, the QR code opens the home's own page on USAHUDhomes.com (always current),
+  and the YouTube description ends with the same dated note.
+
+Keys can be pasted at the top of `4_video_worker.py` or exported as environment variables.
+
+**Music:** put licensed `.mp3`/`.wav` tracks in `hud-pipeline/music/`. Each property is assigned a
+track, and the same property always gets the same one. Good sources that allow commercial use:
+YouTube Audio Library, Pixabay Music, Uppbeat, or a paid Epidemic Sound / Artlist plan (whitelist your
+channel to avoid Content ID claims). Look for "upbeat corporate", "inspiring acoustic" or "lo-fi house",
+90–110 BPM, with no vocals.
+
+```bash
+export ANTHROPIC_API_KEY=...      # optional
+export ELEVENLABS_API_KEY=...     # optional
 python3 scripts/2_video_builder.py --csv output/NC/hud_homes_NC.csv
 python3 scripts/2_video_builder.py --csv output/NC/hud_homes_NC.csv --limit 5
 python3 scripts/2_video_builder.py --csv output/NC/hud_homes_NC.csv --output /custom/videos
