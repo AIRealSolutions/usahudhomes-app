@@ -18,7 +18,7 @@ export default function VideoWatchPage() {
         .select('case_number, city, state, price, beds, baths, sq_ft, status, is_active, updated_at')
         .eq('case_number', caseNumber).maybeSingle(),
       supabase.from('video_jobs')
-        .select('s3_url, youtube_title, duration_sec, completed_at')
+        .select('s3_url, duration_sec, completed_at')
         .eq('case_number', caseNumber).eq('status', 'done').not('s3_url', 'is', null)
         .order('created_at', { ascending: false }).limit(1)
     ]).then(([p, v]) => {
@@ -40,7 +40,8 @@ export default function VideoWatchPage() {
   }
 
   const price = property.price ? `$${Number(property.price).toLocaleString()}` : ''
-  const title = video.youtube_title || `HUD Home Video Tour${price ? ` – ${price}` : ''} in ${property.city}, ${property.state}`
+  // Same wording as api/_video.js: no old bid dates from the YouTube title
+  const title = `${property.beds != null ? `${property.beds} Bed ` : ''}HUD Home Video Tour in ${property.city}, ${property.state}${price ? ` – ${price}` : ''}`
   // Same wording as api/_video.js (what search engines see)
   const facts = [property.beds != null && `${property.beds} bed`, property.baths != null && `${property.baths} bath`].filter(Boolean).join(', ')
   const description =

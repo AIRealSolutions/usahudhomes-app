@@ -23,10 +23,11 @@ function money(price) {
 }
 
 // Title and description never include the street address (it stays behind the login).
+// Written here (not the YouTube title) so search results never show old bid dates or "new"/"now".
 export function videoTitle(job, property) {
-  if (job?.youtube_title) return job.youtube_title
   const price = money(property?.price)
-  return `HUD Home Video Tour${price ? ` – ${price}` : ''} in ${property?.city}, ${property?.state}`
+  const beds = property?.beds != null ? `${property.beds} Bed ` : ''
+  return `${beds}HUD Home Video Tour in ${property?.city}, ${property?.state}${price ? ` – ${price}` : ''}`
 }
 
 // Written here rather than reusing the YouTube description, so the wording on our own
