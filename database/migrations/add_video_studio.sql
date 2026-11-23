@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS video_templates (
 
     -- CTA slide content
     cta_line1 VARCHAR(512) DEFAULT 'Visit USAHUDhomes.com',
-    cta_line2 VARCHAR(512) DEFAULT 'Call Marc Spencer: 910.363.6147',
-    cta_line3 VARCHAR(512) DEFAULT 'Get pre-qualified & bid',
+    cta_line2 VARCHAR(512) DEFAULT 'Use the tools to compare homes',
+    cta_line3 VARCHAR(512) DEFAULT 'Connect with a buyer''s agency',
 
     -- Incentives slide content
     incentive1_title VARCHAR(64) DEFAULT '$100 DOWN',
@@ -147,7 +147,7 @@ VALUES (
     'Lightkeeper Realty', '910.363.6147', 'USAHUDhomes.com',
     '#1a2744', '#e8a020', '#0d1b2a', '#ffffff',
     'DejaVu Sans',
-    'Visit USAHUDhomes.com', 'Call Marc Spencer: 910.363.6147', 'Get pre-qualified & bid',
+    'Visit USAHUDhomes.com', 'Use the tools to compare homes', 'Connect with a buyer''s agency',
     '$100 DOWN', 'FHA Loan', 'Buy this HUD home with just $100 down using an FHA loan.',
     '3% CLOSING', 'Costs Paid', 'HUD pays up to 3% of the purchase price toward closing costs.',
     '$35K REPAIR', '203k Escrow', 'Finance repairs into your mortgage with a 203k escrow loan.',

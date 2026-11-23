@@ -315,8 +315,8 @@ def generate_video(prop: dict, template: dict, images_dir: str, output_path: str
         prop.setdefault("_agency_phone",   template.get("agency_phone",   "910.363.6147"))
         prop.setdefault("_agency_website", template.get("agency_website", "USAHUDhomes.com"))
         prop.setdefault("_cta_line1",      template.get("cta_line1",      "Visit USAHUDhomes.com"))
-        prop.setdefault("_cta_line2",      template.get("cta_line2",      "Call Marc Spencer: 910.363.6147"))
-        prop.setdefault("_cta_line3",      template.get("cta_line3",      "Get pre-qualified & bid"))
+        prop.setdefault("_cta_line2",      template.get("cta_line2",      "Use the tools to compare homes"))
+        prop.setdefault("_cta_line3",      template.get("cta_line3",      "Connect with a buyer's agency"))
         prop.setdefault("_incentive1_title", template.get("incentive1_title", "$100 DOWN"))
         prop.setdefault("_incentive1_sub",   template.get("incentive1_sub",   "FHA Loan"))
         prop.setdefault("_incentive2_title", template.get("incentive2_title", "3% CLOSING"))
@@ -391,7 +391,7 @@ RULES:
 - Include location (city, state, county) and price
 - Title: max 70 characters, punchy, include price and location
 - Description: 3-4 sentences, SEO-friendly, include call to action for USAHUDhomes.com
-- End description with: "Call Marc Spencer at 910.363.6147 | Lightkeeper Realty — Registered HUD Buyer's Agency"
+- End description with: "Connect with a HUD buyer's agency and compare homes with free tools at USAHUDhomes.com | Lightkeeper Realty — Registered HUD Buyer's Agency"
 
 Return JSON only:
 {{"title": "...", "description": "..."}}"""

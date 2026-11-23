@@ -100,7 +100,8 @@ def F(style, size):
 # (The old emoji approach needed NotoColorEmoji; without it every icon was a box.)
 # ─────────────────────────────────────────────────────────────────────────────
 EMOJI_ICON = {"🛏": "bed", "🚿": "bath", "📍": "pin", "📅": "calendar",
-              "📞": "phone", "🔔": "bell", "👍": "thumb"}
+              "📞": "phone", "🔔": "bell", "👍": "thumb", "🔍": "search", "📊": "chart",
+              "🧮": "calc", "📘": "book", "🏠": "house"}
 
 
 def _icon_layer(name, size, color):
@@ -148,6 +149,27 @@ def _icon_layer(name, size, color):
         d.rectangle(R(0.06, 0.46, 0.24, 0.94), fill=c)
         d.rounded_rectangle(R(0.30, 0.42, 0.90, 0.94), radius=S * 0.09, fill=c)
         d.polygon([tuple(R(0.30, 0.48)), tuple(R(0.40, 0.08)), tuple(R(0.56, 0.10)), tuple(R(0.54, 0.44))], fill=c)
+    elif name == "search":
+        d.ellipse(R(0.08, 0.08, 0.66, 0.66), outline=c, width=lw)
+        d.line([*R(0.58, 0.58), *R(0.92, 0.92)], fill=c, width=int(lw * 1.6))
+    elif name == "chart":
+        d.line([*R(0.08, 0.06), *R(0.08, 0.92), *R(0.94, 0.92)], fill=c, width=lw)
+        for x0, top in ((0.22, 0.56), (0.44, 0.34), (0.66, 0.14)):
+            d.rectangle(R(x0, top, x0 + 0.16, 0.84), fill=c)
+    elif name == "calc":
+        d.rounded_rectangle(R(0.16, 0.04, 0.84, 0.96), radius=S * 0.08, outline=c, width=lw)
+        d.rectangle(R(0.28, 0.16, 0.72, 0.34), fill=c)
+        for gx in (0.28, 0.45, 0.62):
+            for gy in (0.46, 0.62, 0.78):
+                d.rectangle(R(gx, gy, gx + 0.10, gy + 0.10), fill=c)
+    elif name == "book":
+        d.polygon([tuple(R(0.04, 0.16)), tuple(R(0.47, 0.24)), tuple(R(0.47, 0.92)), tuple(R(0.04, 0.84))], fill=c)
+        d.polygon([tuple(R(0.96, 0.16)), tuple(R(0.53, 0.24)), tuple(R(0.53, 0.92)), tuple(R(0.96, 0.84))], fill=c)
+    elif name == "house":
+        d.polygon([tuple(R(0.50, 0.04)), tuple(R(0.96, 0.46)), tuple(R(0.04, 0.46))], fill=c)
+        d.rectangle(R(0.16, 0.44, 0.84, 0.94), fill=c)
+        d.rectangle(R(0.32, 0.60, 0.68, 0.70), fill=clear)
+        d.rectangle(R(0.32, 0.76, 0.68, 0.84), fill=clear)
     else:
         d.ellipse(R(0.3, 0.3, 0.7, 0.7), fill=c)
     return im.resize((int(size), int(size)), Image.LANCZOS)
@@ -437,8 +459,7 @@ def slide1_hero(prop, photo):
     centered_text(d, 330, as_of_text(), F("italic", 28), LIGHT, shadow=False)
     _band_edges(d, wy, wh)
 
-    brand_bar(d, f"{_tpl(prop, 'agency_name', 'Lightkeeper Realty')}  •  "
-                 f"{_tpl(prop, 'agency_phone', '910.363.6147')}  •  HUD Buyer's Agency")
+    brand_bar(d, "Connect with a HUD Buyer's Agency")
     return bg, img
 
 
@@ -456,7 +477,7 @@ def slide_photo(prop, photo, label, n, total):
         cx, cy = x0 + k * gap, wy + wh + 46
         fill = GOLD + (255,) if k == n else (255, 255, 255, 110)
         d.ellipse([(cx - r, cy - r), (cx + r, cy + r)], fill=fill)
-    brand_bar(d, f"{_tpl(prop, 'agency_website', 'USAHUDhomes.com')}  •  {_tpl(prop, 'agency_phone', '910.363.6147')}")
+    brand_bar(d, f"{_tpl(prop, 'agency_website', 'USAHUDhomes.com')}  •  HUD Buyer's Agency Tools")
     return bg, img
 
 
@@ -514,7 +535,7 @@ def slide2_details(prop, photo):
         img.alpha_composite(thumb, (50, py0))
         d = BlendDraw(img)
 
-    brand_bar(d, "USAHUDhomes.com  •  Lightkeeper Realty", NAVY2)
+    brand_bar(d, f"{_tpl(prop, 'agency_website', 'USAHUDhomes.com')}  •  HUD Buyer's Agency Tools", NAVY2)
     return bg, img
 
 
@@ -574,77 +595,59 @@ def slide3_incentives(prop, photo):
     centered_text(d, ny, "Owner-occupants get bidding priority", F("italic", 34), LIGHT)
     centered_text(d, ny + 46, "in the first days of each listing", F("italic", 34), LIGHT)
 
-    brand_bar(d, f"{_tpl(prop, 'agency_name', 'Lightkeeper Realty')}  •  {_tpl(prop, 'agency_phone', '910.363.6147')}")
+    brand_bar(d, f"{_tpl(prop, 'agency_website', 'USAHUDhomes.com')}  •  HUD Buyer's Agency Tools")
     return bg, img
 
 
+SITE_TOOLS = [
+    ("🔍", "Search Every HUD Home", "Nationwide listings, updated daily"),
+    ("📊", "Past Bid Results", "See what similar homes sold for"),
+    ("🧮", "Payment Calculator", "Estimate your monthly payment"),
+    ("🔔", "HUD Home Alerts", "Get new listings that match you"),
+    ("📘", "Step-by-Step Guide", "How HUD bidding works"),
+]
+
+
 def slide4_lightkeeper(prop, photo):
+    """The website and its tools: same slide for every state."""
     bg = backdrop(photo, NAVY2, (5, 10, 30))
     img, d = new_layer()
     d.rectangle([(0, 0), (W, 12)], fill=GOLD + (255,))
 
-    home = hud_audio.is_home_state(prop)
+    site = _tpl(prop, "agency_website", "USAHUDhomes.com")
+    centered_text(d, 60, site, F("bold", 76), GOLD)
+    centered_text(d, 168, "Tools to Help You Make", F("bold", 52), WHITE)
+    centered_text(d, 232, "an Informed Decision", F("bold", 52), WHITE)
+    d.line([(80, 330), (W - 80, 330)], fill=GOLD + (160,), width=3)
+
+    t_font, s_font, isz = F("bold", 44), F("reg", 32), 56
+    y, row_h = 372, 186
+    for icon, title, sub in SITE_TOOLS:
+        d.rounded_rectangle([(50, y), (W - 50, y + row_h - 24)], radius=26, fill=DARK_CARD + (215,),
+                            outline=GOLD + (60,), width=2)
+        draw_emoji(d, (90, y + (row_h - 24 - isz) // 2), icon, isz, color=GOLD)
+        d.text((180, y + 30), title, font=t_font, fill=WHITE + (255,))
+        d.text((180, y + 92), sub, font=s_font, fill=LIGHT + (255,))
+        y += row_h
+
+    centered_text(d, y + 20, "Connect with a HUD Buyer's Agency", F("bold", 44), GOLD)
+    centered_text(d, y + 80, "to submit your bid", F("italic", 38), LIGHT)
+
+    brand_bar(d, f"{site}  •  Free to Use")
+    return bg, img
+
+
+def disclosure_text(prop):
+    """Legal disclosures for the end slide. Override per template with prop['_disclosure']."""
     agency = _tpl(prop, "agency_name", "Lightkeeper Realty")
     site = _tpl(prop, "agency_website", "USAHUDhomes.com")
-    if home:
-        first, _, rest = agency.partition(" ")
-        centered_text(d, 60, first, F("bold", 80), GOLD)
-        centered_text(d, 152, rest or "", F("bold", 80), WHITE)
-        centered_text(d, 262, "Helping People Bid on HUD Homes", F("italic", 40), LIGHT)
-        centered_text(d, 314, "for 25 Years", F("italic", 40), LIGHT)
-        body = ("Lightkeeper Realty is the buyer's agency registered with HUD to submit bids "
-                "for buyers of HUD homes in North Carolina. We guide you through every step — "
-                "finding the right property, submitting your bid, inspection, and closing.")
-        chips = ["25+ Years", "HUD Registered", "NC Licensed"]
-    else:
-        st = hud_audio.state_name(prop)
-        centered_text(d, 60, site, F("bold", 72), GOLD)
-        centered_text(d, 156, f"HUD Homes in {st}", F("bold", 60), WHITE)
-        centered_text(d, 262, "We connect you with a", F("italic", 40), LIGHT)
-        centered_text(d, 314, "HUD-registered buyer's agent", F("italic", 40), LIGHT)
-        body = (f"HUD homes can only be bid on through a HUD-registered agent. {site} connects you "
-                f"with an experienced buyer's agent in {st} who will submit your bid and guide you "
-                f"through inspection and closing.")
-        chips = ["Free to Buyers", "HUD Registered", f"{prop.get('state', '')} Agents"]
-
-    d.line([(80, 384), (W - 80, 384)], fill=GOLD + (160,), width=3)
-
-    body_font = F("reg", 40)
-    lines = wrap_text(d, body, body_font, W - 200)
-    box_b = 420 + 50 + len(lines) * 58 + 20
-    d.rounded_rectangle([(50, 420), (W - 50, box_b)], radius=28, fill=DARK_CARD + (215,),
-                        outline=GOLD + (60,), width=2)
-    by = 470
-    for line in lines:
-        centered_text(d, by, line, body_font, OFFWHITE, shadow=False)
-        by += 58
-
-    # Chips
-    chip_font = F("bold", 34)
-    cy = box_b + 50
-    widths = [d.textbbox((0, 0), c, font=chip_font)[2] + 56 for c in chips]
-    gapc = 22
-    x = (W - (sum(widths) + gapc * (len(chips) - 1))) // 2
-    for c, wdt in zip(chips, widths):
-        d.rounded_rectangle([(x, cy), (x + wdt, cy + 72)], radius=36, fill=(255, 255, 255, 22),
-                            outline=GOLD + (200,), width=2)
-        d.text((x + 28, cy + 17), c, font=chip_font, fill=GOLD + (255,))
-        x += wdt + gapc
-
-    # Phone badge
-    ph_font = F("bold", 46)
-    ph_label = f"Marc Spencer  •  {_tpl(prop, 'agency_phone', '910.363.6147')}"
-    tb = d.textbbox((0, 0), ph_label, font=ph_font)
-    isz = 50
-    pw_full = isz + 16 + (tb[2] - tb[0]) + 70
-    ph_h = 96
-    px, py = (W - pw_full) // 2, cy + 140
-    d.rounded_rectangle([(px, py), (px + pw_full, py + ph_h)], radius=ph_h // 2, fill=GOLD + (255,))
-    draw_emoji(d, (px + 35, py + (ph_h - isz) // 2), "📞", isz, color=NAVY)
-    d.text((px + 35 + isz + 16, py + (ph_h - (tb[3] - tb[1])) // 2 - tb[1]), ph_label, font=ph_font, fill=NAVY + (255,))
-
-    brand_bar(d, f"{site}  •  Licensed in NC")
-    return bg, img
+    default = (f"{site} is operated by {agency}, a licensed real estate brokerage and "
+               f"HUD-registered buyer's agency. {site} is an independent resource and is not "
+               f"affiliated with the U.S. Department of Housing and Urban Development. "
+               f"Buyers outside the brokerage's licensed states are referred to licensed, "
+               f"HUD-registered agents. Price, availability, incentives and financing are "
+               f"subject to change and eligibility; information deemed reliable but not guaranteed.")
+    return _tpl(prop, "disclosure", default)
 
 
 def slide5_cta(prop, photo):
@@ -652,33 +655,29 @@ def slide5_cta(prop, photo):
     img, d = new_layer()
     d.rectangle([(0, 0), (W, 12)], fill=GOLD + (255,))
 
-    h1 = F("bold", 74)
-    centered_text(d, 50, "TAKE THE", h1, WHITE)
-    centered_text(d, 136, "NEXT STEP", h1, GOLD)
-    centered_text(d, 222, "TODAY", h1, WHITE)
-    d.line([(80, 322), (W - 80, 322)], fill=GOLD + (120,), width=3)
-
     site = _tpl(prop, "agency_website", "USAHUDhomes.com")
-    d.rounded_rectangle([(50, 348), (W - 50, 548)], radius=24, fill=DARK_CARD + (215,))
-    centered_text(d, 372, site, F("bold", 62), GOLD)
-    centered_text(d, 458, "Browse Every HUD Home in Your State", F("reg", 36), LIGHT)
+    h1 = F("bold", 64)
+    centered_text(d, 44, "CONNECT WITH A", h1, WHITE)
+    centered_text(d, 120, "HUD BUYER'S AGENCY", h1, GOLD)
+    d.rounded_rectangle([(50, 220), (W - 50, 340)], radius=24, fill=DARK_CARD + (215,))
+    centered_text(d, 244, site, F("bold", 62), GOLD)
 
     steps = [
         ("1", _tpl(prop, "cta_line1", f"Visit {site}")),
-        ("2", _tpl(prop, "cta_line2", "Call Marc Spencer: 910.363.6147")),
-        ("3", _tpl(prop, "cta_line3", "Get pre-qualified & bid")),
+        ("2", _tpl(prop, "cta_line2", "Use the tools to compare homes")),
+        ("3", _tpl(prop, "cta_line3", "Connect with a buyer's agency")),
     ]
-    sy, step_font, nf = 590, F("bold", 42), F("bold", 36)
+    sy, step_font, nf = 376, F("bold", 40), F("bold", 34)
     for num, txt in steps:
-        d.ellipse([(60, sy), (124, sy + 64)], fill=GOLD + (255,))
+        d.ellipse([(60, sy), (120, sy + 60)], fill=GOLD + (255,))
         nb = d.textbbox((0, 0), num, font=nf)
-        d.text((92 - (nb[2] - nb[0]) // 2 - nb[0], sy + 32 - (nb[3] - nb[1]) // 2 - nb[1]), num, font=nf, fill=NAVY + (255,))
+        d.text((90 - (nb[2] - nb[0]) // 2 - nb[0], sy + 30 - (nb[3] - nb[1]) // 2 - nb[1]), num, font=nf, fill=NAVY + (255,))
         tb = d.textbbox((0, 0), txt, font=step_font)
-        d.text((146, sy + 32 - (tb[3] - tb[1]) // 2 - tb[1]), txt, font=step_font, fill=WHITE + (255,))
-        sy += 92
+        d.text((140, sy + 30 - (tb[3] - tb[1]) // 2 - tb[1]), txt, font=step_font, fill=WHITE + (255,))
+        sy += 80
 
-    qr_size, fp = 300, 18
-    qr_x, qr_y = (W - qr_size) // 2, sy + 30
+    qr_size, fp = 260, 16
+    qr_x, qr_y = (W - qr_size) // 2, sy + 26
     d.rounded_rectangle([(qr_x - fp, qr_y - fp), (qr_x + qr_size + fp, qr_y + qr_size + fp)],
                         radius=20, fill=(255, 255, 255, 255))
     # QR opens this home's own page, where price and availability are always current
@@ -686,19 +685,42 @@ def slide5_cta(prop, photo):
     qr_url = f"https://www.usahudhomes.com/property/{cn}" if cn else f"https://{site.lower()}"
     img.alpha_composite(make_qr_image(qr_url, size=qr_size), (qr_x, qr_y))
     d = BlendDraw(img)
-    centered_text(d, qr_y + qr_size + fp + 14, "Scan for current price & availability", F("bold", 30), LIGHT, shadow=False)
+    centered_text(d, qr_y + qr_size + fp + 12, "Scan for current price & availability", F("bold", 30), LIGHT, shadow=False)
 
-    sub_y = qr_y + qr_size + fp + 70
-    d.rounded_rectangle([(80, sub_y), (W - 80, sub_y + 84)], radius=42, fill=RED_YT + (235,))
-    sf = F("bold", 38)
+    sub_y = qr_y + qr_size + fp + 64
+    d.rounded_rectangle([(80, sub_y), (W - 80, sub_y + 80)], radius=40, fill=RED_YT + (235,))
+    sf = F("bold", 36)
     label = "SUBSCRIBE for HUD Home Alerts"
     tb = d.textbbox((0, 0), label, font=sf)
-    isz = 40
+    isz = 38
     sx = (W - (isz + 14 + tb[2] - tb[0])) // 2
-    draw_emoji(d, (sx, sub_y + 22), "🔔", isz, color=WHITE)
-    d.text((sx + isz + 14, sub_y + 42 - (tb[3] - tb[1]) // 2 - tb[1]), label, font=sf, fill=WHITE + (255,))
+    draw_emoji(d, (sx, sub_y + 21), "🔔", isz, color=WHITE)
+    d.text((sx + isz + 14, sub_y + 40 - (tb[3] - tb[1]) // 2 - tb[1]), label, font=sf, fill=WHITE + (255,))
 
-    brand_bar(d, f"{_tpl(prop, 'agency_name', 'Lightkeeper Realty')}  •  25 Years Helping HUD Buyers")
+    # Brokerage + legal disclosures
+    agency = _tpl(prop, "agency_name", "Lightkeeper Realty")
+    phone = _tpl(prop, "agency_phone", "910.363.6147")
+    lf, lh = F("reg", 26), 34
+    lines = wrap_text(d, disclosure_text(prop), lf, W - 130)
+    box_t = sub_y + 120
+    box_b = min(H - 130, box_t + 140 + len(lines) * lh + 18)
+    d.rounded_rectangle([(40, box_t), (W - 40, box_b)], radius=22, fill=(0, 0, 0, 150),
+                        outline=(255, 255, 255, 50), width=2)
+    centered_text(d, box_t + 24, f"{agency}  •  {phone}", F("bold", 38), WHITE, shadow=False)
+    eho = "Equal Housing Opportunity"
+    ef = F("bold", 28)
+    ew = d.textbbox((0, 0), eho, font=ef)[2]
+    ex = (W - (34 + 12 + ew)) // 2
+    draw_emoji(d, (ex, box_t + 84), "🏠", 34, color=OFFWHITE)
+    d.text((ex + 46, box_t + 86), eho, font=ef, fill=OFFWHITE + (255,))
+    ly = box_t + 140
+    for line in lines:
+        if ly > box_b - lh:
+            break
+        centered_text(d, ly, line, lf, LIGHT, shadow=False)
+        ly += lh
+
+    brand_bar(d, f"{site}  •  HUD Buyer's Agency Tools")
     return bg, img
 
 
