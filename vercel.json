@@ -52,6 +52,14 @@
       "destination": "/api/property-meta?caseNumber=:caseNumber"
     },
     {
+      "source": "/video-sitemap.xml",
+      "destination": "/api/sitemap?type=video"
+    },
+    {
+      "source": "/video/:caseNumber",
+      "destination": "/api/property-meta?video=1&caseNumber=:caseNumber"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

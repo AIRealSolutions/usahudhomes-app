@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import videoSitemap from './_video-sitemap.js'
 
 const SITE_URL = 'https://www.usahudhomes.com'
 const STATE_NAMES = {
@@ -73,6 +74,8 @@ async function fetchActiveProperties(supabase) {
 }
 
 export default async function handler(req, res) {
+  // /video-sitemap.xml shares this function
+  if (req.query?.type === 'video') return videoSitemap(req, res)
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.setHeader('Allow', 'GET, HEAD')
     return res.status(405).send('Method Not Allowed')

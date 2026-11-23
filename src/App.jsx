@@ -22,6 +22,7 @@ import Unauthorized from './components/Unauthorized'
 const CustomerDetailsPage = lazy(() => import('./components/admin/CustomerDetailsPage'))
 const PropertyGallery = lazy(() => import('./components/PropertyGallery'))
 const VideoPlayerModal = lazy(() => import('./components/VideoPlayerModal'))
+const VideoWatchPage = lazy(() => import('./pages/VideoWatchPage'))
 const BrokerReferralResponse = lazy(() => import('./pages/BrokerReferralResponse'))
 import ContactForm from './pages/ContactForm'
 import ContactThankYou from './pages/ContactThankYou'
@@ -957,6 +958,13 @@ function PropertyDetailPage() {
               </button>
             )}
           </div>
+          {listingVideo && (
+            <p className="-mt-1 mb-4 text-sm">
+              <Link to={`/video/${property.case_number}`} className="text-blue-600 hover:underline">
+                Open the video tour page for this home →
+              </Link>
+            </p>
+          )}
 
           {showVideo && listingVideo && (
             <Suspense fallback={null}>
@@ -1284,6 +1292,7 @@ export default function App() {
               <Route path="/profile" element={<ProtectedRoute><DashboardLayout><Profile /></DashboardLayout></ProtectedRoute>} />
               <Route path="/lead/:id" element={<LeadDetail />} />
               <Route path="/property/:caseNumber" element={<PropertyDetailPage />} />
+              <Route path="/video/:caseNumber" element={<Suspense fallback={null}><VideoWatchPage /></Suspense>} />
               <Route path="/hud-homes" element={<HudHomesStates />} />
               <Route path="/hud-homes/:stateSlug" element={<HudHomesLanding />} />
               <Route path="/hud-homes/:stateSlug/:citySlug" element={<HudHomesLanding />} />

@@ -387,7 +387,9 @@ RULES:
 - This video stays online for weeks: NEVER mention listing status (new, pending, available, sold),
   bid dates, deadlines, or words like "now", "today", "just listed"
 - Make clear it's time-sensitive: HUD homes sell fast, check current price and availability at USAHUDhomes.com
-- Highlight owner-occupant incentives ($100 down FHA, 3% closing costs, $35K 203k)
+- Fair Housing: describe the property, never the people. No "perfect for families", "first-time buyers",
+  "ideal for retirees", "great for kids", neighborhood demographics, schools, churches or "safe"
+- Say owner-occupants "may qualify" for incentives ($100 down FHA, 3% closing costs, 203k repair financing)
 - Include location (city, state, county) and price
 - Title: max 70 characters, punchy, include price and location
 - Description: 3-4 sentences, SEO-friendly, include call to action for USAHUDhomes.com

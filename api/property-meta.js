@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import videoMeta from './_video-meta.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -89,6 +90,8 @@ async function loadIndexHtml(req) {
 }
 
 export default async function handler(req, res) {
+  // /video/:caseNumber watch pages share this function
+  if (req.query.video) return videoMeta(req, res);
   const { caseNumber } = req.query;
   const userAgent = req.headers['user-agent'] || '';
 
