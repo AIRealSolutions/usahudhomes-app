@@ -1,18 +1,33 @@
 User-agent: *
 Allow: /
 
-# Block admin and private routes
+# Signed-in and admin areas
 Disallow: /admin
-Disallow: /admin/
+Disallow: /admin-dashboard
 Disallow: /dashboard
-Disallow: /broker/referrals
-Disallow: /login
+Disallow: /broker-dashboard
+Disallow: /profile
 Disallow: /lead/
-Disallow: /admin/leads/
-Disallow: /admin/properties/import
-Disallow: /admin/bid-results
-Disallow: /admin/referrals
+Disallow: /offers/
+Disallow: /agent-referrals
 
-# Sitemap
+# Private links sent to one person (invites, offers, referrals)
+Disallow: /join/
+Disallow: /offer/
+Disallow: /broker-referral/
+
+# Account and confirmation pages with nothing to index
+Disallow: /login
+Disallow: /reset-password
+Disallow: /forgot-password
+Disallow: /unauthorized
+Disallow: /contact/thank-you
+Disallow: /agent/
+
+# Server functions, except the listing images used as video thumbnails and link previews
+Disallow: /api/
+Allow: /api/og-image
+
+# Sitemaps
 Sitemap: https://www.usahudhomes.com/sitemap.xml
 Sitemap: https://www.usahudhomes.com/video-sitemap.xml
