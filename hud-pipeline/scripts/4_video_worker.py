@@ -429,6 +429,11 @@ def get_duration(path: str) -> float:
         return 0.0
 
 
+def vb_photo_tour() -> bool:
+    """Same switch the video builder uses: HUD_PHOTO_TOUR=on adds the 3-photo tour."""
+    return (os.environ.get("HUD_PHOTO_TOUR") or "off").strip().lower() in ("1", "on", "true", "yes")
+
+
 # ── Per-job time limit ────────────────────────────────────────────────────────
 # One stuck video must not freeze the whole queue. After this long the job is marked
 # as an error, the exact line it was stuck on is printed, and the worker moves on.
@@ -520,7 +525,10 @@ def _process_job(sb: Client, job: dict):
             # All photos → the photo agent picks the hero shot + 3 photo-tour shots
             photos_dir = os.path.join(tmpdir, "photos")
             os.makedirs(photos_dir)
-            prop["_photo_files"] = download_all_photos(prop, photos_dir) or ([img_path] if img_path else [])
+            if vb_photo_tour():
+                prop["_photo_files"] = download_all_photos(prop, photos_dir) or ([img_path] if img_path else [])
+            else:
+                prop["_photo_files"] = [img_path] if img_path else []      # main photo only
             update_progress(sb, job_id, 25)
 
             # 5. Remap Supabase column names → video builder expected keys

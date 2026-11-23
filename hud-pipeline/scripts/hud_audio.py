@@ -18,6 +18,7 @@ Environment variables (all optional):
   ELEVENLABS_API_KEY    best-sounding voice
   ELEVENLABS_VOICE_ID   default: pNInz6obpgDQGcFmaJgB  (pick any voice in your ElevenLabs library)
   ELEVENLABS_MODEL      default: eleven_multilingual_v2
+  HUD_MUSIC             default: off  (on = background music under the voice)
   HUD_MUSIC_DIR         default: hud-pipeline/music
   HUD_MUSIC_VOLUME_DB   default: -18  (music level under the voice while it speaks)
 """
@@ -557,6 +558,11 @@ def _speech_envelope(n, intervals, gap=1.5, attack=0.35, release=0.8):
     return env
 
 
+def music_enabled():
+    """Background music is off unless HUD_MUSIC=on (voice only)."""
+    return _env("HUD_MUSIC", "off").lower() in ("1", "on", "true", "yes")
+
+
 def mix_audio(total_sec, out_path, work_dir, voice_clips=None, seed_text="hud"):
     """
     voice_clips: list of (wav_path, start_sec).
@@ -565,16 +571,20 @@ def mix_audio(total_sec, out_path, work_dir, voice_clips=None, seed_text="hud"):
     the whole mix to -14 LUFS — no compressor pumping, no automatic gain riding.
     """
     n = int(round(total_sec * SR))
-    music_file = pick_music_file(seed_text)
-    music_wav = os.path.join(work_dir, "music.wav")
-    if music_file:
-        print(f"    ✓ Music: {os.path.basename(music_file)}")
-        _ffmpeg(["-stream_loop", "-1", "-i", music_file, "-t", f"{total_sec + 0.5:.3f}",
-                 "-ar", str(SR), "-ac", "2", music_wav])
+    if not music_enabled():
+        print("    · Music: off (voice only)")
+        music = np.zeros((n, 2))
     else:
-        generate_music(total_sec + 0.5, music_wav, seed_text)
-        print("    ✓ Music: generated bed")
-    music = _read_wav(music_wav)[:n]
+        music_file = pick_music_file(seed_text)
+        music_wav = os.path.join(work_dir, "music.wav")
+        if music_file:
+            print(f"    ✓ Music: {os.path.basename(music_file)}")
+            _ffmpeg(["-stream_loop", "-1", "-i", music_file, "-t", f"{total_sec + 0.5:.3f}",
+                     "-ar", str(SR), "-ac", "2", music_wav])
+        else:
+            generate_music(total_sec + 0.5, music_wav, seed_text)
+            print("    ✓ Music: generated bed")
+        music = _read_wav(music_wav)[:n]
     if len(music) < n:
         music = np.pad(music, ((0, n - len(music)), (0, 0)))
     t = np.arange(n) / SR

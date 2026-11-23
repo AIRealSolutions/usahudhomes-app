@@ -831,6 +831,8 @@ def _ctx(prop):
     }
 
 
+# One photo (the listing's main photo) unless HUD_PHOTO_TOUR=on adds a 3-photo tour.
+PHOTO_TOUR = (os.environ.get("HUD_PHOTO_TOUR") or "off").strip().lower() in ("1", "on", "true", "yes")
 MAX_VIDEO_MB = float(os.environ.get("HUD_MAX_VIDEO_MB") or 9.0)   # Supabase bucket limit is 10 MB
 AUDIO_KBPS = 128
 
@@ -882,9 +884,12 @@ def build_video(prop, images_dir, output_path, voiceover=True, captions=True):
     try:
         # ── 1. Photos ──────────────────────────────────────────────────────────
         files = [p for p in (prop.get("_photo_files") or []) if os.path.exists(p)]
-        if not files and image_path and os.path.exists(image_path):
-            files = [image_path]
-        pick = hud_photos.choose_photos(files, prop) if files else None
+        if image_path and os.path.exists(image_path) and (not files or not PHOTO_TOUR):
+            files = [image_path]                      # the listing's main photo
+        if not PHOTO_TOUR and files:
+            pick = {"hero": files[0], "tour": [], "source": "main photo only"}
+        else:
+            pick = hud_photos.choose_photos(files, prop) if files else None
         hero_img = _open(pick["hero"]) if pick else None
         tour = [(img, lab) for img, lab in ((_open(p), lab) for p, lab in (pick["tour"] if pick else []))
                 if img is not None]
@@ -907,7 +912,7 @@ def build_video(prop, images_dir, output_path, voiceover=True, captions=True):
                 print(f"        “{s}”")
         clips = hud_audio.synthesize_segments(segments, work) if voiceover else None
         if not clips:
-            print("    · No voice key configured — music-only video (add ELEVENLABS_API_KEY or OPENAI_API_KEY)")
+            print("    · No voice key configured — video has no voiceover (add ELEVENLABS_API_KEY or OPENAI_API_KEY)")
 
         # ── 3. Slide plan: (segment index, builder, SlideClip options) ────────
         hero_win = (HERO_WIN[0], HERO_WIN[1], hero_img) if hero_img is not None else None
