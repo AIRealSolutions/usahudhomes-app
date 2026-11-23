@@ -131,11 +131,10 @@ def spoken_date(s):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def template_script(prop, ctx):
-    st, area = state_name(prop), area_label(prop)
-    where = area or place_name(prop)
+    area = area_label(prop)
     beds, baths = num_text(prop.get("bedrooms") or prop.get("beds")), num_text(prop.get("bathrooms") or prop.get("baths"))
     price = price_text(prop)
-    agent, phone, site = ctx["agent_name"], ctx["agency_phone"], ctx["agency_website"]
+    site = ctx["agency_website"]
 
     hero = f"HUD home alert! A {beds}-bedroom, {baths}-bath home in {place_name(prop)}"
     hero += f", listed at just {price}." if price else "."
@@ -150,21 +149,14 @@ def template_script(prop, ctx):
     else:
         tour = ""
 
-    # No status or bid dates — the video stays online for a while; send viewers to live info instead
-    details = (f"It's in {area}. HUD homes sell fast, so check current price and availability."
-               if area else "HUD homes sell fast, so check current price and availability.")
+    # No status or bid dates — the video stays online for a while
+    details = f"It's in {area}, and HUD homes sell fast." if area else "HUD homes sell fast."
 
-    incentives = ("Owner-occupants may qualify for just one hundred dollars down with FHA, "
-                  "up to three percent toward closing costs, and repair money with a 203k loan.")
+    incentives = "Owner-occupants may qualify for as little as one hundred dollars down."
 
-    if is_home_state(prop):
-        agency = (f"{ctx['agency_name']} is a HUD-registered buyer's agency. We've helped buyers "
-                  f"bid on HUD homes for twenty-five years, from offer to closing.")
-    else:
-        agency = (f"{site} connects you with a HUD-registered buyer's agent in {st} "
-                  f"who can submit your bid and guide you to closing.")
+    agency = "Work with a HUD buyer's agency that has the tools to help you make an informed decision."
 
-    cta = f"Visit {site} or call {agent} at {phone} to get pre-qualified and bid. Follow for more HUD homes!"
+    cta = f"Connect with one at {site}. Follow for more HUD homes!"
     return [hero, tour, details, incentives, agency, cta]
 
 
@@ -177,19 +169,12 @@ def _script_prompt(prop, ctx):
         "bathrooms": num_text(prop.get("bathrooms") or prop.get("baths")),
         "square_feet": prop.get("square_feet") or prop.get("sq_ft") or "",
     }
-    if is_home_state(prop):
-        agency_rule = (f"Segment 5: {ctx['agency_name']} is the HUD-registered buyer's agency that submits "
-                       f"bids for buyers in North Carolina, 25 years of experience.")
-    else:
-        agency_rule = (f"Segment 5: this home is NOT in North Carolina. Do NOT say {ctx['agency_name']} bids on it. "
-                       f"Say {ctx['agency_website']} connects buyers with a HUD-registered buyer's agent in "
-                       f"{state_name(prop)} who submits the bid.")
     labels = ctx.get("tour_labels") or []
     tour_rule = (f"2. tour — plays over {len(labels)} photo(s) shown in this order: {', '.join(labels)}. "
                  f"Invite the viewer to look around, naming those spaces in that order. Describe only what the "
                  f"label says; no claims about condition, updates or size. 8–16 words."
                  if labels else '2. tour — return an empty string "".')
-    return f"""Write the voiceover for a 35–45 second vertical HUD-home video (YouTube Shorts / Reels).
+    return f"""Write the voiceover for a 25–35 second vertical HUD-home video (YouTube Shorts / Reels).
 
 Property facts (use only these; never invent features, condition, or square footage that is blank):
 {json.dumps(facts, indent=2)}
@@ -197,16 +182,16 @@ Property facts (use only these; never invent features, condition, or square foot
 Write exactly six spoken segments, one per section of the video:
 1. hero — a scroll-stopping hook with price, beds/baths and the location (say it exactly as given). 10–16 words.
 {tour_rule}
-3. details — the county_or_parish (skip it if blank), then make clear this is time-sensitive: HUD homes sell fast, so viewers should check current price and availability. 10–18 words.
-4. incentives — owner-occupant incentives: {ctx['incentive1']}, {ctx['incentive2']}, {ctx['incentive3']}. Say buyers "may qualify". 14–22 words.
-5. agency — 12–20 words. {agency_rule}
-6. cta — visit {ctx['agency_website']} or call {ctx['agent_name']} at {ctx['agency_phone']}, get pre-qualified and bid, then "Follow for more HUD homes". 12–18 words.
+3. details — the county_or_parish (skip it if blank) and that HUD homes sell fast. 5–12 words.
+4. incentives — one short line: owner-occupants "may qualify" for as little as one hundred dollars down. 8–14 words.
+5. agency — work with a HUD buyer's agency that has the tools to help you make an informed decision. Same message in every state; do not mention any state, licensing, or a specific agency name. 10–18 words.
+6. cta — connect with that buyer's agency at {ctx['agency_website']}, then "Follow for more HUD homes". No phone number. 8–14 words.
 
 Rules:
-- Conversational, warm, confident; short sentences that sound natural read aloud.
+- Conversational, warm, confident; keep it simple — short sentences that sound natural read aloud.
 - Never include the street address.
 - Fair Housing: describe the property, never the people (no "perfect for families", "ideal for retirees", neighborhood demographics, schools, churches, "safe").
-- Write numbers the way they should be spoken where it helps (e.g. "one hundred dollars down"); keep prices as $176,000 and the phone number as {ctx['agency_phone']}.
+- Write numbers the way they should be spoken where it helps (e.g. "one hundred dollars down"); keep prices as $176,000.
 - This video stays online for weeks. NEVER mention listing status (new, pending, available, sold), bid dates, deadlines or how long it has been listed, and never say "now" or "today" about availability.
 
 Return only JSON: {{"segments": ["...", "...", "...", "...", "...", "..."]}}"""
