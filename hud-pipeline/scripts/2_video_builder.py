@@ -831,6 +831,34 @@ def _ctx(prop):
     }
 
 
+MAX_VIDEO_MB = float(os.environ.get("HUD_MAX_VIDEO_MB") or 9.0)   # Supabase bucket limit is 10 MB
+AUDIO_KBPS = 128
+
+
+def _video_kbps_budget(seconds, max_mb=None):
+    """Video bitrate (kbps) that keeps video + audio under max_mb for a clip this long."""
+    max_mb = max_mb or MAX_VIDEO_MB
+    total_kbps = max_mb * 8 * 1024 / max(seconds, 1.0)
+    return int(max(600, min(6000, total_kbps * 0.92 - AUDIO_KBPS)))     # 8% for container + VBV slack
+
+
+def _shrink_to_limit(path, seconds, work):
+    """Safety net: if the file still came out over the limit, re-encode it at a lower bitrate."""
+    limit = 10 * 1024 * 1024 * 0.98
+    for factor in (0.8, 0.6):
+        if os.path.getsize(path) <= limit:
+            return
+        kbps = int(_video_kbps_budget(seconds) * factor)
+        print(f"    · {os.path.getsize(path) // 1024} KB is over the limit — re-encoding at {kbps} kbps")
+        tmp = os.path.join(work, "shrink.mp4")
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", path,
+                        "-c:v", "libx264", "-preset", "veryfast", "-b:v", f"{kbps}k",
+                        "-maxrate", f"{kbps}k", "-bufsize", f"{kbps}k", "-pix_fmt", "yuv420p",
+                        "-profile:v", "high", "-g", str(FPS * 2),
+                        "-c:a", "copy", "-movflags", "+faststart", tmp], check=True)
+        os.replace(tmp, path)
+
+
 def _open(path):
     try:
         with Image.open(path) as im:
@@ -938,11 +966,13 @@ def build_video(prop, images_dir, output_path, voiceover=True, captions=True):
 
         # ── 7. Render → ffmpeg (H.264 + AAC, one encode) ───────────────────────
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        vkbps = _video_kbps_budget(total)
         cmd = ["ffmpeg", "-y", "-loglevel", "error",
                "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
                "-i", audio_path,
                "-map", "0:v", "-map", "1:a",
-               "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+               "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
+               "-maxrate", f"{vkbps}k", "-bufsize", f"{vkbps}k",
                "-profile:v", "high", "-g", str(FPS * 2),
                "-c:a", "copy", "-shortest", "-movflags", "+faststart", output_path]
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
@@ -976,6 +1006,7 @@ def build_video(prop, images_dir, output_path, voiceover=True, captions=True):
         proc.stdin.close()
         if proc.wait() != 0:
             raise RuntimeError("ffmpeg encode failed")
+        _shrink_to_limit(output_path, total, work)
     finally:
         import shutil
         shutil.rmtree(work, ignore_errors=True)

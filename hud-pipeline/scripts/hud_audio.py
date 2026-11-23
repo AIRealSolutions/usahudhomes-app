@@ -613,7 +613,7 @@ def mix_audio(total_sec, out_path, work_dir, voice_clips=None, seed_text="hud"):
     gain = (target - lufs) if lufs is not None else 0.0
     # Fixed gain + a transparent peak limiter (rarely touched, slow release so it can't pump)
     _ffmpeg(["-i", pre, "-af", f"volume={gain:.2f}dB,alimiter=limit=0.89:attack=5:release=200:level=disabled",
-             "-ar", str(SR), "-c:a", "aac", "-b:a", "192k", out_path])
+             "-ar", str(SR), "-c:a", "aac", "-b:a", "128k", out_path])
     return out_path
 
 
