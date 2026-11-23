@@ -40,7 +40,7 @@ Configuration (hardcoded at top of this file):
 
 from __future__ import annotations  # allows `str | None` hints on Python 3.9 (Raspberry Pi)
 
-import os, re, sys, time, json, argparse, tempfile, shutil, traceback
+import os, re, sys, time, json, argparse, tempfile, shutil, traceback, signal, faulthandler
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -429,8 +429,57 @@ def get_duration(path: str) -> float:
         return 0.0
 
 
+# ── Per-job time limit ────────────────────────────────────────────────────────
+# One stuck video must not freeze the whole queue. After this long the job is marked
+# as an error, the exact line it was stuck on is printed, and the worker moves on.
+JOB_TIMEOUT_MIN = float(os.environ.get("HUD_JOB_TIMEOUT_MIN") or 20)
+
+
+class JobTimeout(BaseException):
+    """BaseException so the builder's own `except Exception` fallbacks can't swallow it."""
+
+
+def _on_job_timeout(signum, frame):
+    print(f"\n  ⏱ Job took longer than {JOB_TIMEOUT_MIN:g} min — it was stuck here:", flush=True)
+    faulthandler.dump_traceback(file=sys.stdout, all_threads=False)
+    raise JobTimeout(f"Timed out after {JOB_TIMEOUT_MIN:g} minutes")
+
+
+def requeue_stuck_jobs(sb: Client, older_than_min: float = None):
+    """Jobs left in 'processing' by a worker that was stopped or crashed go back in the queue."""
+    older_than_min = older_than_min or JOB_TIMEOUT_MIN + 5
+    cutoff = datetime.now(timezone.utc).timestamp() - older_than_min * 60
+    cutoff_iso = datetime.fromtimestamp(cutoff, timezone.utc).isoformat()
+    try:
+        res = sb.table("video_jobs").update({"status": "queued", "progress": 0}) \
+            .eq("status", "processing").lt("updated_at", cutoff_iso).execute()
+        n = len(res.data or [])
+        if n:
+            print(f"  ↺ Put {n} stuck job(s) back in the queue")
+    except Exception as e:
+        print(f"  ⚠ Could not check for stuck jobs: {e}")
+
+
 # ── Process a single job ──────────────────────────────────────────────────────
 def process_job(sb: Client, job: dict):
+    use_alarm = hasattr(signal, "SIGALRM")
+    if use_alarm:
+        old = signal.signal(signal.SIGALRM, _on_job_timeout)
+        signal.alarm(int(JOB_TIMEOUT_MIN * 60))
+    try:
+        _process_job(sb, job)
+    except JobTimeout as e:
+        try:
+            mark_error(sb, job["id"], str(e))
+        except Exception as e2:
+            print(f"  ⚠ Could not save the error to the job: {e2}")
+    finally:
+        if use_alarm:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old)
+
+
+def _process_job(sb: Client, job: dict):
     job_id      = job["id"]
     property_id = job["property_id"]
     template_id = job.get("template_id")
@@ -514,7 +563,10 @@ def process_job(sb: Client, job: dict):
         tb = traceback.format_exc()
         print(f"  ❌ Error: {e}")
         print(tb)
-        mark_error(sb, job_id, str(e))
+        try:
+            mark_error(sb, job_id, str(e))
+        except Exception as e2:
+            print(f"  ⚠ Could not save the error to the job: {e2}")
 
 
 # ── Auto-queue (hands-off mode) ──────────────────────────────────────────────
@@ -593,6 +645,8 @@ def main():
     print(f"{'='*60}\n")
 
     states = [s.strip().upper() for s in args.states.split(",") if s.strip()]
+    if not args.job_id:
+        requeue_stuck_jobs(sb)
 
     def run_cycle():
         if args.auto_queue and not args.job_id:
