@@ -222,7 +222,7 @@ def _claude_script(prompt):
     except ImportError:
         print("    ⚠ ANTHROPIC_API_KEY is set but the anthropic package is missing (pip install anthropic)")
         return None
-    client = anthropic.Anthropic(api_key=key)
+    client = anthropic.Anthropic(api_key=key, timeout=60.0, max_retries=1)
     model = _env("CLAUDE_MODEL", "claude-opus-5-5")
     kwargs = dict(
         model=model,
@@ -261,7 +261,7 @@ def _openai_script(prompt):
         return None
     try:
         import openai
-        client = openai.OpenAI(api_key=key)
+        client = openai.OpenAI(api_key=key, timeout=60.0, max_retries=1)
         resp = client.chat.completions.create(
             model=_env("OPENAI_SCRIPT_MODEL", "gpt-4o-mini"),
             messages=[{"role": "user", "content": prompt}],

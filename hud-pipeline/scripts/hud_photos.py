@@ -176,7 +176,7 @@ def _openai_review(cands, prompt):
         return None
     try:
         import openai
-        client = openai.OpenAI(api_key=key)
+        client = openai.OpenAI(api_key=key, timeout=60.0, max_retries=1)
         content = [{"type": "text", "text": prompt}]
         for c in cands:
             content.append({"type": "image_url", "image_url": {
@@ -201,7 +201,7 @@ def _claude_review(cands, prompt):
         import anthropic
     except ImportError:
         return None
-    client = anthropic.Anthropic(api_key=key)
+    client = anthropic.Anthropic(api_key=key, timeout=60.0, max_retries=1)
     content = []
     for c in cands:
         content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",

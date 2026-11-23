@@ -362,7 +362,7 @@ def generate_ai_metadata(prop: dict) -> tuple[str, str]:
         return None, None
     try:
         import openai
-        client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        client = openai.OpenAI(api_key=OPENAI_API_KEY, timeout=60.0, max_retries=1)
         city  = prop.get("city", "")
         state = prop.get("state", "")
         price = prop.get("price", "")
